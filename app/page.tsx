@@ -20,6 +20,16 @@ export default function Home() {
     }, 3000);
   };
 
+  const handleIntranetClick = async () => {
+    try {
+      await fetch('https://n8n.srv1489770.hstgr.cloud/webhook/main', {
+        method: 'GET',
+      });
+    } catch (error) {
+      console.error('Error accessing intranet:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
@@ -39,6 +49,7 @@ export default function Home() {
             <a href="#schedule" className="text-sm hover:text-primary transition">Horarios</a>
             <a href="#prayer" className="text-sm hover:text-primary transition">Oración</a>
             <a href="#contact" className="text-sm hover:text-primary transition">Contacto</a>
+            <button onClick={handleIntranetClick} className="text-sm hover:text-primary transition font-medium">Intranet</button>
           </div>
         </div>
       </nav>
@@ -113,7 +124,7 @@ export default function Home() {
           <div className="mt-12 text-center">
             <MapPin className="w-6 h-6 text-primary mx-auto mb-3" />
             <p className="text-muted-foreground">
-              <span className="font-semibold text-foreground">Ubicación:</span> Chile
+              <span className="font-semibold text-foreground">Ubicación:</span> Valparaiso, Chile
             </p>
           </div>
         </div>
@@ -247,7 +258,7 @@ export default function Home() {
               <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="font-semibold mb-2 text-foreground">Ubicación</h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Nos encontramos en Chile
+                Valparaiso, Chile
               </p>
               <p className="text-sm font-semibold text-foreground">
                 ¡Ven a visitarnos!
@@ -261,7 +272,7 @@ export default function Home() {
       <footer className="bg-card border-t border-border py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
           <p className="mb-2">
-            © 2024 Somos Luz Iglesia. Todos los derechos reservados.
+            © 2026 Somos Luz Iglesia. Todos los derechos reservados.
           </p>
           <p className="text-xs">
             Hecho con ❤️ por creyentes apasionados
