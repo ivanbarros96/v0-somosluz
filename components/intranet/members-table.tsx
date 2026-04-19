@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { useMembers } from '@/lib/members-store';
 import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember } from '@/lib/types';
 
@@ -74,6 +73,14 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
           ))}
           {isAdultoMember(member) && <>
             <div className="rounded-lg border p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Fecha nacimiento</p>
+              <p>{fmt((member as any).fecha_nacimiento)}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Edad</p>
+              <p>{fmt((member as any).edad)}</p>
+            </div>
+            <div className="rounded-lg border p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Bautizado</p>
               <p>{fmt(member.bautizado)}</p>
             </div>
@@ -111,11 +118,11 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
 
 function EditAdultoDialog({ member, open, onClose }: { member: AdultoMember | null; open: boolean; onClose: () => void }) {
   const { updateMember } = useMembers();
-  const [form, setForm] = useState<AdultoMember | null>(null);
+  const [form, setForm] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   useMemo(() => setForm(member ? { ...member } : null), [member]);
   if (!member || !form) return null;
-  const set = <K extends keyof AdultoMember>(k: K, v: AdultoMember[K]) => setForm((p) => p ? { ...p, [k]: v } : p);
+  const set = (k: string, v: any) => setForm((p: any) => p ? { ...p, [k]: v } : p);
   const save = async () => {
     setSaving(true);
     try { await updateMember(member.id, form); onClose(); }
@@ -135,12 +142,12 @@ function EditAdultoDialog({ member, open, onClose }: { member: AdultoMember | nu
             <Select value={form.sexo ?? ''} onValueChange={(v) => set('sexo', v || null)}>
               <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="masculino">Masculino</SelectItem>
-                <SelectItem value="femenino">Femenino</SelectItem>
+                <SelectItem value="Masculino">Masculino</SelectItem>
+                <SelectItem value="Femenino">Femenino</SelectItem>
               </SelectContent>
             </Select></div>
           <div className="grid gap-2"><Label>Bautizado</Label>
-            <Select value={form.bautizado ?? ''} onValueChange={(v) => set('bautizado', (v || null) as AdultoMember['bautizado'])}>
+            <Select value={form.bautizado ?? ''} onValueChange={(v) => set('bautizado', v || null)}>
               <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="si">Sí</SelectItem>
@@ -148,6 +155,10 @@ function EditAdultoDialog({ member, open, onClose }: { member: AdultoMember | nu
                 <SelectItem value="en_proceso">En proceso</SelectItem>
               </SelectContent>
             </Select></div>
+          <div className="grid gap-2"><Label>Fecha nacimiento</Label>
+            <Input value={form.fecha_nacimiento ?? ''} onChange={(e) => set('fecha_nacimiento', e.target.value || null)} placeholder="DD/M/YYYY" /></div>
+          <div className="grid gap-2"><Label>Edad</Label>
+            <Input type="number" min={0} value={form.edad ?? ''} onChange={(e) => set('edad', e.target.value === '' ? null : Number(e.target.value))} /></div>
           <div className="grid gap-2"><Label>Teléfono</Label>
             <Input value={form.telefono ?? ''} onChange={(e) => set('telefono', e.target.value || null)} /></div>
           <div className="grid gap-2"><Label>WhatsApp</Label>
@@ -155,7 +166,7 @@ function EditAdultoDialog({ member, open, onClose }: { member: AdultoMember | nu
           <div className="grid gap-2"><Label>Email</Label>
             <Input type="email" value={form.email ?? ''} onChange={(e) => set('email', e.target.value || null)} /></div>
           <div className="grid gap-2"><Label>Tiempo conversión</Label>
-            <Input value={form.tiempo_conversion ?? ''} onChange={(e) => set('tiempo_conversion', e.target.value || null)} /></div>
+            <Input value={form.tiempo_conversion ?? ''} onChange={(e) => set('tiempo_conversion', e.target.value || null)} placeholder="Ej: 16 Años" /></div>
           <div className="grid gap-2"><Label>Región</Label>
             <Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value || null)} /></div>
           <div className="grid gap-2"><Label>Comuna</Label>
@@ -195,19 +206,17 @@ function EditNinoDialog({ member, open, onClose }: { member: NinoMember | null; 
           <div className="md:col-span-2 grid gap-2"><Label>Nombre</Label>
             <Input value={form.nombre} onChange={(e) => set('nombre', e.target.value)} /></div>
           <div className="grid gap-2"><Label>Fecha nacimiento</Label>
-            <Input type="date" value={form.fecha_nacimiento ?? ''} onChange={(e) => set('fecha_nacimiento', e.target.value || null)} /></div>
+            <Input value={form.fecha_nacimiento ?? ''} onChange={(e) => set('fecha_nacimiento', e.target.value || null)} placeholder="DD/M/YYYY" /></div>
           <div className="grid gap-2"><Label>Edad</Label>
             <Input type="number" min={0} value={form.edad ?? ''} onChange={(e) => set('edad', e.target.value === '' ? null : Number(e.target.value))} /></div>
           <div className="grid gap-2"><Label>Sexo</Label>
             <Select value={form.sexo ?? ''} onValueChange={(v) => set('sexo', v || null)}>
               <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="masculino">Masculino</SelectItem>
-                <SelectItem value="femenino">Femenino</SelectItem>
+                <SelectItem value="Masculino">Masculino</SelectItem>
+                <SelectItem value="Femenino">Femenino</SelectItem>
               </SelectContent>
             </Select></div>
-          <div className="grid gap-2"><Label>Fecha registro</Label>
-            <Input type="date" value={form.fecha_registro ?? ''} onChange={(e) => set('fecha_registro', e.target.value || null)} /></div>
           <div className="grid gap-2"><Label>Nombre apoderado</Label>
             <Input value={form.nombre_apoderado ?? ''} onChange={(e) => set('nombre_apoderado', e.target.value || null)} /></div>
           <div className="grid gap-2"><Label>Teléfono apoderado</Label>
