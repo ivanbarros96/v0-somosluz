@@ -4,26 +4,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MapPin, Clock, Instagram, MessageCircle, Lock, User, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Instagram, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 export default function Home() {
   const [prayerForm, setPrayerForm] = useState({ name: '', email: '', prayer: '' });
   const [submitted, setSubmitted] = useState(false);
-
-  const [intranetOpen, setIntranetOpen] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
 
   const handlePrayerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,34 +18,6 @@ export default function Home() {
       setPrayerForm({ name: '', email: '', prayer: '' });
       setSubmitted(false);
     }, 3000);
-  };
-
-  const handleIntranetLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginLoading(true);
-    setLoginError('');
-
-    try {
-      const response = await fetch('https://n8n.srv1489770.hstgr.cloud/webhook/main', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: loginForm.username,
-          password: loginForm.password,
-        }),
-      });
-
-      if (response.ok) {
-        setIntranetOpen(false);
-        setLoginForm({ username: '', password: '' });
-      } else {
-        setLoginError('Credenciales incorrectas. Intenta de nuevo.');
-      }
-    } catch {
-      setLoginError('Error de conexión. Intenta más tarde.');
-    } finally {
-      setLoginLoading(false);
-    }
   };
 
   return (
@@ -81,12 +39,12 @@ export default function Home() {
             <a href="#schedule" className="text-sm hover:text-primary transition">Horarios</a>
             <a href="#prayer" className="text-sm hover:text-primary transition">Oración</a>
             <a href="#contact" className="text-sm hover:text-primary transition">Contacto</a>
-            <button
-              onClick={() => setIntranetOpen(true)}
+            <Link
+              href="/intranet"
               className="text-sm hover:text-primary transition font-medium"
             >
               Intranet
-            </button>
+            </Link>
           </div>
         </div>
       </nav>
@@ -317,73 +275,6 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* Intranet Login Modal */}
-      <Dialog open={intranetOpen} onOpenChange={setIntranetOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center items-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Lock className="h-7 w-7 text-primary" />
-          </div>
-          <DialogTitle className="text-xl">Acceso Intranet</DialogTitle>
-          <DialogDescription>
-            Ingresa tus credenciales para acceder al área interna de Somos Luz.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleIntranetLogin} className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="username">Usuario</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="username"
-                type="text"
-                placeholder="Tu usuario"
-                className="pl-9"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                className="pl-9"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          {loginError && (
-            <p className="text-sm text-destructive text-center">{loginError}</p>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full bg-primary hover:bg-primary/90"
-            disabled={loginLoading}
-          >
-            {loginLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Ingresando...
-              </>
-            ) : (
-              'Ingresar'
-            )}
-          </Button>
-        </form>
-      </DialogContent>
-      </Dialog >
-    </div >
+    </div>
   );
 }
