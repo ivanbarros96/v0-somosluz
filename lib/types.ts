@@ -34,6 +34,8 @@ export interface AdultoMember extends PersonaBase {
   tipo: 'adulto';
   bautizado: BautizadoStatus;
   tiempo_conversion: string | null;
+  fecha_nacimiento: string | null;  // ✅ AGREGADO
+  edad: number | null;              // ✅ AGREGADO
 }
 
 export interface NinoMember extends PersonaBase {

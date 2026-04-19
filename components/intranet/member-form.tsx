@@ -64,13 +64,12 @@ function emptyForm() {
     codTel: '+56', telefono: '',
     codWa: '+56', whatsapp: '',
     email: '',
+    email_apoderado: '',
     region: '', comuna: '',
     direccion: '',
     bautizado: false,
     convNum: '', convUnidad: '',
     dia: '', mes: '', anio: '',
-    nombre_apoderado: '',
-    telefono_apoderado: '',
   };
 }
 
@@ -108,6 +107,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
+  // ✅ Para mostrar datos del apoderado encontrado
+  const [apoderadoEncontrado, setApoderadoEncontrado] = useState<{ nombre: string; telefono: string | null } | null>(null);
+  const [buscandoApoderado, setBuscandoApoderado] = useState(false);
 
   useEffect(() => {
     if (!member) { setForm(emptyForm()); return; }
@@ -118,53 +120,41 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       codTel: tel.code, telefono: tel.num,
       codWa: '+56', whatsapp: '',
       email: member.email ?? '',
+      email_apoderado: '',
       region: member.region ?? '',
       comuna: member.comuna ?? '',
       direccion: member.direccion ?? '',
       bautizado: false,
       convNum: '', convUnidad: '',
       dia: '', mes: '', anio: '',
-      nombre_apoderado: '',
-      telefono_apoderado: '',
     };
 
     if (member.tipo === 'adulto') {
       const a = member as AdultoMember;
-
-      // WhatsApp
       const wa = parseTelefono(a.whatsapp);
       base.codWa = wa.code;
       base.whatsapp = wa.num;
-
-      // Bautizado
       base.bautizado = a.bautizado === 'si';
-
-      // Tiempo conversión
       const conv = parseTiempoConversion(a.tiempo_conversion);
       base.convNum = conv.num;
       base.convUnidad = conv.unidad;
-
-      // ✅ Fecha nacimiento adulto
-      const fechaAdulto = (a as any).fecha_nacimiento ?? null;
-      if (fechaAdulto) {
-        const [d, m, an] = fechaAdulto.split('/');
-        base.dia = d ?? '';
-        base.mes = m ?? '';
-        base.anio = an ?? '';
+      if (a.fecha_nacimiento) {
+        const parts = a.fecha_nacimiento.split('/');
+        base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
+        base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
+        base.anio = parts[2] ?? '';
       }
     }
 
     if (member.tipo === 'nino') {
       const n = member as NinoMember;
       if (n.fecha_nacimiento) {
-        const [d, m, a] = n.fecha_nacimiento.split('/');
-        base.dia = d ?? '';
-        base.mes = m ?? '';
-        base.anio = a ?? '';
+        const parts = n.fecha_nacimiento.split('/');
+        base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
+        base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
+        base.anio = parts[2] ?? '';
       }
-      base.nombre_apoderado = n.nombre_apoderado ?? '';
-      const apo = parseTelefono(n.telefono_apoderado);
-      base.telefono_apoderado = apo.num;
+      base.email_apoderado = n.email ?? '';
     }
 
     setForm(base);
@@ -177,31 +167,74 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     setForm((f) => ({ ...f, region: val, comuna: '' }));
   };
 
+  // ✅ Buscar apoderado al salir del campo email
+  const buscarApoderado = async (email: string) => {
+    if (!email.trim()) { setApoderadoEncontrado(null); return; }
+    setBuscandoApoderado(true);
+    const { data } = await supabase
+      .from('personas')
+      .select('nombre, telefono')
+      .eq('source_tipo', 'adulto')
+      .eq('email', email.trim().toLowerCase())
+      .single();
+    setBuscandoApoderado(false);
+    setApoderadoEncontrado(data ? { nombre: data.nombre, telefono: data.telefono } : null);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(''); setOk(false);
+
     if (!form.nombre.trim()) { setError('El nombre es obligatorio.'); return; }
     if (modo !== 'nuevo' && !form.sexo) { setError('Selecciona el sexo.'); return; }
-    if (modo === 'nino' && !form.nombre_apoderado.trim()) { setError('El nombre del apoderado es obligatorio.'); return; }
+
+    if ((modo === 'adulto' || modo === 'nuevo') && !form.email.trim()) {
+      setError('El correo electrónico es obligatorio.'); return;
+    }
+
+    if (modo === 'nino' && !form.email_apoderado.trim()) {
+      setError('El email del apoderado es obligatorio.'); return;
+    }
 
     setLoading(true);
     try {
+      // ✅ MODO NUEVO → guardar en miembros_nuevos
+      if (modo === 'nuevo') {
+        const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
+        const { error: insertError } = await supabase
+          .from('miembros_nuevos')
+          .insert({
+            nombre: form.nombre.trim(),
+            telefono: telFull,
+            email: form.email.trim().toLowerCase(),
+            fecha_registro: new Date().toISOString(),
+          });
+        if (insertError) throw new Error(insertError.message);
+        setOk(true);
+        setForm(emptyForm());
+        onSuccess?.();
+        return;
+      }
+
       const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
       const waFull = form.whatsapp
         ? `${form.codWa} ${form.whatsapp}`
-        : form.telefono
-          ? `${form.codTel} ${form.telefono}`
-          : null;
+        : form.telefono ? `${form.codTel} ${form.telefono}` : null;
       const convFull = (form.convNum && form.convUnidad)
         ? `${form.convNum} ${form.convUnidad}` : null;
 
-      if (form.email.trim()) {
-        const { data: existing } = await supabase
+      // ✅ Verificar email duplicado adulto
+      // ✅ Solo verifica duplicado si es adulto Y no es edición del mismo registro
+      if (modo === 'adulto' && form.email.trim()) {
+        const query = supabase
           .from('personas')
           .select('id, nombre')
-          .eq('email', form.email.trim().toLowerCase())
-          .neq('id', member?.id ?? 0)
-          .single();
+          .eq('source_tipo', 'adulto')
+          .eq('email', form.email.trim().toLowerCase());
+
+        if (member?.id) query.neq('id', member.id);
+
+        const { data: existing } = await query.single();
         if (existing) {
           setError(`Este email ya está registrado para: ${existing.nombre}`);
           setLoading(false);
@@ -209,49 +242,73 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         }
       }
 
-      const fecha = (form.dia && form.mes && form.anio)
-        ? `${form.dia}/${form.mes}/${form.anio}` : null;
-      const edad = (form.dia && form.mes && form.anio)
-        ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
-
+      // ✅ Niño: verificar que el email del apoderado exista como adulto
       if (modo === 'nino') {
+        const { data: apoderado } = await supabase
+          .from('personas')
+          .select('id, nombre, telefono')
+          .eq('source_tipo', 'adulto')
+          .eq('email', form.email_apoderado.trim().toLowerCase())
+          .single();
+
+        if (!apoderado) {
+          setError('No se encontró ningún adulto registrado con ese email. Registra primero al apoderado.');
+          setLoading(false);
+          return;
+        }
+
+        const fecha = (form.dia && form.mes && form.anio)
+          ? `${form.dia}/${form.mes}/${form.anio}` : null;
+        const edad = (form.dia && form.mes && form.anio)
+          ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
+
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
           tipo: 'nino',
           source_id: member?.source_id ?? undefined,
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),
           sexo: form.sexo || null,
-          telefono: telFull,
+          telefono: null,
           whatsapp: null,
+          // ✅ Después
           email: null,
           region: null, comuna: null, direccion: null,
           fecha_nacimiento: fecha,
           edad,
-          nombre_apoderado: form.nombre_apoderado.trim() || null,
-          telefono_apoderado: form.telefono_apoderado
-            ? `${form.codTel} ${form.telefono_apoderado}` : null,
+          // ✅ Rellenar automáticamente con datos del apoderado encontrado
+          nombre_apoderado: apoderado.nombre,
+          telefono_apoderado: apoderado.telefono,
         };
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
-      } else {
-        const data: Omit<AdultoMember, 'id' | 'created_at'> = {
-          tipo: 'adulto',
-          source_id: member?.source_id ?? undefined,
-          fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
-          nombre: form.nombre.trim(),
-          sexo: modo === 'nuevo' ? null : form.sexo || null,
-          telefono: telFull,
-          whatsapp: waFull,
-          email: form.email.trim() || null,
-          region: form.region || null,
-          comuna: form.comuna || null,
-          direccion: form.direccion.trim() || null,
-          bautizado: form.bautizado ? 'si' : 'no',
-          tiempo_conversion: convFull,
-          fecha_nacimiento: fecha,
-          edad,
-        } as any;
-        isEditing ? await updateMember(member!.id, data) : await addMember(data);
+        setOk(true);
+        if (!isEditing) setForm(emptyForm());
+        onSuccess?.();
+        return;
       }
+
+      const fecha = (form.dia && form.mes && form.anio)
+        ? `${form.dia}/${form.mes}/${form.anio}` : null;
+      const edad = (form.dia && form.mes && form.anio)
+        ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
+
+      const data: Omit<AdultoMember, 'id' | 'created_at'> = {
+        tipo: 'adulto',
+        source_id: member?.source_id ?? undefined,
+        fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
+        nombre: form.nombre.trim(),
+        sexo: form.sexo || null,
+        telefono: telFull,
+        whatsapp: waFull,
+        email: form.email.trim().toLowerCase() || null,
+        region: form.region || null,
+        comuna: form.comuna || null,
+        direccion: form.direccion.trim() || null,
+        bautizado: form.bautizado ? 'si' : 'no',
+        tiempo_conversion: convFull,
+        fecha_nacimiento: fecha,
+        edad,
+      };
+      isEditing ? await updateMember(member!.id, data) : await addMember(data);
 
       setOk(true);
       if (!isEditing) setForm(emptyForm());
@@ -269,7 +326,11 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     <form onSubmit={handleSubmit} className="space-y-5">
 
       {!isEditing && (
-        <Tabs value={modo} onValueChange={(v) => { setModo(v as Modo); setError(''); setOk(false); }}>
+        <Tabs value={modo} onValueChange={(v) => {
+          setModo(v as Modo);
+          setError(''); setOk(false);
+          setApoderadoEncontrado(null);
+        }}>
           <TabsList className="w-full">
             <TabsTrigger value="adulto" className="flex-1">👤 Adulto</TabsTrigger>
             <TabsTrigger value="nino" className="flex-1">🧒 Niño / Joven</TabsTrigger>
@@ -281,7 +342,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
-            {modo === 'nino' ? 'Datos del Niño / Joven' : 'Datos Personales'}
+            {modo === 'nino' ? 'Datos del Niño / Joven' : modo === 'nuevo' ? 'Datos del Visitante' : 'Datos Personales'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -365,7 +426,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                     </Select>
                   </div>
                 </div>
-
                 <div className="space-y-1">
                   <Label>¿Bautizado/a?</Label>
                   <div
@@ -388,36 +448,38 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
+          {/* ✅ Niño: solo email apoderado con búsqueda automática */}
           {modo === 'nino' && (
-            <div className="border-t pt-4 space-y-4">
-              <p className="text-xs uppercase tracking-widest font-semibold text-purple-700">
-                Datos del Apoderado
-              </p>
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-xs uppercase tracking-widest font-semibold text-purple-700">Apoderado</p>
               <div className="space-y-1">
-                <Label>Nombre del Apoderado <span className="text-red-500">*</span></Label>
+                <Label>Email del Apoderado <span className="text-red-500">*</span></Label>
                 <Input
-                  value={form.nombre_apoderado}
-                  onChange={(e) => set('nombre_apoderado', e.target.value)}
-                  placeholder="Ej: Juan Carlos García"
+                  type="email"
+                  value={form.email_apoderado}
+                  onChange={(e) => {
+                    set('email_apoderado', e.target.value);
+                    setApoderadoEncontrado(null);
+                  }}
+                  onBlur={(e) => buscarApoderado(e.target.value)}
+                  placeholder="correo@apoderado.com"
                 />
-              </div>
-              <div className="space-y-1">
-                <Label>Teléfono del Apoderado</Label>
-                <div className="flex gap-2">
-                  <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
-                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={form.telefono_apoderado}
-                    onChange={(e) => set('telefono_apoderado', e.target.value)}
-                    placeholder="9 1234 5678"
-                    className="flex-1"
-                    inputMode="tel"
-                  />
-                </div>
+                {buscandoApoderado && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Buscando apoderado...
+                  </p>
+                )}
+                {apoderadoEncontrado && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs">
+                    ✓ Apoderado encontrado: <span className="font-semibold">{apoderadoEncontrado.nombre}</span>
+                    {apoderadoEncontrado.telefono && <span>— {apoderadoEncontrado.telefono}</span>}
+                  </div>
+                )}
+                {!buscandoApoderado && form.email_apoderado && !apoderadoEncontrado && (
+                  <p className="text-xs text-amber-600">
+                    ⚠ No se encontró adulto con ese email. Regístralo primero.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -425,34 +487,35 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* ✅ Contacto solo para adulto y nuevo, NO para niño */}
+      {(modo === 'adulto' || modo === 'nuevo') && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
 
-          <div className="space-y-1">
-            <Label>Teléfono</Label>
-            <div className="flex gap-2">
-              <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input
-                value={form.telefono}
-                onChange={(e) => set('telefono', e.target.value)}
-                placeholder="9 1234 5678"
-                className="flex-1"
-                inputMode="tel"
-              />
-            </div>
-          </div>
-
-          {(modo === 'adulto' || modo === 'nuevo') && (
             <div className="space-y-1">
-              <Label>Email</Label>
+              <Label>Teléfono</Label>
+              <div className="flex gap-2">
+                <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={form.telefono}
+                  onChange={(e) => set('telefono', e.target.value)}
+                  placeholder="9 1234 5678"
+                  className="flex-1"
+                  inputMode="tel"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Email <span className="text-red-500">*</span></Label>
               <Input
                 type="email"
                 value={form.email}
@@ -460,75 +523,75 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                 placeholder="correo@ejemplo.com"
               />
             </div>
-          )}
 
-          {modo === 'adulto' && (
-            <>
-              <div className="space-y-1">
-                <Label>WhatsApp</Label>
-                <div className="flex gap-2">
-                  <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
-                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={form.whatsapp}
-                    onChange={(e) => set('whatsapp', e.target.value)}
-                    placeholder="9 1234 5678"
-                    className="flex-1"
-                    inputMode="tel"
-                  />
-                </div>
-              </div>
-
-              <div className="border-t pt-4 space-y-4">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label>Región</Label>
-                    <Select value={form.region} onValueChange={handleRegionChange}>
-                      <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(REGIONES).map((r) => (
-                          <SelectItem key={r} value={r}>{r}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Comuna</Label>
-                    <Select
-                      value={form.comuna}
-                      onValueChange={(v) => set('comuna', v)}
-                      disabled={!form.region}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {comunas.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+            {modo === 'adulto' && (
+              <>
                 <div className="space-y-1">
-                  <Label>Dirección</Label>
-                  <Input
-                    value={form.direccion}
-                    onChange={(e) => set('direccion', e.target.value)}
-                    placeholder="Ej: Av. Brasil 1234"
-                  />
+                  <Label>WhatsApp</Label>
+                  <div className="flex gap-2">
+                    <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
+                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={form.whatsapp}
+                      onChange={(e) => set('whatsapp', e.target.value)}
+                      placeholder="9 1234 5678"
+                      className="flex-1"
+                      inputMode="tel"
+                    />
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
 
-        </CardContent>
-      </Card>
+                <div className="border-t pt-4 space-y-4">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Región</Label>
+                      <Select value={form.region} onValueChange={handleRegionChange}>
+                        <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(REGIONES).map((r) => (
+                            <SelectItem key={r} value={r}>{r}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Comuna</Label>
+                      <Select
+                        value={form.comuna}
+                        onValueChange={(v) => set('comuna', v)}
+                        disabled={!form.region}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {comunas.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Dirección</Label>
+                    <Input
+                      value={form.direccion}
+                      onChange={(e) => set('direccion', e.target.value)}
+                      placeholder="Ej: Av. Brasil 1234"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -537,7 +600,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       )}
       {ok && !isEditing && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-          ✓ Miembro registrado exitosamente
+          ✓ {modo === 'nuevo' ? 'Visitante registrado en miembros nuevos' : 'Miembro registrado exitosamente'}
         </div>
       )}
 
@@ -554,7 +617,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             : modo === 'nino'
               ? 'Registrar Niño/Joven ✓'
               : modo === 'nuevo'
-                ? 'Registrar Visita ✓'
+                ? 'Registrar Visitante ✓'
                 : 'Registrar Miembro ✓'}
         </Button>
       </div>
