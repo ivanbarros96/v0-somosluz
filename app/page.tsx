@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mail, MapPin, Clock, Instagram, MessageCircle } from 'lucide-react';
+import { MapPin, Clock, Instagram, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Home() {
@@ -18,16 +18,6 @@ export default function Home() {
       setPrayerForm({ name: '', email: '', prayer: '' });
       setSubmitted(false);
     }, 3000);
-  };
-
-  const handleIntranetClick = async () => {
-    try {
-      await fetch('https://n8n.srv1489770.hstgr.cloud/webhook/main', {
-        method: 'GET',
-      });
-    } catch (error) {
-      console.error('Error accessing intranet:', error);
-    }
   };
 
   return (
@@ -49,7 +39,12 @@ export default function Home() {
             <a href="#schedule" className="text-sm hover:text-primary transition">Horarios</a>
             <a href="#prayer" className="text-sm hover:text-primary transition">Oración</a>
             <a href="#contact" className="text-sm hover:text-primary transition">Contacto</a>
-            <button onClick={handleIntranetClick} className="text-sm hover:text-primary transition font-medium">Intranet</button>
+            <Link
+              href="/intranet"
+              className="text-sm hover:text-primary transition font-medium"
+            >
+              Intranet
+            </Link>
           </div>
         </div>
       </nav>
@@ -220,13 +215,13 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-12 text-foreground">
             Conecta con Nosotros
           </h2>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <Instagram className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="font-semibold mb-2 text-foreground">Instagram</h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Síguenos para inspiración diaria y actualizaciones
+                Siguenos para inspiracion diaria y actualizaciones
               </p>
               <a
                 href="https://www.instagram.com/somosluz.iglesia/"
@@ -234,7 +229,7 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className="inline-block text-primary hover:underline text-sm font-semibold"
               >
-                @somosluz.iglesia →
+                @somosluz.iglesia
               </a>
             </div>
 
@@ -242,7 +237,7 @@ export default function Home() {
               <MessageCircle className="w-12 h-12 text-accent mx-auto mb-4" />
               <h3 className="font-semibold mb-2 text-foreground">WhatsApp</h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Contáctanos por mensajes directos
+                Contactanos por mensajes directos
               </p>
               <a
                 href="https://wa.me/?text=Hola%20Somos%20Luz"
@@ -250,18 +245,18 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className="inline-block text-accent hover:underline text-sm font-semibold"
               >
-                Enviar mensaje →
+                Enviar mensaje
               </a>
             </div>
 
             <div className="text-center">
               <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="font-semibold mb-2 text-foreground">Ubicación</h3>
+              <h3 className="font-semibold mb-2 text-foreground">Ubicacion</h3>
               <p className="text-muted-foreground text-sm mb-4">
                 Valparaiso, Chile
               </p>
               <p className="text-sm font-semibold text-foreground">
-                ¡Ven a visitarnos!
+                Ven a visitarnos!
               </p>
             </div>
           </div>
@@ -275,10 +270,11 @@ export default function Home() {
             © 2026 Somos Luz Iglesia. Todos los derechos reservados.
           </p>
           <p className="text-xs">
-            Hecho con ❤️ por creyentes apasionados
+            Hecho con amor por creyentes apasionados
           </p>
         </div>
       </footer>
+
     </div>
   );
 }
