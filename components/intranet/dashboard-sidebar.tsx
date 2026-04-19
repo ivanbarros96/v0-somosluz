@@ -5,9 +5,13 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, LogOut, Home, Settings, Shield, User, ClipboardList, UserCheck } from 'lucide-react';
+import { Users, LogOut, Home, Settings, Shield, User, ClipboardList, UserCheck, X } from 'lucide-react';
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  onClose?: () => void;
+}
+
+export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -18,10 +22,15 @@ export function DashboardSidebar() {
 
   const isAdmin = user?.role === 'admin';
 
+  const handleNav = (href: string) => {
+    router.push(href);
+    onClose?.();
+  };
+
   return (
     <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-border">
+      <div className="p-6 border-b border-border flex items-center justify-between">
         <Image
           src="/logo.png"
           alt="Somos Luz"
@@ -29,12 +38,21 @@ export function DashboardSidebar() {
           height={60}
           className="mx-auto"
         />
+        {/* Botón cerrar solo en móvil */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden p-1 rounded-md hover:bg-secondary transition ml-2"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* User info */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             {isAdmin ? (
               <Shield className="w-5 h-5 text-primary" />
             ) : (
@@ -56,51 +74,50 @@ export function DashboardSidebar() {
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           <li>
-            <a
-              href="/intranet/dashboard"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+            <button
+              onClick={() => handleNav('/intranet/dashboard')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
             >
               <Home className="w-4 h-4" />
               Inicio
-            </a>
+            </button>
           </li>
           <li>
-            <a
-              href="/intranet/dashboard/registro"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+            <button
+              onClick={() => handleNav('/intranet/dashboard/registro')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
             >
               <ClipboardList className="w-4 h-4" />
               Registro
-            </a>
+            </button>
           </li>
           <li>
-            <a
-              href="/intranet/dashboard/members"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+            <button
+              onClick={() => handleNav('/intranet/dashboard/members')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
             >
               <Users className="w-4 h-4" />
               Miembros
-            </a>
+            </button>
           </li>
-          {/* ← NUEVO */}
           <li>
-            <a
-              href="/intranet/dashboard/asistencia"
-              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+            <button
+              onClick={() => handleNav('/intranet/dashboard/asistencia')}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
             >
               <UserCheck className="w-4 h-4" />
               Asistencia
-            </a>
+            </button>
           </li>
           {isAdmin && (
             <li>
-              <a
-                href="/intranet/dashboard/settings"
-                className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+              <button
+                onClick={() => handleNav('/intranet/dashboard/settings')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
               >
                 <Settings className="w-4 h-4" />
                 Configuracion
-              </a>
+              </button>
             </li>
           )}
         </ul>
