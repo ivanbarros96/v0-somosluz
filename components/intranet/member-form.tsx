@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -128,33 +127,52 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       nombre_apoderado: '',
       telefono_apoderado: '',
     };
+
     if (member.tipo === 'adulto') {
       const a = member as AdultoMember;
+
+      // WhatsApp
       const wa = parseTelefono(a.whatsapp);
       base.codWa = wa.code;
       base.whatsapp = wa.num;
+
+      // Bautizado
       base.bautizado = a.bautizado === 'si';
+
+      // Tiempo conversión
       const conv = parseTiempoConversion(a.tiempo_conversion);
       base.convNum = conv.num;
       base.convUnidad = conv.unidad;
+
+      // ✅ Fecha nacimiento adulto
+      const fechaAdulto = (a as any).fecha_nacimiento ?? null;
+      if (fechaAdulto) {
+        const [d, m, an] = fechaAdulto.split('/');
+        base.dia = d ?? '';
+        base.mes = m ?? '';
+        base.anio = an ?? '';
+      }
     }
+
     if (member.tipo === 'nino') {
       const n = member as NinoMember;
       if (n.fecha_nacimiento) {
         const [d, m, a] = n.fecha_nacimiento.split('/');
-        base.dia = d ?? ''; base.mes = m ?? ''; base.anio = a ?? '';
+        base.dia = d ?? '';
+        base.mes = m ?? '';
+        base.anio = a ?? '';
       }
       base.nombre_apoderado = n.nombre_apoderado ?? '';
       const apo = parseTelefono(n.telefono_apoderado);
       base.telefono_apoderado = apo.num;
     }
+
     setForm(base);
   }, [member]);
 
   const set = (key: string, val: string | boolean) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  // Cuando cambia región, resetea comuna
   const handleRegionChange = (val: string) => {
     setForm((f) => ({ ...f, region: val, comuna: '' }));
   };
@@ -176,7 +194,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           : null;
       const convFull = (form.convNum && form.convUnidad)
         ? `${form.convNum} ${form.convUnidad}` : null;
-      // Validar email duplicado antes de guardar
+
       if (form.email.trim()) {
         const { data: existing } = await supabase
           .from('personas')
@@ -184,18 +202,19 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           .eq('email', form.email.trim().toLowerCase())
           .neq('id', member?.id ?? 0)
           .single();
-
         if (existing) {
           setError(`Este email ya está registrado para: ${existing.nombre}`);
           setLoading(false);
           return;
         }
       }
+
+      const fecha = (form.dia && form.mes && form.anio)
+        ? `${form.dia}/${form.mes}/${form.anio}` : null;
+      const edad = (form.dia && form.mes && form.anio)
+        ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
+
       if (modo === 'nino') {
-        const fecha = (form.dia && form.mes && form.anio)
-          ? `${form.dia}/${form.mes}/${form.anio}` : null;
-        const edad = (form.dia && form.mes && form.anio)
-          ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
           tipo: 'nino',
           source_id: member?.source_id ?? undefined,
@@ -214,12 +233,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         };
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
       } else {
-        const fecha = (form.dia && form.mes && form.anio)
-          ? `${form.dia}/${form.mes}/${form.anio}` : null;
-        const edad = (form.dia && form.mes && form.anio)
-          ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
-
-
         const data: Omit<AdultoMember, 'id' | 'created_at'> = {
           tipo: 'adulto',
           source_id: member?.source_id ?? undefined,
@@ -234,8 +247,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           direccion: form.direccion.trim() || null,
           bautizado: form.bautizado ? 'si' : 'no',
           tiempo_conversion: convFull,
-          fecha_nacimiento: fecha,   // ← AGREGAR
-          edad,                       // ← AGREGAR
+          fecha_nacimiento: fecha,
+          edad,
         } as any;
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
       }
@@ -255,7 +268,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
-      {/* Toggle modo */}
       {!isEditing && (
         <Tabs value={modo} onValueChange={(v) => { setModo(v as Modo); setError(''); setOk(false); }}>
           <TabsList className="w-full">
@@ -266,7 +278,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </Tabs>
       )}
 
-      {/* Datos personales */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -275,7 +286,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
 
-          {/* Nombre */}
           <div className="space-y-1">
             <Label>Nombre Completo <span className="text-red-500">*</span></Label>
             <Input
@@ -285,7 +295,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             />
           </div>
 
-          {/* Fecha nacimiento — adulto y niño, no nuevo */}
           {modo !== 'nuevo' && (
             <div className="space-y-1">
               <Label>Fecha de Nacimiento</Label>
@@ -312,7 +321,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {/* Sexo — no en nuevo */}
           {modo !== 'nuevo' && (
             <div className="space-y-1">
               <Label>Sexo <span className="text-red-500">*</span></Label>
@@ -333,13 +341,10 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {/* Fe y comunidad — solo adulto */}
           {modo === 'adulto' && (
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Fe y Comunidad</p>
               <div className="grid grid-cols-2 gap-4">
-
-                {/* Tiempo conversión — 2 selects */}
                 <div className="space-y-1">
                   <Label>Tiempo de Conversión</Label>
                   <div className="grid grid-cols-2 gap-2">
@@ -361,16 +366,15 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   </div>
                 </div>
 
-                {/* Bautizado */}
                 <div className="space-y-1">
                   <Label>¿Bautizado/a?</Label>
                   <div
                     onClick={() => set('bautizado', !form.bautizado)}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors select-none
-    ${form.bautizado ? 'bg-primary/10 border-primary' : 'bg-muted border-border'}`}
+                      ${form.bautizado ? 'bg-primary/10 border-primary' : 'bg-muted border-border'}`}
                   >
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0
-    ${form.bautizado ? 'bg-primary border-primary' : 'bg-white border-border'}`}>
+                      ${form.bautizado ? 'bg-primary border-primary' : 'bg-white border-border'}`}>
                       {form.bautizado && (
                         <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
                           <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -384,7 +388,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {/* Apoderado — solo niño */}
           {modo === 'nino' && (
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest font-semibold text-purple-700">
@@ -422,7 +425,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardContent>
       </Card>
 
-      {/* Contacto */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
@@ -448,6 +450,18 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           </div>
 
+          {(modo === 'adulto' || modo === 'nuevo') && (
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => set('email', e.target.value)}
+                placeholder="correo@ejemplo.com"
+              />
+            </div>
+          )}
+
           {modo === 'adulto' && (
             <>
               <div className="space-y-1">
@@ -468,79 +482,54 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set('email', e.target.value)}
-                  placeholder="correo@ejemplo.com"
-                />
+
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Región</Label>
+                    <Select value={form.region} onValueChange={handleRegionChange}>
+                      <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(REGIONES).map((r) => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Comuna</Label>
+                    <Select
+                      value={form.comuna}
+                      onValueChange={(v) => set('comuna', v)}
+                      disabled={!form.region}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {comunas.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Dirección</Label>
+                  <Input
+                    value={form.direccion}
+                    onChange={(e) => set('direccion', e.target.value)}
+                    placeholder="Ej: Av. Brasil 1234"
+                  />
+                </div>
               </div>
             </>
-          )}
-
-          {modo === 'nuevo' && (
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                placeholder="correo@ejemplo.com"
-              />
-            </div>
-          )}
-
-          {/* Ubicación con selects de regiones/comunas — solo adulto */}
-          {modo === 'adulto' && (
-            <div className="border-t pt-4 space-y-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Región</Label>
-                  <Select value={form.region} onValueChange={handleRegionChange}>
-                    <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(REGIONES).map((r) => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Comuna</Label>
-                  <Select
-                    value={form.comuna}
-                    onValueChange={(v) => set('comuna', v)}
-                    disabled={!form.region}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {comunas.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label>Dirección</Label>
-                <Input
-                  value={form.direccion}
-                  onChange={(e) => set('direccion', e.target.value)}
-                  placeholder="Ej: Av. Brasil 1234"
-                />
-              </div>
-            </div>
           )}
 
         </CardContent>
       </Card>
 
-      {/* Mensajes */}
       {error && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
           ⚠ {error}
@@ -552,7 +541,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </div>
       )}
 
-      {/* Botones */}
       <div className="flex gap-3">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} className="flex-1">

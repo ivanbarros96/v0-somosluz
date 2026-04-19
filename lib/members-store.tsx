@@ -48,6 +48,8 @@ function mapToMember(row: any): Member {
     tipo: 'adulto',
     bautizado: row.bautizado ?? null,
     tiempo_conversion: row.tiempo_conversion ?? null,
+    fecha_nacimiento: row.fecha_nacimiento ?? null, // ✅ fix
+    edad: row.edad ?? null,                          // ✅ fix
   } as AdultoMember;
 }
 
