@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, LogOut, Home, Settings, Shield, User, ClipboardList } from 'lucide-react';
+import { Users, LogOut, Home, Settings, Shield, User, ClipboardList, UserCheck } from 'lucide-react';
 
 export function DashboardSidebar() {
   const { user, logout } = useAuth();
@@ -80,6 +80,16 @@ export function DashboardSidebar() {
             >
               <Users className="w-4 h-4" />
               Miembros
+            </a>
+          </li>
+          {/* ← NUEVO */}
+          <li>
+            <a
+              href="/intranet/dashboard/asistencia"
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+            >
+              <UserCheck className="w-4 h-4" />
+              Asistencia
             </a>
           </li>
           {isAdmin && (
