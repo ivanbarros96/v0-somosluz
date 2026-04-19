@@ -263,62 +263,62 @@ export default function Home() {
               <Instagram className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="font-semibold mb-2 text-foreground">Instagram</h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Síguenos para inspiración diaria y actualizaciones
+                Siguenos para inspiracion diaria y actualizaciones
               </p>
-
-              href="https://www.instagram.com/somosluz.iglesia/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-primary hover:underline text-sm font-semibold"
+              <a
+                href="https://www.instagram.com/somosluz.iglesia/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-primary hover:underline text-sm font-semibold"
               >
-              @somosluz.iglesia →
-            </a>
+                @somosluz.iglesia
+              </a>
+            </div>
+
+            <div className="text-center">
+              <MessageCircle className="w-12 h-12 text-accent mx-auto mb-4" />
+              <h3 className="font-semibold mb-2 text-foreground">WhatsApp</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Contactanos por mensajes directos
+              </p>
+              <a
+                href="https://wa.me/?text=Hola%20Somos%20Luz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-accent hover:underline text-sm font-semibold"
+              >
+                Enviar mensaje
+              </a>
+            </div>
+
+            <div className="text-center">
+              <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h3 className="font-semibold mb-2 text-foreground">Ubicacion</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                Valparaiso, Chile
+              </p>
+              <p className="text-sm font-semibold text-foreground">
+                Ven a visitarnos!
+              </p>
+            </div>
           </div>
-
-          <div className="text-center">
-            <MessageCircle className="w-12 h-12 text-accent mx-auto mb-4" />
-            <h3 className="font-semibold mb-2 text-foreground">WhatsApp</h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Contáctanos por mensajes directos
-            </p>
-
-            href="https://wa.me/?text=Hola%20Somos%20Luz"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block text-accent hover:underline text-sm font-semibold"
-              >
-            Enviar mensaje →
-          </a>
         </div>
+      </section>
 
-        <div className="text-center">
-          <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h3 className="font-semibold mb-2 text-foreground">Ubicación</h3>
-          <p className="text-muted-foreground text-sm mb-4">
-            Valparaiso, Chile
+      {/* Footer */}
+      <footer className="bg-card border-t border-border py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
+          <p className="mb-2">
+            © 2026 Somos Luz Iglesia. Todos los derechos reservados.
           </p>
-          <p className="text-sm font-semibold text-foreground">
-            ¡Ven a visitarnos!
+          <p className="text-xs">
+            Hecho con amor por creyentes apasionados
           </p>
         </div>
-    </div>
-        </div >
-      </section >
+      </footer>
 
-    {/* Footer */ }
-    < footer className = "bg-card border-t border-border py-8 px-4 sm:px-6 lg:px-8" >
-      <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
-        <p className="mb-2">
-          © 2026 Somos Luz Iglesia. Todos los derechos reservados.
-        </p>
-        <p className="text-xs">
-          Hecho con ❤️ por creyentes apasionados
-        </p>
-      </div>
-      </footer >
-
-    {/* Intranet Login Modal */ }
-    < Dialog open = { intranetOpen } onOpenChange = { setIntranetOpen } >
+      {/* Intranet Login Modal */}
+      <Dialog open={intranetOpen} onOpenChange={setIntranetOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-center items-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
