@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mail, MapPin, Clock, Instagram, MessageCircle, Lock, User, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Instagram, MessageCircle, Lock, User, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   Dialog,
