@@ -234,7 +234,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           direccion: form.direccion.trim() || null,
           bautizado: form.bautizado ? 'si' : 'no',
           tiempo_conversion: convFull,
-        };
+          fecha_nacimiento: fecha,   // ← AGREGAR
+          edad,                       // ← AGREGAR
+        } as any;
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
       }
 
