@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 type Modo = 'adulto' | 'nino' | 'nuevo';
 
@@ -33,6 +34,30 @@ const PAISES = [
   { flag: '🇩🇴', code: '+1' },
 ];
 
+const REGIONES: Record<string, string[]> = {
+  'Arica y Parinacota': ['Arica', 'Camarones', 'Putre', 'General Lagos'],
+  'Tarapacá': ['Iquique', 'Alto Hospicio', 'Pozo Almonte', 'Camiña', 'Colchane', 'Huara', 'Pica'],
+  'Antofagasta': ['Antofagasta', 'Mejillones', 'Sierra Gorda', 'Taltal', 'Calama', 'Ollagüe', 'San Pedro de Atacama', 'Tocopilla', 'María Elena'],
+  'Atacama': ['Copiapó', 'Caldera', 'Tierra Amarilla', 'Chañaral', 'Diego de Almagro', 'Vallenar', 'Alto del Carmen', 'Freirina', 'Huasco'],
+  'Coquimbo': ['La Serena', 'Coquimbo', 'Andacollo', 'La Higuera', 'Paihuano', 'Vicuña', 'Illapel', 'Canela', 'Los Vilos', 'Salamanca', 'Ovalle', 'Combarbalá', 'Monte Patria', 'Punitaqui', 'Río Hurtado'],
+  'Valparaíso': ['Valparaíso', 'Casablanca', 'Concón', 'Juan Fernández', 'Puchuncaví', 'Quintero', 'Viña del Mar', 'Los Andes', 'Calle Larga', 'Rinconada', 'San Esteban', 'La Ligua', 'Cabildo', 'Papudo', 'Petorca', 'Zapallar', 'Quillota', 'Calera', 'Hijuelas', 'La Cruz', 'Limache', 'Nogales', 'Olmué', 'San Antonio', 'Algarrobo', 'Cartagena', 'El Quisco', 'El Tabo', 'Santo Domingo', 'San Felipe', 'Catemu', 'Llaillay', 'Panquehue', 'Putaendo', 'Santa María', 'Quilpué', 'Villa Alemana'],
+  'Región Metropolitana': ['Santiago', 'Cerrillos', 'Cerro Navia', 'Conchalí', 'El Bosque', 'Estación Central', 'Huechuraba', 'Independencia', 'La Cisterna', 'La Florida', 'La Granja', 'La Pintana', 'La Reina', 'Las Condes', 'Lo Barnechea', 'Lo Espejo', 'Lo Prado', 'Macul', 'Maipú', 'Ñuñoa', 'Pedro Aguirre Cerda', 'Peñalolén', 'Providencia', 'Pudahuel', 'Quilicura', 'Quinta Normal', 'Recoleta', 'Renca', 'San Joaquín', 'San Miguel', 'San Ramón', 'Vitacura', 'Puente Alto', 'Pirque', 'San José de Maipo', 'Colina', 'Lampa', 'Tiltil', 'San Bernardo', 'Buin', 'Calera de Tango', 'Paine', 'Melipilla', 'Alhué', 'Curacaví', 'María Pinto', 'San Pedro', 'Talagante', 'El Monte', 'Isla de Maipo', 'Padre Hurtado', 'Peñaflor'],
+  "O'Higgins": ['Rancagua', 'Codegua', 'Coinco', 'Coltauco', 'Doñihue', 'Graneros', 'Las Cabras', 'Machalí', 'Malloa', 'Mostazal', 'Olivar', 'Peumo', 'Pichidegua', 'Quinta de Tilcoco', 'Rengo', 'Requínoa', 'San Vicente', 'Pichilemu', 'La Estrella', 'Litueche', 'Marchihue', 'Navidad', 'Paredones', 'San Fernando', 'Chépica', 'Chimbarongo', 'Lolol', 'Nancagua', 'Palmilla', 'Peralillo', 'Placilla', 'Pumanque', 'Santa Cruz'],
+  'Maule': ['Talca', 'Constitución', 'Curepto', 'Empedrado', 'Maule', 'Pelarco', 'Pencahue', 'Río Claro', 'San Clemente', 'San Rafael', 'Cauquenes', 'Chanco', 'Pelluhue', 'Curicó', 'Hualañé', 'Licantén', 'Molina', 'Rauco', 'Romeral', 'Sagrada Familia', 'Teno', 'Vichuquén', 'Linares', 'Colbún', 'Longaví', 'Parral', 'Retiro', 'San Javier', 'Villa Alegre', 'Yerbas Buenas'],
+  'Ñuble': ['Chillán', 'Bulnes', 'Chillán Viejo', 'El Carmen', 'Pemuco', 'Pinto', 'Quillón', 'San Ignacio', 'Yungay', 'Cobquecura', 'Coelemu', 'Ninhue', 'Portezuelo', 'Quirihue', 'Ránquil', 'Treguaco', 'Coihueco', 'Ñiquén', 'San Carlos', 'San Fabián', 'San Nicolás'],
+  'Biobío': ['Concepción', 'Coronel', 'Chiguayante', 'Florida', 'Hualqui', 'Lota', 'Penco', 'San Pedro de la Paz', 'Santa Juana', 'Talcahuano', 'Tomé', 'Hualpén', 'Lebu', 'Arauco', 'Cañete', 'Contulmo', 'Curanilahue', 'Los Álamos', 'Tirúa', 'Los Ángeles', 'Antuco', 'Cabrero', 'Laja', 'Mulchén', 'Nacimiento', 'Negrete', 'Quilaco', 'Quilleco', 'San Rosendo', 'Santa Bárbara', 'Tucapel', 'Yumbel', 'Alto Biobío'],
+  'La Araucanía': ['Temuco', 'Carahue', 'Cunco', 'Curarrehue', 'Freire', 'Galvarino', 'Gorbea', 'Lautaro', 'Loncoche', 'Melipeuco', 'Nueva Imperial', 'Padre las Casas', 'Perquenco', 'Pitrufquén', 'Pucón', 'Saavedra', 'Teodoro Schmidt', 'Toltén', 'Vilcún', 'Villarrica', 'Cholchol', 'Angol', 'Collipulli', 'Curacautín', 'Ercilla', 'Lonquimay', 'Los Sauces', 'Lumaco', 'Purén', 'Renaico', 'Traiguén', 'Victoria'],
+  'Los Ríos': ['Valdivia', 'Corral', 'Futrono', 'La Unión', 'Lago Ranco', 'Lanco', 'Los Lagos', 'Máfil', 'Mariquina', 'Paillaco', 'Panguipulli', 'Río Bueno'],
+  'Los Lagos': ['Puerto Montt', 'Calbuco', 'Cochamó', 'Fresia', 'Frutillar', 'Los Muermos', 'Llanquihue', 'Maullín', 'Puerto Varas', 'Castro', 'Ancud', 'Chonchi', 'Curaco de Vélez', 'Dalcahue', 'Puqueldón', 'Queilén', 'Quellón', 'Quémchi', 'Quinchao', 'Osorno', 'Puerto Octay', 'Purranque', 'Puyehue', 'Río Negro', 'San Juan de la Costa', 'San Pablo', 'Chaitén', 'Futaleufú', 'Hualaihué', 'Palena'],
+  'Aysén': ['Coyhaique', 'Lago Verde', 'Aysén', 'Cisnes', 'Guaitecas', 'Cochrane', "O'Higgins", 'Tortel', 'Chile Chico', 'Río Ibáñez'],
+  'Magallanes': ['Punta Arenas', 'Laguna Blanca', 'Río Verde', 'San Gregorio', 'Cabo de Hornos', 'Antártica', 'Porvenir', 'Primavera', 'Timaukel', 'Natales', 'Torres del Paine'],
+};
+
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
+const ANIOS = Array.from({ length: new Date().getFullYear() - 1929 }, (_, i) => new Date().getFullYear() - i);
+const NUMS_CONVERSION = Array.from({ length: 50 }, (_, i) => i + 1);
+
 function emptyForm() {
   return {
     nombre: '',
@@ -43,7 +68,7 @@ function emptyForm() {
     region: '', comuna: '',
     direccion: '',
     bautizado: false,
-    tiempo_conversion: '',
+    convNum: '', convUnidad: '',
     dia: '', mes: '', anio: '',
     nombre_apoderado: '',
     telefono_apoderado: '',
@@ -63,6 +88,12 @@ function calcEdad(d: number, m: number, a: number) {
   const dm = hoy.getMonth() + 1 - m;
   if (dm < 0 || (dm === 0 && hoy.getDate() < d)) edad--;
   return edad;
+}
+
+function parseTiempoConversion(val: string | null) {
+  if (!val) return { num: '', unidad: '' };
+  const parts = val.trim().split(' ');
+  return { num: parts[0] ?? '', unidad: parts[1] ?? '' };
 }
 
 export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
@@ -92,7 +123,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       comuna: member.comuna ?? '',
       direccion: member.direccion ?? '',
       bautizado: false,
-      tiempo_conversion: '',
+      convNum: '', convUnidad: '',
       dia: '', mes: '', anio: '',
       nombre_apoderado: '',
       telefono_apoderado: '',
@@ -103,7 +134,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       base.codWa = wa.code;
       base.whatsapp = wa.num;
       base.bautizado = a.bautizado === 'si';
-      base.tiempo_conversion = a.tiempo_conversion ?? '';
+      const conv = parseTiempoConversion(a.tiempo_conversion);
+      base.convNum = conv.num;
+      base.convUnidad = conv.unidad;
     }
     if (member.tipo === 'nino') {
       const n = member as NinoMember;
@@ -121,6 +154,11 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const set = (key: string, val: string | boolean) =>
     setForm((f) => ({ ...f, [key]: val }));
 
+  // Cuando cambia región, resetea comuna
+  const handleRegionChange = (val: string) => {
+    setForm((f) => ({ ...f, region: val, comuna: '' }));
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(''); setOk(false);
@@ -131,8 +169,28 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     setLoading(true);
     try {
       const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
-      const waFull = form.whatsapp ? `${form.codWa} ${form.whatsapp}` : null;
+      const waFull = form.whatsapp
+        ? `${form.codWa} ${form.whatsapp}`
+        : form.telefono
+          ? `${form.codTel} ${form.telefono}`
+          : null;
+      const convFull = (form.convNum && form.convUnidad)
+        ? `${form.convNum} ${form.convUnidad}` : null;
+      // Validar email duplicado antes de guardar
+      if (form.email.trim()) {
+        const { data: existing } = await supabase
+          .from('personas')
+          .select('id, nombre')
+          .eq('email', form.email.trim().toLowerCase())
+          .neq('id', member?.id ?? 0)
+          .single();
 
+        if (existing) {
+          setError(`Este email ya está registrado para: ${existing.nombre}`);
+          setLoading(false);
+          return;
+        }
+      }
       if (modo === 'nino') {
         const fecha = (form.dia && form.mes && form.anio)
           ? `${form.dia}/${form.mes}/${form.anio}` : null;
@@ -140,7 +198,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
           tipo: 'nino',
-          source_id: member?.source_id ?? null,
+          source_id: member?.source_id ?? undefined,
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),
           sexo: form.sexo || null,
@@ -156,9 +214,15 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         };
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
       } else {
+        const fecha = (form.dia && form.mes && form.anio)
+          ? `${form.dia}/${form.mes}/${form.anio}` : null;
+        const edad = (form.dia && form.mes && form.anio)
+          ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
+
+
         const data: Omit<AdultoMember, 'id' | 'created_at'> = {
           tipo: 'adulto',
-          source_id: member?.source_id ?? null,
+          source_id: member?.source_id ?? undefined,
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),
           sexo: modo === 'nuevo' ? null : form.sexo || null,
@@ -169,7 +233,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           comuna: form.comuna || null,
           direccion: form.direccion.trim() || null,
           bautizado: form.bautizado ? 'si' : 'no',
-          tiempo_conversion: form.tiempo_conversion || null,
+          tiempo_conversion: convFull,
         };
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
       }
@@ -184,14 +248,12 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     }
   }
 
-  const dias = Array.from({ length: 31 }, (_, i) => i + 1);
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const anios = Array.from({ length: new Date().getFullYear() - 1929 }, (_, i) => new Date().getFullYear() - i);
+  const comunas = form.region ? (REGIONES[form.region] ?? []) : [];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
-      {/* Toggle modo — solo en registro nuevo */}
+      {/* Toggle modo */}
       {!isEditing && (
         <Tabs value={modo} onValueChange={(v) => { setModo(v as Modo); setError(''); setOk(false); }}>
           <TabsList className="w-full">
@@ -202,7 +264,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </Tabs>
       )}
 
-      {/* Card datos personales */}
+      {/* Datos personales */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -211,6 +273,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
 
+          {/* Nombre */}
           <div className="space-y-1">
             <Label>Nombre Completo <span className="text-red-500">*</span></Label>
             <Input
@@ -220,22 +283,28 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             />
           </div>
 
-          {/* Fecha nacimiento — solo niño */}
-          {modo === 'nino' && (
+          {/* Fecha nacimiento — adulto y niño, no nuevo */}
+          {modo !== 'nuevo' && (
             <div className="space-y-1">
               <Label>Fecha de Nacimiento</Label>
               <div className="grid grid-cols-3 gap-2">
                 <Select value={form.dia} onValueChange={(v) => set('dia', v)}>
                   <SelectTrigger><SelectValue placeholder="Día" /></SelectTrigger>
-                  <SelectContent>{dias.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {DIAS.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
+                  </SelectContent>
                 </Select>
                 <Select value={form.mes} onValueChange={(v) => set('mes', v)}>
                   <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
-                  <SelectContent>{meses.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {MESES.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
+                  </SelectContent>
                 </Select>
                 <Select value={form.anio} onValueChange={(v) => set('anio', v)}>
                   <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
-                  <SelectContent>{anios.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {ANIOS.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -267,22 +336,45 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Fe y Comunidad</p>
               <div className="grid grid-cols-2 gap-4">
+
+                {/* Tiempo conversión — 2 selects */}
                 <div className="space-y-1">
                   <Label>Tiempo de Conversión</Label>
-                  <Input
-                    value={form.tiempo_conversion}
-                    onChange={(e) => set('tiempo_conversion', e.target.value)}
-                    placeholder="Ej: 3 Años"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
+                      <SelectTrigger><SelectValue placeholder="N°" /></SelectTrigger>
+                      <SelectContent>
+                        {NUMS_CONVERSION.map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={form.convUnidad} onValueChange={(v) => set('convUnidad', v)}>
+                      <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Meses">Meses</SelectItem>
+                        <SelectItem value="Años">Años</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
+                {/* Bautizado */}
                 <div className="space-y-1">
                   <Label>¿Bautizado/a?</Label>
                   <div
                     onClick={() => set('bautizado', !form.bautizado)}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors
-                      ${form.bautizado ? 'bg-primary/10 border-primary' : 'bg-muted border-border'}`}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors select-none
+    ${form.bautizado ? 'bg-primary/10 border-primary' : 'bg-muted border-border'}`}
                   >
-                    <Checkbox checked={form.bautizado as boolean} readOnly />
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0
+    ${form.bautizado ? 'bg-primary border-primary' : 'bg-white border-border'}`}>
+                      {form.bautizado && (
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
                     <span className="text-sm">Sí, está bautizado/a</span>
                   </div>
                 </div>
@@ -328,7 +420,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardContent>
       </Card>
 
-      {/* Card contacto */}
+      {/* Contacto */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
@@ -398,23 +490,47 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {/* Ubicación — solo adulto */}
+          {/* Ubicación con selects de regiones/comunas — solo adulto */}
           {modo === 'adulto' && (
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Región</Label>
-                  <Input value={form.region} onChange={(e) => set('region', e.target.value)} placeholder="Ej: Valparaíso" />
+                  <Select value={form.region} onValueChange={handleRegionChange}>
+                    <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(REGIONES).map((r) => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label>Comuna</Label>
-                  <Input value={form.comuna} onChange={(e) => set('comuna', e.target.value)} placeholder="Ej: Viña del Mar" />
+                  <Select
+                    value={form.comuna}
+                    onValueChange={(v) => set('comuna', v)}
+                    disabled={!form.region}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {comunas.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-1">
                 <Label>Dirección</Label>
-                <Input value={form.direccion} onChange={(e) => set('direccion', e.target.value)} placeholder="Ej: Av. Brasil 1234" />
+                <Input
+                  value={form.direccion}
+                  onChange={(e) => set('direccion', e.target.value)}
+                  placeholder="Ej: Av. Brasil 1234"
+                />
               </div>
             </div>
           )}
