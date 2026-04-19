@@ -7,9 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMembers } from '@/lib/members-store';
@@ -75,11 +72,11 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
           {isAdultoMember(member) && <>
             <div className="rounded-lg border p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Fecha nacimiento</p>
-              <p>{fmt((member as any).fecha_nacimiento)}</p>
+              <p>{fmt(member.fecha_nacimiento)}</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Edad</p>
-              <p>{fmt((member as any).edad)}</p>
+              <p>{fmt(member.edad)}</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Bautizado</p>
@@ -117,132 +114,10 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
   );
 }
 
-function EditAdultoDialog({ member, open, onClose }: { member: AdultoMember | null; open: boolean; onClose: () => void }) {
-  const { updateMember } = useMembers();
-  const [form, setForm] = useState<any | null>(null);
-  const [saving, setSaving] = useState(false);
-  useMemo(() => setForm(member ? { ...member } : null), [member]);
-  if (!member || !form) return null;
-  const set = (k: string, v: any) => setForm((p: any) => p ? { ...p, [k]: v } : p);
-  const save = async () => {
-    setSaving(true);
-    try { await updateMember(member.id, form); onClose(); }
-    finally { setSaving(false); }
-  };
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Editar adulto</DialogTitle>
-          <DialogDescription>Actualiza los datos pastorales y de contacto.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-2 md:grid-cols-2">
-          <div className="md:col-span-2 grid gap-2"><Label>Nombre</Label>
-            <Input value={form.nombre} onChange={(e) => set('nombre', e.target.value)} /></div>
-          <div className="grid gap-2"><Label>Sexo</Label>
-            <Select value={form.sexo ?? ''} onValueChange={(v) => set('sexo', v || null)}>
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Masculino">Masculino</SelectItem>
-                <SelectItem value="Femenino">Femenino</SelectItem>
-              </SelectContent>
-            </Select></div>
-          <div className="grid gap-2"><Label>Bautizado</Label>
-            <Select value={form.bautizado ?? ''} onValueChange={(v) => set('bautizado', v || null)}>
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="si">Sí</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-                <SelectItem value="en_proceso">En proceso</SelectItem>
-              </SelectContent>
-            </Select></div>
-          <div className="grid gap-2"><Label>Fecha nacimiento</Label>
-            <Input value={form.fecha_nacimiento ?? ''} onChange={(e) => set('fecha_nacimiento', e.target.value || null)} placeholder="DD/M/YYYY" /></div>
-          <div className="grid gap-2"><Label>Edad</Label>
-            <Input type="number" min={0} value={form.edad ?? ''} onChange={(e) => set('edad', e.target.value === '' ? null : Number(e.target.value))} /></div>
-          <div className="grid gap-2"><Label>Teléfono</Label>
-            <Input value={form.telefono ?? ''} onChange={(e) => set('telefono', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>WhatsApp</Label>
-            <Input value={form.whatsapp ?? ''} onChange={(e) => set('whatsapp', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Email</Label>
-            <Input type="email" value={form.email ?? ''} onChange={(e) => set('email', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Tiempo conversión</Label>
-            <Input value={form.tiempo_conversion ?? ''} onChange={(e) => set('tiempo_conversion', e.target.value || null)} placeholder="Ej: 16 Años" /></div>
-          <div className="grid gap-2"><Label>Región</Label>
-            <Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Comuna</Label>
-            <Input value={form.comuna ?? ''} onChange={(e) => set('comuna', e.target.value || null)} /></div>
-          <div className="md:col-span-2 grid gap-2"><Label>Dirección</Label>
-            <Input value={form.direccion ?? ''} onChange={(e) => set('direccion', e.target.value || null)} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function EditNinoDialog({ member, open, onClose }: { member: NinoMember | null; open: boolean; onClose: () => void }) {
-  const { updateMember } = useMembers();
-  const [form, setForm] = useState<NinoMember | null>(null);
-  const [saving, setSaving] = useState(false);
-  useMemo(() => setForm(member ? { ...member } : null), [member]);
-  if (!member || !form) return null;
-  const set = <K extends keyof NinoMember>(k: K, v: NinoMember[K]) => setForm((p) => p ? { ...p, [k]: v } : p);
-  const save = async () => {
-    setSaving(true);
-    try { await updateMember(member.id, form); onClose(); }
-    finally { setSaving(false); }
-  };
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Editar niño</DialogTitle>
-          <DialogDescription>Actualiza los datos del menor y su apoderado.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-2 md:grid-cols-2">
-          <div className="md:col-span-2 grid gap-2"><Label>Nombre</Label>
-            <Input value={form.nombre} onChange={(e) => set('nombre', e.target.value)} /></div>
-          <div className="grid gap-2"><Label>Fecha nacimiento</Label>
-            <Input value={form.fecha_nacimiento ?? ''} onChange={(e) => set('fecha_nacimiento', e.target.value || null)} placeholder="DD/M/YYYY" /></div>
-          <div className="grid gap-2"><Label>Edad</Label>
-            <Input type="number" min={0} value={form.edad ?? ''} onChange={(e) => set('edad', e.target.value === '' ? null : Number(e.target.value))} /></div>
-          <div className="grid gap-2"><Label>Sexo</Label>
-            <Select value={form.sexo ?? ''} onValueChange={(v) => set('sexo', v || null)}>
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Masculino">Masculino</SelectItem>
-                <SelectItem value="Femenino">Femenino</SelectItem>
-              </SelectContent>
-            </Select></div>
-          <div className="grid gap-2"><Label>Nombre apoderado</Label>
-            <Input value={form.nombre_apoderado ?? ''} onChange={(e) => set('nombre_apoderado', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Teléfono apoderado</Label>
-            <Input value={form.telefono_apoderado ?? ''} onChange={(e) => set('telefono_apoderado', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Región</Label>
-            <Input value={form.region ?? ''} onChange={(e) => set('region', e.target.value || null)} /></div>
-          <div className="grid gap-2"><Label>Comuna</Label>
-            <Input value={form.comuna ?? ''} onChange={(e) => set('comuna', e.target.value || null)} /></div>
-          <div className="md:col-span-2 grid gap-2"><Label>Dirección</Label>
-            <Input value={form.direccion ?? ''} onChange={(e) => set('direccion', e.target.value || null)} /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function MembersTable() {
   const { members, isLoading, error, deleteMember } = useMembers();
   const [viewing, setViewing] = useState<Member | null>(null);
-  const [editAdulto, setEditAdulto] = useState<AdultoMember | null>(null);
-  const [editNino, setEditNino] = useState<NinoMember | null>(null);
+  const [editing, setEditing] = useState<Member | null>(null); // ✅ un solo estado
 
   const adultos = useMemo(() => members.filter(isAdultoMember), [members]);
   const ninos = useMemo(() => members.filter(isNinoMember), [members]);
@@ -253,8 +128,10 @@ export function MembersTable() {
 
   const Actions = ({ m }: { m: Member }) => (
     <div className="flex justify-end gap-1">
-      <Button variant="ghost" size="icon" onClick={() => setViewing(m)}><Eye className="h-4 w-4" /></Button>
-      <Button variant="ghost" size="icon" onClick={() => isAdultoMember(m) ? setEditAdulto(m) : setEditNino(m as NinoMember)}>
+      <Button variant="ghost" size="icon" onClick={() => setViewing(m)}>
+        <Eye className="h-4 w-4" />
+      </Button>
+      <Button variant="ghost" size="icon" onClick={() => setEditing(m)}>
         <Pencil className="h-4 w-4" />
       </Button>
       <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(m)}>
@@ -367,17 +244,22 @@ export function MembersTable() {
       </Card>
 
       <ViewDialog member={viewing} open={!!viewing} onClose={() => setViewing(null)} />
-      <Dialog open={!!(editAdulto || editNino)} onOpenChange={(o) => { if (!o) { setEditAdulto(null); setEditNino(null); } }}>
+
+      {/* ✅ FIX CRÍTICO: key={editing.id} fuerza recrear el MemberForm cada vez */}
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar miembro</DialogTitle>
             <DialogDescription>Actualiza los datos del registro.</DialogDescription>
           </DialogHeader>
-          <MemberForm
-            member={editAdulto ?? editNino}
-            onSuccess={() => { setEditAdulto(null); setEditNino(null); }}
-            onCancel={() => { setEditAdulto(null); setEditNino(null); }}
-          />
+          {editing && (
+            <MemberForm
+              key={editing.id}
+              member={editing}
+              onSuccess={() => setEditing(null)}
+              onCancel={() => setEditing(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

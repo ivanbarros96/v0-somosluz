@@ -48,6 +48,8 @@ function mapToMember(row: any): Member {
     tipo: 'adulto',
     bautizado: row.bautizado ?? null,
     tiempo_conversion: row.tiempo_conversion ?? null,
+    fecha_nacimiento: row.fecha_nacimiento ?? null, // ✅
+    edad: row.edad ?? null,                          // ✅
   } as AdultoMember;
 }
 
@@ -93,8 +95,8 @@ export function MembersProvider({ children }: { children: ReactNode }) {
       const a = data as Omit<AdultoMember, 'id' | 'created_at'>;
       row.bautizado = a.bautizado;
       row.tiempo_conversion = a.tiempo_conversion;
-      row.fecha_nacimiento = (a as any).fecha_nacimiento;
-      row.edad = (a as any).edad;
+      row.fecha_nacimiento = a.fecha_nacimiento ?? null; // ✅ sin as any
+      row.edad = a.edad ?? null;                         // ✅ sin as any
     } else {
       const n = data as Omit<NinoMember, 'id' | 'created_at'>;
       row.fecha_nacimiento = n.fecha_nacimiento;
