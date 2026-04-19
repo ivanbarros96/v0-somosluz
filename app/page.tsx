@@ -4,12 +4,26 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mail, MapPin, Clock, Instagram, MessageCircle } from 'lucide-react';
+import { Mail, MapPin, Clock, Instagram, MessageCircle, Lock, User, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function Home() {
   const [prayerForm, setPrayerForm] = useState({ name: '', email: '', prayer: '' });
   const [submitted, setSubmitted] = useState(false);
+
+  const [intranetOpen, setIntranetOpen] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const handlePrayerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,13 +34,31 @@ export default function Home() {
     }, 3000);
   };
 
-  const handleIntranetClick = async () => {
+  const handleIntranetLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+
     try {
-      await fetch('https://n8n.srv1489770.hstgr.cloud/webhook/main', {
-        method: 'GET',
+      const response = await fetch('https://n8n.srv1489770.hstgr.cloud/webhook/main', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginForm.username,
+          password: loginForm.password,
+        }),
       });
-    } catch (error) {
-      console.error('Error accessing intranet:', error);
+
+      if (response.ok) {
+        setIntranetOpen(false);
+        setLoginForm({ username: '', password: '' });
+      } else {
+        setLoginError('Credenciales incorrectas. Intenta de nuevo.');
+      }
+    } catch {
+      setLoginError('Error de conexión. Intenta más tarde.');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -49,7 +81,12 @@ export default function Home() {
             <a href="#schedule" className="text-sm hover:text-primary transition">Horarios</a>
             <a href="#prayer" className="text-sm hover:text-primary transition">Oración</a>
             <a href="#contact" className="text-sm hover:text-primary transition">Contacto</a>
-            <button onClick={handleIntranetClick} className="text-sm hover:text-primary transition font-medium">Intranet</button>
+            <button
+              onClick={() => setIntranetOpen(true)}
+              className="text-sm hover:text-primary transition font-medium"
+            >
+              Intranet
+            </button>
           </div>
         </div>
       </nav>
@@ -220,7 +257,7 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-12 text-foreground">
             Conecta con Nosotros
           </h2>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <Instagram className="w-12 h-12 text-primary mx-auto mb-4" />
@@ -228,57 +265,125 @@ export default function Home() {
               <p className="text-muted-foreground text-sm mb-4">
                 Síguenos para inspiración diaria y actualizaciones
               </p>
-              <a
-                href="https://www.instagram.com/somosluz.iglesia/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-primary hover:underline text-sm font-semibold"
-              >
-                @somosluz.iglesia →
-              </a>
-            </div>
 
-            <div className="text-center">
-              <MessageCircle className="w-12 h-12 text-accent mx-auto mb-4" />
-              <h3 className="font-semibold mb-2 text-foreground">WhatsApp</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Contáctanos por mensajes directos
-              </p>
-              <a
-                href="https://wa.me/?text=Hola%20Somos%20Luz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block text-accent hover:underline text-sm font-semibold"
+              href="https://www.instagram.com/somosluz.iglesia/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-primary hover:underline text-sm font-semibold"
               >
-                Enviar mensaje →
-              </a>
-            </div>
+              @somosluz.iglesia →
+            </a>
+          </div>
 
-            <div className="text-center">
-              <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h3 className="font-semibold mb-2 text-foreground">Ubicación</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Valparaiso, Chile
-              </p>
-              <p className="text-sm font-semibold text-foreground">
-                ¡Ven a visitarnos!
-              </p>
+          <div className="text-center">
+            <MessageCircle className="w-12 h-12 text-accent mx-auto mb-4" />
+            <h3 className="font-semibold mb-2 text-foreground">WhatsApp</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Contáctanos por mensajes directos
+            </p>
+
+            href="https://wa.me/?text=Hola%20Somos%20Luz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-accent hover:underline text-sm font-semibold"
+              >
+            Enviar mensaje →
+          </a>
+        </div>
+
+        <div className="text-center">
+          <MapPin className="w-12 h-12 text-primary mx-auto mb-4" />
+          <h3 className="font-semibold mb-2 text-foreground">Ubicación</h3>
+          <p className="text-muted-foreground text-sm mb-4">
+            Valparaiso, Chile
+          </p>
+          <p className="text-sm font-semibold text-foreground">
+            ¡Ven a visitarnos!
+          </p>
+        </div>
+    </div>
+        </div >
+      </section >
+
+    {/* Footer */ }
+    < footer className = "bg-card border-t border-border py-8 px-4 sm:px-6 lg:px-8" >
+      <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
+        <p className="mb-2">
+          © 2026 Somos Luz Iglesia. Todos los derechos reservados.
+        </p>
+        <p className="text-xs">
+          Hecho con ❤️ por creyentes apasionados
+        </p>
+      </div>
+      </footer >
+
+    {/* Intranet Login Modal */ }
+    < Dialog open = { intranetOpen } onOpenChange = { setIntranetOpen } >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="text-center items-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <Lock className="h-7 w-7 text-primary" />
+          </div>
+          <DialogTitle className="text-xl">Acceso Intranet</DialogTitle>
+          <DialogDescription>
+            Ingresa tus credenciales para acceder al área interna de Somos Luz.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleIntranetLogin} className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <Label htmlFor="username">Usuario</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="username"
+                type="text"
+                placeholder="Tu usuario"
+                className="pl-9"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                required
+              />
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Footer */}
-      <footer className="bg-card border-t border-border py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto text-center text-muted-foreground text-sm">
-          <p className="mb-2">
-            © 2026 Somos Luz Iglesia. Todos los derechos reservados.
-          </p>
-          <p className="text-xs">
-            Hecho con ❤️ por creyentes apasionados
-          </p>
-        </div>
-      </footer>
-    </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Contraseña</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                className="pl-9"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+
+          {loginError && (
+            <p className="text-sm text-destructive text-center">{loginError}</p>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full bg-primary hover:bg-primary/90"
+            disabled={loginLoading}
+          >
+            {loginLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Ingresando...
+              </>
+            ) : (
+              'Ingresar'
+            )}
+          </Button>
+        </form>
+      </DialogContent>
+      </Dialog >
+    </div >
   );
 }
