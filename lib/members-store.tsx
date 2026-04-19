@@ -1,225 +1,153 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Member, AdultoMember, NinoMember } from './types';
-import { supabase } from './supabase';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
+import type { Member, AdultoMember, NinoMember } from '@/lib/types';
 
-interface MembersContextType {
+type MembersContextType = {
   members: Member[];
   isLoading: boolean;
-  addMember: (member: Omit<Member, 'id'>) => Promise<void>;
+  error: string | null;
+  refreshMembers: () => Promise<void>;
+  addMember: (data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'>) => Promise<void>;
   updateMember: (id: string, data: Partial<Member>) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
-  getMemberById: (id: string) => Member | undefined;
-  refreshMembers: () => Promise<void>;
-}
+};
 
 const MembersContext = createContext<MembersContextType | undefined>(undefined);
 
-// ── Mapear fila Supabase → Member ──────────────────────────
-
 function mapToMember(row: any): Member {
-  const tipo: 'adulto' | 'nino' = row.source_tipo === 'nino' ? 'nino' : 'adulto';
-
   const base = {
     id: String(row.id),
-    tipo,
-    sourceId: row.source_id,
-    fechaRegistro: row.fecha_registro
-      ? new Date(row.fecha_registro).toISOString().split('T')[0]
-      : row.created_at
-        ? new Date(row.created_at).toISOString().split('T')[0]
-        : '',
+    source_id: row.source_id ?? null,
+    fecha_registro: row.fecha_registro ?? null,
     nombre: row.nombre ?? '',
-    sexo: row.sexo ?? '',
-    telefono: row.telefono ?? '',
-    whatsapp: row.whatsapp ?? '',
-    email: row.email ?? '',
-    region: row.region ?? '',
-    comuna: row.comuna ?? '',
-    direccion: row.direccion ?? '',
-    status: 'active' as const,
-    notes: row.notes ?? '',
+    sexo: row.sexo ?? null,
+    telefono: row.telefono ?? null,
+    whatsapp: row.whatsapp ?? null,
+    email: row.email ?? null,
+    region: row.region ?? null,
+    comuna: row.comuna ?? null,
+    direccion: row.direccion ?? null,
+    created_at: row.created_at ?? null,
   };
 
-  if (tipo === 'nino') {
-    const nino: NinoMember = {
+  if (row.source_tipo === 'nino') {
+    return {
       ...base,
       tipo: 'nino',
-      fechaNacimiento: row.fecha_nacimiento
-        ? new Date(row.fecha_nacimiento).toISOString().split('T')[0]
-        : undefined,
-      edad: row.edad ?? undefined,
-      nombreApoderado: row.nombre_apoderado ?? '',
-      telefonoApoderado: row.telefono_apoderado ?? '',
-    };
-    return nino;
-  } else {
-    const adulto: AdultoMember = {
-      ...base,
-      tipo: 'adulto',
-      bautizado: row.bautizado ?? '',
-      tiempoConversion: row.tiempo_conversion ?? '',
-    };
-    return adulto;
-  }
-}
-
-// ── Mapear Member → fila Supabase ──────────────────────────
-
-function mapToRow(member: Omit<Member, 'id'>) {
-  const base: any = {
-    source_tipo: member.tipo,
-    source_id: member.sourceId ?? Date.now(),
-    fecha_registro: member.fechaRegistro || new Date().toISOString(),
-    nombre: member.nombre?.trim() || '',
-    sexo: member.sexo || null,
-    telefono: member.telefono || null,
-    whatsapp: member.whatsapp || null,
-    email: member.email || null,
-    region: member.region || null,
-    comuna: member.comuna || null,
-    direccion: member.direccion || null,
-    notes: member.notes || null,
-  };
-
-  if (member.tipo === 'nino') {
-    base.fecha_nacimiento = member.fechaNacimiento || null;
-    base.edad = member.edad ?? null;
-    base.nombre_apoderado = member.nombreApoderado || null;
-    base.telefono_apoderado = member.telefonoApoderado || null;
-  } else {
-    base.bautizado = member.bautizado || null;
-    base.tiempo_conversion = member.tiempoConversion || null;
+      fecha_nacimiento: row.fecha_nacimiento ?? null,
+      edad: row.edad ?? null,
+      nombre_apoderado: row.nombre_apoderado ?? null,
+      telefono_apoderado: row.telefono_apoderado ?? null,
+    } as NinoMember;
   }
 
-  return base;
+  return {
+    ...base,
+    tipo: 'adulto',
+    bautizado: row.bautizado ?? null,
+    tiempo_conversion: row.tiempo_conversion ?? null,
+  } as AdultoMember;
 }
-
-// ── Mapear campos de update parcial → columnas Supabase ────
-
-function mapUpdateFields(data: Partial<Member>): any {
-  const row: any = {};
-
-  if (data.nombre !== undefined) row.nombre = data.nombre;
-  if (data.sexo !== undefined) row.sexo = data.sexo;
-  if (data.telefono !== undefined) row.telefono = data.telefono;
-  if (data.whatsapp !== undefined) row.whatsapp = data.whatsapp;
-  if (data.email !== undefined) row.email = data.email;
-  if (data.region !== undefined) row.region = data.region;
-  if (data.comuna !== undefined) row.comuna = data.comuna;
-  if (data.direccion !== undefined) row.direccion = data.direccion;
-  if (data.fechaRegistro !== undefined) row.fecha_registro = data.fechaRegistro;
-  if (data.notes !== undefined) row.notes = data.notes;
-  if (data.tipo !== undefined) row.source_tipo = data.tipo;
-
-  // Campos de adulto
-  if ('bautizado' in data && data.bautizado !== undefined) row.bautizado = data.bautizado;
-  if ('tiempoConversion' in data && data.tiempoConversion !== undefined)
-    row.tiempo_conversion = data.tiempoConversion;
-
-  // Campos de niño
-  if ('fechaNacimiento' in data && data.fechaNacimiento !== undefined)
-    row.fecha_nacimiento = data.fechaNacimiento;
-  if ('edad' in data && data.edad !== undefined) row.edad = data.edad;
-  if ('nombreApoderado' in data && data.nombreApoderado !== undefined)
-    row.nombre_apoderado = data.nombreApoderado;
-  if ('telefonoApoderado' in data && data.telefonoApoderado !== undefined)
-    row.telefono_apoderado = data.telefonoApoderado;
-
-  return row;
-}
-
-// ── Provider ───────────────────────────────────────────────
 
 export function MembersProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchMembers = async () => {
+  const refreshMembers = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     const { data, error } = await supabase
       .from('personas')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setMembers(data.map(mapToMember));
+    if (error) {
+      setError(error.message);
     } else {
-      console.error('Error fetching members:', error);
+      setMembers((data ?? []).map(mapToMember));
     }
     setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchMembers();
   }, []);
 
-  const addMember = async (memberData: Omit<Member, 'id'>) => {
-    const row = mapToRow(memberData);
-    const { data, error } = await supabase
-      .from('personas')
-      .insert(row)
-      .select()
-      .single();
+  const addMember = useCallback(async (
+    data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'>
+  ) => {
+    const row: any = {
+      source_tipo: data.tipo,
+      source_id: data.source_id,
+      fecha_registro: data.fecha_registro,
+      nombre: data.nombre,
+      sexo: data.sexo,
+      telefono: data.telefono,
+      whatsapp: data.whatsapp,
+      email: data.email,
+      region: data.region,
+      comuna: data.comuna,
+      direccion: data.direccion,
+    };
 
-    if (!error && data) {
-      setMembers(prev => [mapToMember(data), ...prev]);
+    if (data.tipo === 'adulto') {
+      const a = data as Omit<AdultoMember, 'id' | 'created_at'>;
+      row.bautizado = a.bautizado;
+      row.tiempo_conversion = a.tiempo_conversion;
     } else {
-      console.error('Error adding member:', error);
+      const n = data as Omit<NinoMember, 'id' | 'created_at'>;
+      row.fecha_nacimiento = n.fecha_nacimiento;
+      row.edad = n.edad;
+      row.nombre_apoderado = n.nombre_apoderado;
+      row.telefono_apoderado = n.telefono_apoderado;
     }
-  };
 
-  const updateMember = async (id: string, memberData: Partial<Member>) => {
-    const updateRow = mapUpdateFields(memberData);
+    const { error } = await supabase.from('personas').insert(row);
+    if (error) throw new Error(error.message);
+    await refreshMembers();
+  }, [refreshMembers]);
 
-    const { data, error } = await supabase
-      .from('personas')
-      .update(updateRow)
-      .eq('id', id)
-      .select()
-      .single();
+  const updateMember = useCallback(async (id: string, data: Partial<Member>) => {
+    const row: any = {};
+    if (data.nombre !== undefined) row.nombre = data.nombre;
+    if (data.sexo !== undefined) row.sexo = data.sexo;
+    if (data.telefono !== undefined) row.telefono = data.telefono;
+    if (data.whatsapp !== undefined) row.whatsapp = data.whatsapp;
+    if (data.email !== undefined) row.email = data.email;
+    if (data.region !== undefined) row.region = data.region;
+    if (data.comuna !== undefined) row.comuna = data.comuna;
+    if (data.direccion !== undefined) row.direccion = data.direccion;
+    if (data.fecha_registro !== undefined) row.fecha_registro = data.fecha_registro;
+    if ('bautizado' in data) row.bautizado = data.bautizado;
+    if ('tiempo_conversion' in data) row.tiempo_conversion = data.tiempo_conversion;
+    if ('fecha_nacimiento' in data) row.fecha_nacimiento = data.fecha_nacimiento;
+    if ('edad' in data) row.edad = data.edad;
+    if ('nombre_apoderado' in data) row.nombre_apoderado = data.nombre_apoderado;
+    if ('telefono_apoderado' in data) row.telefono_apoderado = data.telefono_apoderado;
 
-    if (!error && data) {
-      setMembers(prev => prev.map(m => (m.id === id ? mapToMember(data) : m)));
-    } else {
-      console.error('Error updating member:', error);
-    }
-  };
+    const { error } = await supabase.from('personas').update(row).eq('id', id);
+    if (error) throw new Error(error.message);
+    await refreshMembers();
+  }, [refreshMembers]);
 
-  const deleteMember = async (id: string) => {
+  const deleteMember = useCallback(async (id: string) => {
     const { error } = await supabase.from('personas').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    await refreshMembers();
+  }, [refreshMembers]);
 
-    if (!error) {
-      setMembers(prev => prev.filter(m => m.id !== id));
-    } else {
-      console.error('Error deleting member:', error);
-    }
-  };
-
-  const getMemberById = (id: string) => members.find(m => m.id === id);
+  useEffect(() => {
+    refreshMembers();
+  }, [refreshMembers]);
 
   return (
-    <MembersContext.Provider
-      value={{
-        members,
-        isLoading,
-        addMember,
-        updateMember,
-        deleteMember,
-        getMemberById,
-        refreshMembers: fetchMembers,
-      }}
-    >
+    <MembersContext.Provider value={{ members, isLoading, error, refreshMembers, addMember, updateMember, deleteMember }}>
       {children}
     </MembersContext.Provider>
   );
 }
 
 export function useMembers() {
-  const context = useContext(MembersContext);
-  if (context === undefined) {
-    throw new Error('useMembers must be used within a MembersProvider');
-  }
-  return context;
+  const ctx = useContext(MembersContext);
+  if (!ctx) throw new Error('useMembers debe usarse dentro de MembersProvider');
+  return ctx;
 }

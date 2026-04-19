@@ -1,5 +1,3 @@
-// Tipos para el sistema de intranet
-
 export type UserRole = 'admin' | 'user';
 
 export interface AuthUser {
@@ -15,49 +13,47 @@ export interface AuthContextType {
   isAuthenticated: boolean;
 }
 
-// ── Personas ──────────────────────────────────────────────
+export type BautizadoStatus = 'si' | 'no' | 'en_proceso' | null;
 
 export interface PersonaBase {
   id: string;
-  tipo: 'adulto' | 'nino';
-  sourceId?: number;
-  fechaRegistro: string;
-
+  source_id: string | null;
+  fecha_registro: string | null;
   nombre: string;
-  sexo?: string;
-
-  telefono?: string;
-  whatsapp?: string;
-  email?: string;
-
-  region?: string;
-  comuna?: string;
-  direccion?: string;
-
-  status: 'active' | 'inactive';
-  notes?: string;
+  sexo: string | null;
+  telefono: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  region: string | null;
+  comuna: string | null;
+  direccion: string | null;
+  created_at: string | null;
 }
 
 export interface AdultoMember extends PersonaBase {
   tipo: 'adulto';
-  bautizado?: string;          // 'Sí' | 'No' | 'En proceso'
-  tiempoConversion?: string;
+  bautizado: BautizadoStatus;
+  tiempo_conversion: string | null;
 }
 
 export interface NinoMember extends PersonaBase {
   tipo: 'nino';
-  fechaNacimiento?: string;
-  edad?: number;
-  nombreApoderado?: string;
-  telefonoApoderado?: string;
+  fecha_nacimiento: string | null;
+  edad: number | null;
+  nombre_apoderado: string | null;
+  telefono_apoderado: string | null;
 }
 
 export type Member = AdultoMember | NinoMember;
 
-// Helper de tipo
-export function isAdulto(m: Member): m is AdultoMember {
+export function isAdultoMember(m: Member): m is AdultoMember {
   return m.tipo === 'adulto';
 }
-export function isNino(m: Member): m is NinoMember {
+
+export function isNinoMember(m: Member): m is NinoMember {
   return m.tipo === 'nino';
+}
+
+export function getMemberInitials(nombre: string) {
+  return nombre.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 }
