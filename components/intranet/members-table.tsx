@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMembers } from '@/lib/members-store';
 import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember } from '@/lib/types';
+import { MemberForm } from '@/components/intranet/member-form';
 
 function fmt(v: string | number | null | undefined) {
   return v === null || v === undefined || v === '' ? '—' : String(v);
@@ -366,8 +367,19 @@ export function MembersTable() {
       </Card>
 
       <ViewDialog member={viewing} open={!!viewing} onClose={() => setViewing(null)} />
-      <EditAdultoDialog member={editAdulto} open={!!editAdulto} onClose={() => setEditAdulto(null)} />
-      <EditNinoDialog member={editNino} open={!!editNino} onClose={() => setEditNino(null)} />
+      <Dialog open={!!(editAdulto || editNino)} onOpenChange={(o) => { if (!o) { setEditAdulto(null); setEditNino(null); } }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar miembro</DialogTitle>
+            <DialogDescription>Actualiza los datos del registro.</DialogDescription>
+          </DialogHeader>
+          <MemberForm
+            member={editAdulto ?? editNino}
+            onSuccess={() => { setEditAdulto(null); setEditNino(null); }}
+            onCancel={() => { setEditAdulto(null); setEditNino(null); }}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
