@@ -22,26 +22,30 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+
       {/* Navigation */}
       <nav className="sticky top-0 z-50 backdrop-blur-sm bg-background/95 border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/logo.png"
-              alt="Somos Luz"
-              width={120}
-              height={40}
-              className="h-10 w-auto"
-            />
+            <Image src="/logo.png" alt="Somos Luz" width={120} height={40} className="h-10 w-auto" />
           </Link>
-          <div className="hidden md:flex gap-8">
+
+          {/* Desktop */}
+          <div className="hidden md:flex gap-8 items-center">
             <a href="#about" className="text-sm hover:text-primary transition">Sobre Nosotros</a>
             <a href="#schedule" className="text-sm hover:text-primary transition">Horarios</a>
             <a href="#prayer" className="text-sm hover:text-primary transition">Oración</a>
             <a href="#contact" className="text-sm hover:text-primary transition">Contacto</a>
+            <Link href="/intranet" className="text-sm hover:text-primary transition font-medium">
+              Intranet
+            </Link>
+          </div>
+
+          {/* Mobile — botones directos */}
+          <div className="flex md:hidden items-center gap-3">
             <Link
               href="/intranet"
-              className="text-sm hover:text-primary transition font-medium"
+              className="text-sm font-semibold text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary/10 transition"
             >
               Intranet
             </Link>

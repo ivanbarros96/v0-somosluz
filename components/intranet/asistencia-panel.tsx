@@ -23,6 +23,8 @@ type Culto = {
   activo: boolean;
 };
 
+type Filtro = 'todos' | 'adulto' | 'nino' | 'nuevo';
+
 function personaKey(p: Persona) {
   return `${p.tipo}::${p.id}`;
 }
@@ -48,12 +50,12 @@ export function AsistenciaPanel() {
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('todos');
   const [nuevaFecha, setNuevaFecha] = useState('');
   const [creando, setCreando] = useState(false);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [cerrandoCulto, setCerrandoCulto] = useState(false);
 
-  // Cargar cultos
   useEffect(() => {
     const load = async () => {
       setLoadingCultos(true);
@@ -68,7 +70,6 @@ export function AsistenciaPanel() {
     load();
   }, []);
 
-  // Cargar todas las personas
   useEffect(() => {
     const load = async () => {
       setLoadingPersonas(true);
@@ -98,7 +99,6 @@ export function AsistenciaPanel() {
     load();
   }, []);
 
-  // Cargar asistencias del culto seleccionado
   const cargarAsistencias = useCallback(async (id: number) => {
     const { data } = await supabase
       .from('asistencias')
@@ -118,7 +118,6 @@ export function AsistenciaPanel() {
     if (cultoId) cargarAsistencias(cultoId);
   }, [cultoId, cargarAsistencias]);
 
-  // Toggle asistencia
   const toggleAsistencia = async (persona: Persona) => {
     if (!cultoId) return;
     const key = personaKey(persona);
@@ -133,10 +132,7 @@ export function AsistenciaPanel() {
       }
       setPresentes((prev) => { const n = new Set(prev); n.delete(key); return n; });
     } else {
-      const row: any = {
-        culto_id: cultoId,
-        fecha_registro: new Date().toISOString(),
-      };
+      const row: any = { culto_id: cultoId, fecha_registro: new Date().toISOString() };
       if (persona.tipo === 'nuevo') {
         row.miembro_nuevo_id = persona.id;
       } else {
@@ -148,7 +144,6 @@ export function AsistenciaPanel() {
     setSavingKey(null);
   };
 
-  // Crear culto — descripción automática, sin campo manual
   const crearCulto = async () => {
     if (!nuevaFecha) return;
     setCreando(true);
@@ -169,28 +164,29 @@ export function AsistenciaPanel() {
     setCreando(false);
   };
 
-  // Cerrar culto activo
   const cerrarCulto = async () => {
     if (!cultoId) return;
     setCerrandoCulto(true);
-    const { error } = await supabase
-      .from('cultos')
-      .update({ activo: false })
-      .eq('id', cultoId);
+    const { error } = await supabase.from('cultos').update({ activo: false }).eq('id', cultoId);
     if (!error) {
-      setCultos((prev) =>
-        prev.map((c) => c.id === cultoId ? { ...c, activo: false } : c)
-      );
+      setCultos((prev) => prev.map((c) => c.id === cultoId ? { ...c, activo: false } : c));
     }
     setCerrandoCulto(false);
   };
 
-  const filtradas = personas.filter((p) =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const filtradas = personas
+    .filter((p) => filtro === 'todos' || p.tipo === filtro)
+    .filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   const totalPresentes = presentes.size;
   const cultoActual = cultos.find((c) => c.id === cultoId);
+
+  const FILTROS: { key: Filtro; label: string }[] = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'adulto', label: 'Adultos' },
+    { key: 'nino', label: 'Niños' },
+    { key: 'nuevo', label: 'Nuevos' },
+  ];
 
   return (
     <div className="space-y-5">
@@ -209,7 +205,6 @@ export function AsistenciaPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-
           {mostrarNuevo && (
             <div className="grid gap-3 p-4 rounded-lg bg-muted/50 border">
               <div className="space-y-1">
@@ -278,14 +273,8 @@ export function AsistenciaPanel() {
                   <Users className="w-3 h-3" />
                   {personas.length} total
                 </Badge>
-                {/* Botón cerrar culto — solo si está activo */}
                 {cultoActual?.activo && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={cerrarCulto}
-                    disabled={cerrandoCulto}
-                  >
+                  <Button size="sm" variant="destructive" onClick={cerrarCulto} disabled={cerrandoCulto}>
                     {cerrandoCulto
                       ? <Loader2 className="w-4 h-4 animate-spin mr-1" />
                       : <XCircle className="w-4 h-4 mr-1" />}
@@ -294,13 +283,32 @@ export function AsistenciaPanel() {
                 )}
               </div>
             </div>
+
+            {/* Buscador */}
             <Input
               className="mt-3"
               placeholder="Buscar persona..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
+
+            {/* Filtros por tipo */}
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {FILTROS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFiltro(key)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                    ${filtro === key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </CardHeader>
+
           <CardContent className="px-0 pt-0">
             {loadingPersonas ? (
               <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
@@ -345,7 +353,6 @@ export function AsistenciaPanel() {
                     </div>
                   );
                 })}
-
                 {filtradas.length === 0 && (
                   <div className="py-10 text-center text-muted-foreground text-sm">
                     No se encontraron personas.
