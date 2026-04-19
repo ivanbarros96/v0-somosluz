@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, CalendarPlus, Users, UserCheck } from 'lucide-react';
+import { Loader2, CalendarPlus, Users, UserCheck, XCircle } from 'lucide-react';
 
 type Persona = {
   id: number;
@@ -20,9 +20,11 @@ type Culto = {
   id: number;
   fecha: string;
   descripcion: string;
+  activo: boolean;
 };
 
-// Clave única por persona en el Set de presentes
+type Filtro = 'todos' | 'adulto' | 'nino' | 'nuevo';
+
 function personaKey(p: Persona) {
   return `${p.tipo}::${p.id}`;
 }
@@ -48,19 +50,18 @@ export function AsistenciaPanel() {
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-
+  const [filtro, setFiltro] = useState<Filtro>('todos');
   const [nuevaFecha, setNuevaFecha] = useState('');
-  const [nuevaDesc, setNuevaDesc] = useState('');
   const [creando, setCreando] = useState(false);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
+  const [cerrandoCulto, setCerrandoCulto] = useState(false);
 
-  // Cargar cultos
   useEffect(() => {
     const load = async () => {
       setLoadingCultos(true);
       const { data } = await supabase
         .from('cultos')
-        .select('id, fecha, descripcion')
+        .select('id, fecha, descripcion, activo')
         .order('fecha', { ascending: false });
       setCultos(data ?? []);
       if (data && data.length > 0) setCultoId(data[0].id);
@@ -69,7 +70,6 @@ export function AsistenciaPanel() {
     load();
   }, []);
 
-  // Cargar todas las personas
   useEffect(() => {
     const load = async () => {
       setLoadingPersonas(true);
@@ -99,7 +99,6 @@ export function AsistenciaPanel() {
     load();
   }, []);
 
-  // Cargar asistencias del culto seleccionado
   const cargarAsistencias = useCallback(async (id: number) => {
     const { data } = await supabase
       .from('asistencias')
@@ -119,14 +118,12 @@ export function AsistenciaPanel() {
     if (cultoId) cargarAsistencias(cultoId);
   }, [cultoId, cargarAsistencias]);
 
-  // Toggle asistencia
   const toggleAsistencia = async (persona: Persona) => {
     if (!cultoId) return;
     const key = personaKey(persona);
     setSavingKey(key);
 
     if (presentes.has(key)) {
-      // Eliminar
       const query = supabase.from('asistencias').delete().eq('culto_id', cultoId);
       if (persona.tipo === 'nuevo') {
         await query.eq('miembro_nuevo_id', persona.id);
@@ -135,11 +132,7 @@ export function AsistenciaPanel() {
       }
       setPresentes((prev) => { const n = new Set(prev); n.delete(key); return n; });
     } else {
-      // Insertar
-      const row: any = {
-        culto_id: cultoId,
-        fecha_registro: new Date().toISOString(),
-      };
+      const row: any = { culto_id: cultoId, fecha_registro: new Date().toISOString() };
       if (persona.tipo === 'nuevo') {
         row.miembro_nuevo_id = persona.id;
       } else {
@@ -151,11 +144,12 @@ export function AsistenciaPanel() {
     setSavingKey(null);
   };
 
-  // Crear culto
   const crearCulto = async () => {
     if (!nuevaFecha) return;
     setCreando(true);
-    const desc = nuevaDesc.trim() || `Culto ${new Date(nuevaFecha).toLocaleDateString('es-CL')}`;
+    const desc = `Culto dominical ${new Date(nuevaFecha + 'T12:00:00').toLocaleDateString('es-ES', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    })}`;
     const { data, error } = await supabase
       .from('cultos')
       .insert({ fecha: nuevaFecha, descripcion: desc, activo: true })
@@ -165,18 +159,34 @@ export function AsistenciaPanel() {
       setCultos((prev) => [data, ...prev]);
       setCultoId(data.id);
       setNuevaFecha('');
-      setNuevaDesc('');
       setMostrarNuevo(false);
     }
     setCreando(false);
   };
 
-  const filtradas = personas.filter((p) =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const cerrarCulto = async () => {
+    if (!cultoId) return;
+    setCerrandoCulto(true);
+    const { error } = await supabase.from('cultos').update({ activo: false }).eq('id', cultoId);
+    if (!error) {
+      setCultos((prev) => prev.map((c) => c.id === cultoId ? { ...c, activo: false } : c));
+    }
+    setCerrandoCulto(false);
+  };
+
+  const filtradas = personas
+    .filter((p) => filtro === 'todos' || p.tipo === filtro)
+    .filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   const totalPresentes = presentes.size;
   const cultoActual = cultos.find((c) => c.id === cultoId);
+
+  const FILTROS: { key: Filtro; label: string }[] = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'adulto', label: 'Adultos' },
+    { key: 'nino', label: 'Niños' },
+    { key: 'nuevo', label: 'Nuevos' },
+  ];
 
   return (
     <div className="space-y-5">
@@ -195,26 +205,15 @@ export function AsistenciaPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-
           {mostrarNuevo && (
             <div className="grid gap-3 p-4 rounded-lg bg-muted/50 border">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Fecha <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="date"
-                    value={nuevaFecha}
-                    onChange={(e) => setNuevaFecha(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Descripción</Label>
-                  <Input
-                    value={nuevaDesc}
-                    onChange={(e) => setNuevaDesc(e.target.value)}
-                    placeholder="Ej: Culto dominical"
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label>Fecha <span className="text-red-500">*</span></Label>
+                <Input
+                  type="date"
+                  value={nuevaFecha}
+                  onChange={(e) => setNuevaFecha(e.target.value)}
+                />
               </div>
               <Button onClick={crearCulto} disabled={creando || !nuevaFecha}>
                 {creando && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -238,7 +237,12 @@ export function AsistenciaPanel() {
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background hover:bg-muted border-border'}`}
                 >
-                  <p className="font-medium">{c.descripcion}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">{c.descripcion}</p>
+                    {c.activo && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Abierto</span>
+                    )}
+                  </div>
                   <p className={`text-xs mt-0.5 ${cultoId === c.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                     {formatFecha(c.fecha)}
                   </p>
@@ -260,7 +264,7 @@ export function AsistenciaPanel() {
                   {cultoActual ? formatFecha(cultoActual.fecha) : ''}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge className="bg-green-100 text-green-700 border-green-200 gap-1">
                   <UserCheck className="w-3 h-3" />
                   {totalPresentes} presentes
@@ -269,15 +273,42 @@ export function AsistenciaPanel() {
                   <Users className="w-3 h-3" />
                   {personas.length} total
                 </Badge>
+                {cultoActual?.activo && (
+                  <Button size="sm" variant="destructive" onClick={cerrarCulto} disabled={cerrandoCulto}>
+                    {cerrandoCulto
+                      ? <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      : <XCircle className="w-4 h-4 mr-1" />}
+                    Cerrar culto
+                  </Button>
+                )}
               </div>
             </div>
+
+            {/* Buscador */}
             <Input
               className="mt-3"
               placeholder="Buscar persona..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
+
+            {/* Filtros por tipo */}
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {FILTROS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFiltro(key)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                    ${filtro === key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </CardHeader>
+
           <CardContent className="px-0 pt-0">
             {loadingPersonas ? (
               <div className="py-10 text-center text-muted-foreground flex items-center justify-center gap-2">
@@ -297,7 +328,6 @@ export function AsistenciaPanel() {
                       className={`flex items-center gap-4 px-6 py-3 cursor-pointer transition-colors
                         hover:bg-muted/50 ${presente ? 'bg-green-50' : ''}`}
                     >
-                      {/* Checkbox */}
                       <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
                         ${presente ? 'bg-green-500 border-green-500' : 'bg-white border-border'}`}>
                         {saving
@@ -308,8 +338,6 @@ export function AsistenciaPanel() {
                             </svg>
                           )}
                       </div>
-
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${presente ? 'text-green-800' : ''}`}>
                           {persona.nombre}
@@ -318,16 +346,13 @@ export function AsistenciaPanel() {
                           <p className="text-xs text-muted-foreground">{persona.telefono}</p>
                         )}
                       </div>
-
                       {tipoBadge(persona.tipo)}
-
                       {presente && !saving && (
                         <span className="text-xs text-green-600 font-medium">✓ Presente</span>
                       )}
                     </div>
                   );
                 })}
-
                 {filtradas.length === 0 && (
                   <div className="py-10 text-center text-muted-foreground text-sm">
                     No se encontraron personas.
