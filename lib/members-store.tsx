@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Member } from './types';
+import { Member, AdultoMember, NinoMember } from './types';
 import { supabase } from './supabase';
 
 interface MembersContextType {
@@ -16,43 +16,121 @@ interface MembersContextType {
 
 const MembersContext = createContext<MembersContextType | undefined>(undefined);
 
-// Mapear fila de Supabase al tipo Member
+// ── Mapear fila Supabase → Member ──────────────────────────
+
 function mapToMember(row: any): Member {
-  return {
+  const tipo: 'adulto' | 'nino' = row.source_tipo === 'nino' ? 'nino' : 'adulto';
+
+  const base = {
     id: String(row.id),
-    firstName: row.nombre?.split(' ')[0] ?? '',
-    lastName: row.nombre?.split(' ').slice(1).join(' ') ?? '',
-    email: row.email ?? '',
-    phone: row.telefono ?? row.whatsapp ?? '',
-    registrationDate: row.fecha_registro
+    tipo,
+    sourceId: row.source_id,
+    fechaRegistro: row.fecha_registro
       ? new Date(row.fecha_registro).toISOString().split('T')[0]
       : row.created_at
-      ? new Date(row.created_at).toISOString().split('T')[0]
-      : '',
-    status: 'active',
-    ministry: row.region ?? '',
-    notes: [
-      row.bautizado ? `Bautizado: ${row.bautizado}` : '',
-      row.tiempo_conversion ? `Conversion: ${row.tiempo_conversion}` : '',
-      row.comuna ? `Comuna: ${row.comuna}` : '',
-    ]
-      .filter(Boolean)
-      .join(' | '),
+        ? new Date(row.created_at).toISOString().split('T')[0]
+        : '',
+    nombre: row.nombre ?? '',
+    sexo: row.sexo ?? '',
+    telefono: row.telefono ?? '',
+    whatsapp: row.whatsapp ?? '',
+    email: row.email ?? '',
+    region: row.region ?? '',
+    comuna: row.comuna ?? '',
+    direccion: row.direccion ?? '',
+    status: 'active' as const,
+    notes: row.notes ?? '',
   };
+
+  if (tipo === 'nino') {
+    const nino: NinoMember = {
+      ...base,
+      tipo: 'nino',
+      fechaNacimiento: row.fecha_nacimiento
+        ? new Date(row.fecha_nacimiento).toISOString().split('T')[0]
+        : undefined,
+      edad: row.edad ?? undefined,
+      nombreApoderado: row.nombre_apoderado ?? '',
+      telefonoApoderado: row.telefono_apoderado ?? '',
+    };
+    return nino;
+  } else {
+    const adulto: AdultoMember = {
+      ...base,
+      tipo: 'adulto',
+      bautizado: row.bautizado ?? '',
+      tiempoConversion: row.tiempo_conversion ?? '',
+    };
+    return adulto;
+  }
 }
 
-// Mapear Member al formato de Supabase para insertar/actualizar
+// ── Mapear Member → fila Supabase ──────────────────────────
+
 function mapToRow(member: Omit<Member, 'id'>) {
-  return {
-    nombre: `${member.firstName} ${member.lastName}`.trim(),
+  const base: any = {
+    source_tipo: member.tipo,
+    source_id: member.sourceId ?? Date.now(),
+    fecha_registro: member.fechaRegistro || new Date().toISOString(),
+    nombre: member.nombre?.trim() || '',
+    sexo: member.sexo || null,
+    telefono: member.telefono || null,
+    whatsapp: member.whatsapp || null,
     email: member.email || null,
-    telefono: member.phone || null,
-    fecha_registro: member.registrationDate || new Date().toISOString(),
-    source_tipo: 'intranet',
-    source_id: Date.now(),
-    region: member.ministry || null,
+    region: member.region || null,
+    comuna: member.comuna || null,
+    direccion: member.direccion || null,
+    notes: member.notes || null,
   };
+
+  if (member.tipo === 'nino') {
+    base.fecha_nacimiento = member.fechaNacimiento || null;
+    base.edad = member.edad ?? null;
+    base.nombre_apoderado = member.nombreApoderado || null;
+    base.telefono_apoderado = member.telefonoApoderado || null;
+  } else {
+    base.bautizado = member.bautizado || null;
+    base.tiempo_conversion = member.tiempoConversion || null;
+  }
+
+  return base;
 }
+
+// ── Mapear campos de update parcial → columnas Supabase ────
+
+function mapUpdateFields(data: Partial<Member>): any {
+  const row: any = {};
+
+  if (data.nombre !== undefined) row.nombre = data.nombre;
+  if (data.sexo !== undefined) row.sexo = data.sexo;
+  if (data.telefono !== undefined) row.telefono = data.telefono;
+  if (data.whatsapp !== undefined) row.whatsapp = data.whatsapp;
+  if (data.email !== undefined) row.email = data.email;
+  if (data.region !== undefined) row.region = data.region;
+  if (data.comuna !== undefined) row.comuna = data.comuna;
+  if (data.direccion !== undefined) row.direccion = data.direccion;
+  if (data.fechaRegistro !== undefined) row.fecha_registro = data.fechaRegistro;
+  if (data.notes !== undefined) row.notes = data.notes;
+  if (data.tipo !== undefined) row.source_tipo = data.tipo;
+
+  // Campos de adulto
+  if ('bautizado' in data && data.bautizado !== undefined) row.bautizado = data.bautizado;
+  if ('tiempoConversion' in data && data.tiempoConversion !== undefined)
+    row.tiempo_conversion = data.tiempoConversion;
+
+  // Campos de niño
+  if ('fechaNacimiento' in data && data.fechaNacimiento !== undefined)
+    row.fecha_nacimiento = data.fechaNacimiento;
+  if ('edad' in data && data.edad !== undefined) row.edad = data.edad;
+  if ('nombreApoderado' in data && data.nombreApoderado !== undefined)
+    row.nombre_apoderado = data.nombreApoderado;
+  if ('telefonoApoderado' in data && data.telefonoApoderado !== undefined)
+    row.telefono_apoderado = data.telefonoApoderado;
+
+  return row;
+}
+
+// ── Provider ───────────────────────────────────────────────
 
 export function MembersProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -93,17 +171,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   };
 
   const updateMember = async (id: string, memberData: Partial<Member>) => {
-    const updateRow: any = {};
-    if (memberData.firstName || memberData.lastName) {
-      const current = members.find(m => m.id === id);
-      const firstName = memberData.firstName ?? current?.firstName ?? '';
-      const lastName = memberData.lastName ?? current?.lastName ?? '';
-      updateRow.nombre = `${firstName} ${lastName}`.trim();
-    }
-    if (memberData.email !== undefined) updateRow.email = memberData.email;
-    if (memberData.phone !== undefined) updateRow.telefono = memberData.phone;
-    if (memberData.ministry !== undefined) updateRow.region = memberData.ministry;
-    if (memberData.registrationDate !== undefined) updateRow.fecha_registro = memberData.registrationDate;
+    const updateRow = mapUpdateFields(memberData);
 
     const { data, error } = await supabase
       .from('personas')
@@ -120,10 +188,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMember = async (id: string) => {
-    const { error } = await supabase
-      .from('personas')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('personas').delete().eq('id', id);
 
     if (!error) {
       setMembers(prev => prev.filter(m => m.id !== id));
@@ -136,7 +201,15 @@ export function MembersProvider({ children }: { children: ReactNode }) {
 
   return (
     <MembersContext.Provider
-      value={{ members, isLoading, addMember, updateMember, deleteMember, getMemberById, refreshMembers: fetchMembers }}
+      value={{
+        members,
+        isLoading,
+        addMember,
+        updateMember,
+        deleteMember,
+        getMemberById,
+        refreshMembers: fetchMembers,
+      }}
     >
       {children}
     </MembersContext.Provider>
