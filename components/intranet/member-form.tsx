@@ -188,7 +188,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     if (!form.nombre.trim()) { setError('El nombre es obligatorio.'); return; }
     if (modo !== 'nuevo' && !form.sexo) { setError('Selecciona el sexo.'); return; }
 
-    if ((modo === 'adulto' || modo === 'nuevo') && !form.email.trim()) {
+    if (modo === 'nuevo' && !form.email.trim()) {
       setError('El correo electrónico es obligatorio.'); return;
     }
 
@@ -515,7 +515,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
 
             <div className="space-y-1">
-              <Label>Email <span className="text-red-500">*</span></Label>
+              <Label>Email <span className="text-muted-foreground text-xs font-normal">(opcional)</span></Label>
               <Input
                 type="email"
                 value={form.email}
