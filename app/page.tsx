@@ -4,12 +4,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MapPin, Clock, Instagram, MessageCircle } from 'lucide-react';
+import { MapPin, Clock, Instagram, MessageCircle, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Home() {
   const [prayerForm, setPrayerForm] = useState({ name: '', email: '', prayer: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handlePrayerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,13 +21,15 @@ export default function Home() {
     }, 3000);
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
 
       {/* Navigation */}
       <nav className="sticky top-0 z-50 backdrop-blur-sm bg-background/95 border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2" onClick={closeMenu}>
             <Image src="/logo.png" alt="Somos Luz" width={120} height={40} className="h-10 w-auto" />
           </Link>
 
@@ -41,16 +44,28 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Mobile — botones directos */}
-          <div className="flex md:hidden items-center gap-3">
-            <Link
-              href="/intranet"
-              className="text-sm font-semibold text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary/10 transition"
-            >
+          {/* Mobile — hamburguesa */}
+          <button
+            className="md:hidden p-2 rounded-md hover:bg-secondary transition"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Abrir menu"
+          >
+            {menuOpen ? <X className="w-5 h-5 text-foreground" /> : <Menu className="w-5 h-5 text-foreground" />}
+          </button>
+        </div>
+
+        {/* Mobile menu desplegable */}
+        {menuOpen && (
+          <div className="md:hidden border-t border-border bg-background/98 px-4 py-4 flex flex-col gap-4">
+            <a href="#about" onClick={closeMenu} className="text-sm font-medium hover:text-primary transition py-2 border-b border-border">Sobre Nosotros</a>
+            <a href="#schedule" onClick={closeMenu} className="text-sm font-medium hover:text-primary transition py-2 border-b border-border">Horarios</a>
+            <a href="#prayer" onClick={closeMenu} className="text-sm font-medium hover:text-primary transition py-2 border-b border-border">Oracion</a>
+            <a href="#contact" onClick={closeMenu} className="text-sm font-medium hover:text-primary transition py-2 border-b border-border">Contacto</a>
+            <Link href="/intranet" onClick={closeMenu} className="text-sm font-semibold text-primary py-2">
               Intranet
             </Link>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -220,7 +235,7 @@ export default function Home() {
             Conecta con Nosotros
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             <div className="text-center">
               <Instagram className="w-12 h-12 text-primary mx-auto mb-4" />
               <h3 className="font-semibold mb-2 text-foreground">Instagram</h3>
