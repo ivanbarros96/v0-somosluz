@@ -99,6 +99,7 @@ export function AsistenciaPanel() {
     load();
   }, []);
 
+  // ✅ CÓDIGO CORRECTO
   const cargarAsistencias = useCallback(async (id: number) => {
     const { data } = await supabase
       .from('asistencias')
@@ -107,12 +108,15 @@ export function AsistenciaPanel() {
 
     const keys = new Set<string>();
     for (const a of data ?? []) {
-      if (a.persona_id) keys.add(`adulto::${a.persona_id}`);
-      if (a.persona_id) keys.add(`nino::${a.persona_id}`);
+      if (a.persona_id) {
+        // Buscar el tipo real de la persona en el estado `personas`
+        const persona = personas.find(p => p.id === a.persona_id && p.tipo !== 'nuevo');
+        if (persona) keys.add(`${persona.tipo}::${a.persona_id}`);
+      }
       if (a.miembro_nuevo_id) keys.add(`nuevo::${a.miembro_nuevo_id}`);
     }
     setPresentes(keys);
-  }, []);
+  }, [personas]); // ← agregar personas como dependencia
 
   useEffect(() => {
     if (cultoId) cargarAsistencias(cultoId);
