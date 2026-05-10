@@ -213,13 +213,12 @@ export function MembersTable() {
                     <TableHead>Sexo</TableHead>
                     <TableHead>Apoderado</TableHead>
                     <TableHead>Tel. apoderado</TableHead>
-                    <TableHead>Región / Comuna</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ninos.length === 0
-                    ? <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Sin niños registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin niños registrados.</TableCell></TableRow>
                     : ninos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -232,7 +231,6 @@ export function MembersTable() {
                         <TableCell>{fmt(m.sexo)}</TableCell>
                         <TableCell>{fmt(m.nombre_apoderado)}</TableCell>
                         <TableCell>{fmt(m.telefono_apoderado)}</TableCell>
-                        <TableCell>{fmt(m.region)}{m.comuna ? ` / ${m.comuna}` : ''}</TableCell>
                         <TableCell><Actions m={m} /></TableCell>
                       </TableRow>
                     ))}
