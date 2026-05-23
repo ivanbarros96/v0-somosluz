@@ -17,6 +17,8 @@ export default function IntranetLoginPage() {
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showTransition, setShowTransition] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const { login, isAuthenticated, user } = useAuth();
   const router = useRouter();
@@ -26,6 +28,32 @@ export default function IntranetLoginPage() {
       router.push('/intranet/dashboard');
     }
   }, [isAuthenticated, user, router]);
+
+  // Animacion de progreso
+  useEffect(() => {
+    if (!showTransition) return;
+    const duration = 1200;
+    const interval = 20;
+    const increment = 100 / (duration / interval);
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + increment;
+        if (next >= 100) {
+          clearInterval(timer);
+          return 100;
+        }
+        return next;
+      });
+    }, interval);
+    return () => clearInterval(timer);
+  }, [showTransition]);
+
+  // Redirigir cuando progreso llega a 100
+  useEffect(() => {
+    if (progress >= 100) {
+      router.push('/intranet/dashboard');
+    }
+  }, [progress, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,15 +66,38 @@ export default function IntranetLoginPage() {
     const success = login(username, password);
 
     if (success) {
-      router.push('/intranet/dashboard');
+      setShowTransition(true);
     } else {
       setError('Credenciales incorrectas');
       setShake(true);
       setTimeout(() => setShake(false), 500);
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
+
+  // Pantalla de transicion
+  if (showTransition) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-primary">
+        <Image
+          src="/logo.png"
+          alt="Somos Luz"
+          width={200}
+          height={80}
+          className="mb-8 brightness-0 invert"
+        />
+        <div className="w-64 h-2 bg-primary-foreground/20 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary-foreground rounded-full transition-all duration-100 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="mt-4 text-primary-foreground text-sm font-medium">
+          Cargando...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
