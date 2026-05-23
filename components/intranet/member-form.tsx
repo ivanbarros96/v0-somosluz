@@ -264,23 +264,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         }
       }
 
-      // ✅ Verificar email duplicado adulto (después de la verificación de nombre)
-      if (modo === 'adulto' && form.email.trim()) {
-        const query = supabase
-          .from('personas')
-          .select('id, nombre')
-          .eq('source_tipo', 'adulto')
-          .eq('email', form.email.trim().toLowerCase());
-
-        if (isEditing && member?.id) query.neq('id', member.id);
-
-        const { data: existing } = await query.maybeSingle();
-        if (existing) {
-          setError(`Este email ya está registrado para: ${existing.nombre}`);
-          setLoading(false);
-          return;
-        }
-      }
 
       // ✅ Niño: verificar que el email del apoderado exista como adulto
       if (modo === 'nino') {
