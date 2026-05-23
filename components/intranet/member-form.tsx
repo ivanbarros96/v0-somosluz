@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMembers } from '@/lib/members-store';
 import type { Member, AdultoMember, NinoMember } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,6 @@ function emptyForm() {
     codTel: '+56', telefono: '',
     codWa: '+56', whatsapp: '',
     email: '',
-    email_apoderado: '',
     region: '', comuna: '',
     direccion: '',
     bautizado: false,
@@ -107,9 +106,14 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
-  // ✅ Para mostrar datos del apoderado encontrado
-  const [apoderadoEncontrado, setApoderadoEncontrado] = useState<{ nombre: string; telefono: string | null } | null>(null);
-  const [buscandoApoderado, setBuscandoApoderado] = useState(false);
+
+  // Autocomplete apoderado
+  const [apoderadoQuery, setApoderadoQuery] = useState('');
+  const [apoderadoResultados, setApoderadoResultados] = useState<{ id: string; nombre: string; telefono: string | null }[]>([]);
+  const [apoderadoBuscando, setApoderadoBuscando] = useState(false);
+  const [apoderadoSeleccionado, setApoderadoSeleccionado] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null);
+  const [apoderadoDropdownOpen, setApoderadoDropdownOpen] = useState(false);
+  const apoderadoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!member) { setForm(emptyForm()); return; }
@@ -154,31 +158,58 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
         base.anio = parts[2] ?? '';
       }
-      base.email_apoderado = n.email ?? '';
+      // Precargar apoderado si existe
+      if (n.nombre_apoderado) {
+        setApoderadoQuery(n.nombre_apoderado);
+        setApoderadoSeleccionado({ id: '', nombre: n.nombre_apoderado, telefono: n.telefono_apoderado ?? null });
+      }
     }
 
     setForm(base);
   }, [member]);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (apoderadoRef.current && !apoderadoRef.current.contains(e.target as Node)) {
+        setApoderadoDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Buscar apoderados al escribir
+  useEffect(() => {
+    if (apoderadoQuery.length < 2) {
+      setApoderadoResultados([]);
+      setApoderadoDropdownOpen(false);
+      return;
+    }
+    // Si ya hay uno seleccionado y el query coincide con su nombre, no buscar
+    if (apoderadoSeleccionado && apoderadoQuery === apoderadoSeleccionado.nombre) return;
+
+    setApoderadoBuscando(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('personas')
+        .select('id, nombre, telefono')
+        .eq('source_tipo', 'adulto')
+        .ilike('nombre', `%${apoderadoQuery}%`)
+        .order('nombre')
+        .limit(8);
+      setApoderadoResultados(data ?? []);
+      setApoderadoDropdownOpen(true);
+      setApoderadoBuscando(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [apoderadoQuery]);
 
   const set = (key: string, val: string | boolean) =>
     setForm((f) => ({ ...f, [key]: val }));
 
   const handleRegionChange = (val: string) => {
     setForm((f) => ({ ...f, region: val, comuna: '' }));
-  };
-
-  // ✅ Buscar apoderado al salir del campo email
-  const buscarApoderado = async (email: string) => {
-    if (!email.trim()) { setApoderadoEncontrado(null); return; }
-    setBuscandoApoderado(true);
-    const { data } = await supabase
-      .from('personas')
-      .select('nombre, telefono')
-      .eq('source_tipo', 'adulto')
-      .eq('email', email.trim().toLowerCase())
-      .single();
-    setBuscandoApoderado(false);
-    setApoderadoEncontrado(data ? { nombre: data.nombre, telefono: data.telefono } : null);
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -192,20 +223,37 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       setError('El correo electrónico es obligatorio.'); return;
     }
 
-    if (modo === 'nino' && !form.email_apoderado.trim()) {
-      setError('El email del apoderado es obligatorio.'); return;
+    if (modo === 'nino') {
+      if (!apoderadoQuery.trim()) {
+        setError('El apoderado es obligatorio.'); return;
+      }
+      if (!apoderadoSeleccionado) {
+        setError('Debes seleccionar un apoderado de la lista.'); return;
+      }
     }
 
     setLoading(true);
     try {
-      // ✅ MODO NUEVO → verificar duplicado por nombre en miembros_nuevos
+      // ✅ MODO NUEVO → verificar duplicado por nombre en personas Y en miembros_nuevos
       if (modo === 'nuevo') {
-        const queryNuevo = supabase
+        const { data: existeEnPersonas } = await supabase
+          .from('personas')
+          .select('id, nombre')
+          .ilike('nombre', form.nombre.trim())
+          .maybeSingle();
+
+        if (existeEnPersonas) {
+          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
+          setLoading(false);
+          return;
+        }
+
+        const { data: existeNuevo } = await supabase
           .from('miembros_nuevos')
           .select('id, nombre')
-          .ilike('nombre', form.nombre.trim());
+          .ilike('nombre', form.nombre.trim())
+          .maybeSingle();
 
-        const { data: existeNuevo } = await queryNuevo.maybeSingle();
         if (existeNuevo) {
           setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
           setLoading(false);
@@ -235,12 +283,11 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       const convFull = (form.convNum && form.convUnidad)
         ? `${form.convNum} ${form.convUnidad}` : null;
 
-      // ✅ Verificar duplicado por nombre en personas (adulto y niño)
+      // ✅ Verificar duplicado por nombre en personas (sin filtrar por source_tipo)
       {
         const queryNombre = supabase
           .from('personas')
           .select('id, nombre')
-          .eq('source_tipo', modo)
           .ilike('nombre', form.nombre.trim());
 
         if (isEditing && member?.id) queryNombre.neq('id', member.id);
@@ -253,39 +300,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         }
       }
 
-      // ✅ Verificar email duplicado adulto (después de la verificación de nombre)
-      if (modo === 'adulto' && form.email.trim()) {
-        const query = supabase
-          .from('personas')
-          .select('id, nombre')
-          .eq('source_tipo', 'adulto')
-          .eq('email', form.email.trim().toLowerCase());
 
-        if (isEditing && member?.id) query.neq('id', member.id);
-
-        const { data: existing } = await query.maybeSingle();
-        if (existing) {
-          setError(`Este email ya está registrado para: ${existing.nombre}`);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // ✅ Niño: verificar que el email del apoderado exista como adulto
+      // Niño: usar apoderado seleccionado del autocomplete
       if (modo === 'nino') {
-        const { data: apoderado } = await supabase
-          .from('personas')
-          .select('id, nombre, telefono')
-          .eq('source_tipo', 'adulto')
-          .eq('email', form.email_apoderado.trim().toLowerCase())
-          .single();
-
-        if (!apoderado) {
-          setError('No se encontró ningún adulto registrado con ese email. Registra primero al apoderado.');
-          setLoading(false);
-          return;
-        }
-
         const fecha = (form.dia && form.mes && form.anio)
           ? `${form.dia}/${form.mes}/${form.anio}` : null;
         const edad = (form.dia && form.mes && form.anio)
@@ -299,18 +316,16 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           sexo: form.sexo || null,
           telefono: null,
           whatsapp: null,
-          // ✅ Después
           email: null,
           region: null, comuna: null, direccion: null,
           fecha_nacimiento: fecha,
           edad,
-          // ✅ Rellenar automáticamente con datos del apoderado encontrado
-          nombre_apoderado: apoderado.nombre,
-          telefono_apoderado: apoderado.telefono,
+          nombre_apoderado: apoderadoSeleccionado!.nombre,
+          telefono_apoderado: apoderadoSeleccionado!.telefono,
         };
         isEditing ? await updateMember(member!.id, data) : await addMember(data);
         setOk(true);
-        if (!isEditing) setForm(emptyForm());
+        if (!isEditing) { setForm(emptyForm()); setApoderadoQuery(''); setApoderadoSeleccionado(null); }
         onSuccess?.();
         return;
       }
@@ -358,7 +373,10 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         <Tabs value={modo} onValueChange={(v) => {
           setModo(v as Modo);
           setError(''); setOk(false);
-          setApoderadoEncontrado(null);
+          setApoderadoQuery('');
+          setApoderadoSeleccionado(null);
+          setApoderadoResultados([]);
+          setApoderadoDropdownOpen(false);
         }}>
           <TabsList className="w-full">
             <TabsTrigger value="adulto" className="flex-1">👤 Adulto</TabsTrigger>
@@ -477,37 +495,62 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {/* ✅ Niño: solo email apoderado con búsqueda automática */}
+          {/* Niño: autocomplete de apoderado */}
           {modo === 'nino' && (
             <div className="border-t pt-4 space-y-3">
-              <p className="text-xs uppercase tracking-widest font-semibold text-purple-700">Apoderado</p>
-              <div className="space-y-1">
-                <Label>Email del Apoderado <span className="text-red-500">*</span></Label>
-                <Input
-                  type="email"
-                  value={form.email_apoderado}
-                  onChange={(e) => {
-                    set('email_apoderado', e.target.value);
-                    setApoderadoEncontrado(null);
-                  }}
-                  onBlur={(e) => buscarApoderado(e.target.value)}
-                  placeholder="correo@apoderado.com"
-                />
-                {buscandoApoderado && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Buscando apoderado...
-                  </p>
-                )}
-                {apoderadoEncontrado && (
+              <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">Apoderado</p>
+              <div className="space-y-1" ref={apoderadoRef}>
+                <Label>Apoderado <span className="text-red-500">*</span></Label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={apoderadoQuery}
+                    onChange={(e) => {
+                      setApoderadoQuery(e.target.value);
+                      if (apoderadoSeleccionado && e.target.value !== apoderadoSeleccionado.nombre) {
+                        setApoderadoSeleccionado(null);
+                      }
+                    }}
+                    onFocus={() => { if (apoderadoResultados.length > 0) setApoderadoDropdownOpen(true); }}
+                    placeholder="Buscar por nombre..."
+                    autoComplete="off"
+                  />
+                  {apoderadoBuscando && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {apoderadoDropdownOpen && apoderadoResultados.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden">
+                      {apoderadoResultados.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setApoderadoSeleccionado(a);
+                            setApoderadoQuery(a.nombre);
+                            setApoderadoDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 hover:bg-secondary transition-colors flex justify-between items-center gap-4"
+                        >
+                          <span className="text-sm font-medium text-foreground">{a.nombre}</span>
+                          {a.telefono && <span className="text-xs text-muted-foreground shrink-0">{a.telefono}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {apoderadoDropdownOpen && apoderadoQuery.length >= 2 && !apoderadoBuscando && apoderadoResultados.length === 0 && (
+                    <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg px-4 py-3 text-sm text-muted-foreground">
+                      Sin resultados. Registra primero al adulto.
+                    </div>
+                  )}
+                </div>
+                {apoderadoSeleccionado && (
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs">
-                    ✓ Apoderado encontrado: <span className="font-semibold">{apoderadoEncontrado.nombre}</span>
-                    {apoderadoEncontrado.telefono && <span>— {apoderadoEncontrado.telefono}</span>}
+                    <span className="font-semibold">Apoderado: {apoderadoSeleccionado.nombre}</span>
+                    {apoderadoSeleccionado.telefono && <span>— {apoderadoSeleccionado.telefono}</span>}
                   </div>
-                )}
-                {!buscandoApoderado && form.email_apoderado && !apoderadoEncontrado && (
-                  <p className="text-xs text-amber-600">
-                    ⚠ No se encontró adulto con ese email. Regístralo primero.
-                  </p>
                 )}
               </div>
             </div>
