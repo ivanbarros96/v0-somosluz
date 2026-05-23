@@ -198,20 +198,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
     setLoading(true);
     try {
-      // ✅ MODO NUEVO → verificar duplicado por nombre en miembros_nuevos
+      // ✅ MODO NUEVO → guardar en miembros_nuevos
       if (modo === 'nuevo') {
-        const queryNuevo = supabase
-          .from('miembros_nuevos')
-          .select('id, nombre')
-          .ilike('nombre', form.nombre.trim());
-
-        const { data: existeNuevo } = await queryNuevo.maybeSingle();
-        if (existeNuevo) {
-          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
-          setLoading(false);
-          return;
-        }
-
         const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
         const { error: insertError } = await supabase
           .from('miembros_nuevos')
@@ -235,25 +223,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       const convFull = (form.convNum && form.convUnidad)
         ? `${form.convNum} ${form.convUnidad}` : null;
 
-      // ✅ Verificar duplicado por nombre en personas (adulto y niño)
-      {
-        const queryNombre = supabase
-          .from('personas')
-          .select('id, nombre')
-          .eq('source_tipo', modo)
-          .ilike('nombre', form.nombre.trim());
-
-        if (isEditing && member?.id) queryNombre.neq('id', member.id);
-
-        const { data: existeNombre } = await queryNombre.maybeSingle();
-        if (existeNombre) {
-          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // ✅ Verificar email duplicado adulto (después de la verificación de nombre)
+      // ✅ Verificar email duplicado adulto
+      // ✅ Solo verifica duplicado si es adulto Y no es edición del mismo registro
       if (modo === 'adulto' && form.email.trim()) {
         const query = supabase
           .from('personas')
@@ -261,9 +232,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           .eq('source_tipo', 'adulto')
           .eq('email', form.email.trim().toLowerCase());
 
-        if (isEditing && member?.id) query.neq('id', member.id);
+        if (member?.id) query.neq('id', member.id);
 
-        const { data: existing } = await query.maybeSingle();
+        const { data: existing } = await query.single();
         if (existing) {
           setError(`Este email ya está registrado para: ${existing.nombre}`);
           setLoading(false);
