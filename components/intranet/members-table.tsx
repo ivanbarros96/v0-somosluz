@@ -80,9 +80,9 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
               <p>{fmt(member.edad)}</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Bautizado</p>
-              <p>{fmt(member.bautizado)}</p>
-            </div>
+  <p className="text-xs font-medium uppercase text-muted-foreground">Bautizado</p>
+  <p>{member.bautizado === 'si' ? 'Sí' : member.bautizado === 'no' ? 'No' : '—'}</p>
+</div>
             <div className="rounded-lg border p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Tiempo conversión</p>
               <p>{fmt(member.tiempo_conversion)}</p>
@@ -197,7 +197,13 @@ export function MembersTable() {
                         <TableCell>{fmt(m.telefono)}</TableCell>
                         <TableCell>{fmt(m.email)}</TableCell>
                         <TableCell>{fmt(m.region)}{m.comuna ? ` / ${m.comuna}` : ''}</TableCell>
-                        <TableCell>{fmt(m.bautizado)}</TableCell>
+                        <TableCell>
+                          {m.bautizado === 'si'
+                            ? <span className="text-green-600 font-medium">Sí</span>
+                            : m.bautizado === 'no'
+                              ? <span className="text-muted-foreground">No</span>
+                              : '—'}
+                        </TableCell>
                         <TableCell><Actions m={m} /></TableCell>
                       </TableRow>
                     ))}
