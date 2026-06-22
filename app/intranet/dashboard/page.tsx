@@ -5,12 +5,18 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { KpiCards, type KpiData } from '@/components/intranet/pastor/kpi-cards';
 import { AsistenciaChart, type CultoAsistencia } from '@/components/intranet/pastor/asistencia-chart';
+import { AsistenciaMensualChart, type AsistenciaMes } from '@/components/intranet/pastor/asistencia-mensual-chart';
 import { CrecimientoChart, type CrecimientoMes } from '@/components/intranet/pastor/crecimiento-chart';
 import { BautizadosChart, type BautizadosData } from '@/components/intranet/pastor/bautizados-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, UserPlus, ClipboardList, UserX, Calendar } from 'lucide-react';
-import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { Users, UserPlus, ClipboardList, UserX, Settings, Activity } from 'lucide-react';
+import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+const capMes = (d: Date) => {
+  const l = format(d, 'MMM yy', { locale: es });
+  return l.charAt(0).toUpperCase() + l.slice(1);
+};
 
 // ─── Pastor Dashboard ────────────────────────────────────────────────────────
 
@@ -18,6 +24,7 @@ function PastorDashboard() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, ninos: 0, pctAsistenciaPromedio: 0 });
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
+  const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
   const [loading, setLoading] = useState(true);
@@ -39,50 +46,79 @@ function PastorDashboard() {
       const en_proceso = adultoRows.filter((p) => p.bautizado === 'en_proceso').length;
       const no_bautizados = adultoRows.filter((p) => p.bautizado === 'no' || p.bautizado == null).length;
 
-      // Crecimiento mensual (6 meses)
+      // Crecimiento ACUMULADO desde el inicio de la iglesia (primer registro)
       const now = new Date();
+      const fechas = (personas ?? [])
+        .map((p) => p.created_at)
+        .filter(Boolean)
+        .sort() as string[];
+      const inicio = fechas.length ? startOfMonth(parseISO(fechas[0])) : startOfMonth(subMonths(now, 5));
+      let nMeses = differenceInMonths(startOfMonth(now), inicio) + 1;
+      if (nMeses < 1) nMeses = 1;
+      if (nMeses > 12) nMeses = 12; // límite de legibilidad
+
       const meses: CrecimientoMes[] = [];
       let acumulado = 0;
-      for (let i = 5; i >= 0; i--) {
+      for (let i = nMeses - 1; i >= 0; i--) {
         const mes = subMonths(now, i);
-        const inicio = startOfMonth(mes).toISOString();
+        const ini = startOfMonth(mes).toISOString();
         const fin = endOfMonth(mes).toISOString();
-        const nuevos = personas?.filter((p) => p.created_at && p.created_at >= inicio && p.created_at <= fin).length ?? 0;
+        const nuevos = personas?.filter((p) => p.created_at && p.created_at >= ini && p.created_at <= fin).length ?? 0;
         acumulado += nuevos;
-        const label = format(mes, 'MMM', { locale: es });
-        meses.push({ mes: label.charAt(0).toUpperCase() + label.slice(1), nuevos, acumulado });
+        meses.push({ mes: capMes(mes), nuevos, acumulado });
       }
 
-      // Últimos 8 cultos + asistencias
+      // Todos los cultos + todas las asistencias
       const { data: cultos } = await supabase
         .from('cultos')
         .select('id, fecha, descripcion')
-        .order('fecha', { ascending: false })
-        .limit(8);
+        .order('fecha', { ascending: true });
 
-      let asistencias: CultoAsistencia[] = [];
-      let totalPresencias = 0;
+      const { data: rawAsist } = await supabase
+        .from('asistencias')
+        .select('culto_id');
 
-      if (cultos?.length) {
-        const cultoIds = cultos.map((c) => c.id);
-        const { data: rawAsist } = await supabase
-          .from('asistencias')
-          .select('culto_id')
-          .in('culto_id', cultoIds);
-
-        asistencias = cultos.map((culto) => {
-          const n = rawAsist?.filter((a) => a.culto_id === culto.id).length ?? 0;
-          totalPresencias += n;
-          return { fecha: culto.fecha, total: n, descripcion: culto.descripcion };
-        }).reverse();
+      // Conteo por culto
+      const conteoPorCulto: Record<number, number> = {};
+      for (const a of rawAsist ?? []) {
+        const cId = Number(a.culto_id);
+        conteoPorCulto[cId] = (conteoPorCulto[cId] ?? 0) + 1;
       }
 
-      const pctAsistenciaPromedio = cultos?.length && total > 0
-        ? Math.round((totalPresencias / cultos.length / total) * 100)
+      // Asistencia por CULTO (últimos 8)
+      const cultosOrden = cultos ?? [];
+      const ultimos8 = cultosOrden.slice(-8);
+      const asistencias: CultoAsistencia[] = ultimos8.map((c) => ({
+        fecha: c.fecha,
+        total: conteoPorCulto[Number(c.id)] ?? 0,
+        descripcion: c.descripcion,
+      }));
+
+      // Asistencia por MES (suma total mensual)
+      const fechaPorCulto: Record<number, string> = {};
+      for (const c of cultosOrden) fechaPorCulto[Number(c.id)] = c.fecha;
+      const totalPorMes: Record<string, { total: number; orden: number }> = {};
+      for (const a of rawAsist ?? []) {
+        const fecha = fechaPorCulto[Number(a.culto_id)];
+        if (!fecha) continue;
+        const d = parseISO(fecha);
+        const key = format(d, 'yyyy-MM');
+        if (!totalPorMes[key]) totalPorMes[key] = { total: 0, orden: d.getTime() };
+        totalPorMes[key].total += 1;
+      }
+      const mensual: AsistenciaMes[] = Object.entries(totalPorMes)
+        .sort((a, b) => a[1].orden - b[1].orden)
+        .map(([key, v]) => ({ mes: capMes(parseISO(key + '-01')), total: v.total }));
+
+      // % asistencia promedio sobre últimos 8 cultos
+      const totalPresencias = ultimos8.reduce((s, c) => s + (conteoPorCulto[Number(c.id)] ?? 0), 0);
+      const pctAsistenciaPromedio = ultimos8.length && total > 0
+        ? Math.round((totalPresencias / ultimos8.length / total) * 100)
         : 0;
 
       setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio });
       setAsistenciaData(asistencias);
+      setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
       setLoading(false);
@@ -120,39 +156,39 @@ function PastorDashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <AsistenciaChart data={asistenciaData} />
-        <CrecimientoChart data={crecimientoData} />
+        <AsistenciaMensualChart data={asistenciaMensual} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <CrecimientoChart data={crecimientoData} />
         <BautizadosChart data={bautizadosData} />
-
-        <Card>
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="text-base">Accesos Rápidos</CardTitle>
-            <CardDescription>Funciones principales del sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { href: '/intranet/dashboard/members', icon: Users, label: 'Ver Miembros', desc: 'Lista completa' },
-                { href: '/intranet/dashboard/asistencia', icon: ClipboardList, label: 'Asistencia', desc: 'Registrar culto' },
-                { href: '/intranet/dashboard/ausentes', icon: UserX, label: 'Ausentes', desc: '+30 días sin ir' },
-                { href: '/intranet/dashboard/settings', icon: Calendar, label: 'Configuración', desc: 'Ajustes del sistema' },
-              ].map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  className="block p-4 rounded-lg border border-border hover:bg-secondary transition"
-                >
-                  <item.icon className="h-6 w-6 text-primary mb-2" />
-                  <h3 className="font-semibold text-foreground text-sm">{item.label}</h3>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
-                </a>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base">Accesos Rápidos</CardTitle>
+          <CardDescription>Funciones principales del sistema</CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { href: '/intranet/dashboard/seguimiento', icon: Activity, label: 'Seguimiento', desc: 'Ausencias consecutivas' },
+              { href: '/intranet/dashboard/retiros', icon: UserX, label: 'Retiros', desc: '+30 días sin asistir' },
+              { href: '/intranet/dashboard/settings', icon: Settings, label: 'Configuración', desc: 'Ajustes del sistema' },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="block p-4 rounded-lg border border-border hover:bg-secondary transition"
+              >
+                <item.icon className="h-6 w-6 text-primary mb-2" />
+                <h3 className="font-semibold text-foreground text-sm">{item.label}</h3>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </a>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ const MOTIVOS = [
   'Otro',
 ] as const;
 
+const OTRO = 'Otro';
 const DIAS_UMBRAL = 30;
 
 interface AusenteRow {
@@ -36,11 +38,12 @@ interface AusenteRow {
   diasAusente: number;
 }
 
-export default function AusentesPage() {
+export default function RetirosPage() {
   const [ausentes, setAusentes] = useState<AusenteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AusenteRow | null>(null);
   const [motivo, setMotivo] = useState<string>(MOTIVOS[0]);
+  const [motivoOtro, setMotivoOtro] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -101,17 +104,21 @@ export default function AusentesPage() {
   function openModal(row: AusenteRow) {
     setSelected(row);
     setMotivo(MOTIVOS[0]);
+    setMotivoOtro('');
     setObservaciones('');
   }
 
+  const motivoFinal = motivo === OTRO ? motivoOtro.trim() : motivo;
+  const puedeGuardar = motivoFinal.length > 0;
+
   async function confirmarRetiro() {
-    if (!selected) return;
+    if (!selected || !puedeGuardar) return;
     setSaving(true);
 
     const { error } = await supabase.from('retiros').insert({
       persona_id: selected.id,
       nombre: selected.nombre,
-      motivo,
+      motivo: motivoFinal,
       observaciones: observaciones || null,
       fecha_retiro: new Date().toISOString().split('T')[0],
     });
@@ -131,10 +138,10 @@ export default function AusentesPage() {
       <div className="mb-6 md:mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
           <UserX className="h-6 w-6 text-orange-500" />
-          Miembros Ausentes
+          Retiros
         </h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Sin asistencia en los últimos {DIAS_UMBRAL} días
+          Miembros sin asistencia en +{DIAS_UMBRAL} días · confirma y registra el motivo del retiro
         </p>
       </div>
 
@@ -146,7 +153,7 @@ export default function AusentesPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-            <h3 className="font-semibold text-foreground text-lg">Sin ausencias prolongadas</h3>
+            <h3 className="font-semibold text-foreground text-lg">Sin candidatos a retiro</h3>
             <p className="text-muted-foreground text-sm mt-1">
               Todos los miembros han asistido en el último mes.
             </p>
@@ -236,6 +243,17 @@ export default function AusentesPage() {
                   </div>
                 ))}
               </RadioGroup>
+
+              {motivo === OTRO && (
+                <Input
+                  autoFocus
+                  placeholder="Escribe el motivo..."
+                  value={motivoOtro}
+                  onChange={(e) => setMotivoOtro(e.target.value)}
+                  className="text-sm mt-1"
+                  maxLength={120}
+                />
+              )}
             </div>
 
             <div className="space-y-2">
@@ -252,7 +270,7 @@ export default function AusentesPage() {
 
           <DialogFooter className="gap-2">
             <Button variant="ghost" onClick={() => setSelected(null)} disabled={saving}>Cancelar</Button>
-            <Button onClick={confirmarRetiro} disabled={saving} variant="destructive">
+            <Button onClick={confirmarRetiro} disabled={saving || !puedeGuardar} variant="destructive">
               {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : 'Confirmar retiro'}
             </Button>
           </DialogFooter>
