@@ -73,67 +73,34 @@ export default function IntranetLoginPage() {
     }
   }
 
-  // Pantalla de transición — iglesia que se "llena" mientras carga
+  // Pantalla de transición — anillo de progreso minimalista
   if (showTransition) {
     const isPastor = selectedProfile === 'pastor';
-    const fillColor = isPastor ? '#fbbf24' : '#60a5fa';
-    const fillY = 140 - (140 * progress) / 100;
+    const accent = isPastor ? '#f59e0b' : '#3b82f6';
+    const radius = 30;
+    const circ = 2 * Math.PI * radius;
+    const offset = circ * (1 - progress / 100);
 
     return (
-      <div className={cn(
-        'fixed inset-0 z-50 flex flex-col items-center justify-center',
-        isPastor ? 'bg-amber-950' : 'bg-blue-950'
-      )}>
-        <svg width="150" height="175" viewBox="0 0 120 140" className="mb-7">
-          <defs>
-            <clipPath id="fillClip">
-              <rect x="0" y={fillY} width="120" height={140 - fillY} />
-            </clipPath>
-          </defs>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+        <div className="relative flex items-center justify-center mb-8">
+          <svg width="84" height="84" viewBox="0 0 84 84" className="-rotate-90">
+            <circle cx="42" cy="42" r={radius} fill="none" strokeWidth="3" className="stroke-border" />
+            <circle
+              cx="42" cy="42" r={radius} fill="none" stroke={accent} strokeWidth="3"
+              strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
+              style={{ transition: 'stroke-dashoffset 80ms linear' }}
+            />
+          </svg>
+          <span className="absolute text-sm font-semibold tabular-nums text-foreground">
+            {Math.round(progress)}%
+          </span>
+        </div>
 
-          {/* Silueta fantasma (siempre visible, tenue) */}
-          <g fill={fillColor} fillOpacity={0.15}>
-            <rect x="33.5" y="6" width="4" height="20" />
-            <rect x="29.5" y="11" width="12" height="4" />
-            <polygon points="24,42 47,42 35.5,24" />
-            <rect x="28" y="42" width="15" height="78" />
-            <polygon points="43,72 110,72 76.5,44" />
-            <rect x="50" y="72" width="60" height="48" />
-            <rect x="18" y="120" width="94" height="10" rx="2" />
-          </g>
-
-          {/* Relleno que sube con el progreso */}
-          <g fill={fillColor} clipPath="url(#fillClip)">
-            <rect x="33.5" y="6" width="4" height="20" />
-            <rect x="29.5" y="11" width="12" height="4" />
-            <polygon points="24,42 47,42 35.5,24" />
-            <rect x="28" y="42" width="15" height="78" />
-            <polygon points="43,72 110,72 76.5,44" />
-            <rect x="50" y="72" width="60" height="48" />
-            <rect x="18" y="120" width="94" height="10" rx="2" />
-          </g>
-
-          {/* Detalles: puerta y vitrales */}
-          <g fill="none" stroke="white" strokeOpacity={0.4} strokeWidth={1.3}>
-            <path d="M70 120 V100 a6.5 6.5 0 0 1 13 0 V120" />
-            <circle cx="76.5" cy="88" r="4.5" />
-            <circle cx="35.5" cy="66" r="3.2" />
-          </g>
-        </svg>
-
-        <Image src="/logo.png" alt="Somos Luz" width={150} height={60} className="mb-5 brightness-0 invert opacity-90" />
-        <p className="text-white/70 text-sm font-medium">
+        <Image src="/logo.png" alt="Somos Luz" width={140} height={56} className="mb-3 opacity-95" />
+        <p className="text-muted-foreground text-sm">
           {isPastor ? 'Preparando tu panel gerencial' : 'Cargando panel operativo'}
         </p>
-        <div className="flex gap-1.5 mt-3">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className={cn('w-1.5 h-1.5 rounded-full animate-pulse', isPastor ? 'bg-yellow-400' : 'bg-blue-400')}
-              style={{ animationDelay: `${i * 150}ms` }}
-            />
-          ))}
-        </div>
       </div>
     );
   }
