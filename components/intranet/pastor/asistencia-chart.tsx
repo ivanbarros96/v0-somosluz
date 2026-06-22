@@ -41,7 +41,7 @@ export function AsistenciaChart({ data }: { data: CultoAsistencia[] }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
             <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)', rx: 4 }} />
             <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={48} />
           </BarChart>
         </ResponsiveContainer>
