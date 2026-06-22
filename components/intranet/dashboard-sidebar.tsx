@@ -1,11 +1,35 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, LogOut, Home, Settings, Shield, User, ClipboardList, UserCheck, X } from 'lucide-react';
+import {
+  LayoutDashboard, Users, ClipboardList, UserX, Settings,
+  LogOut, UserPlus, X, BookOpen, Sun,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+}
+
+const PASTOR_NAV: NavItem[] = [
+  { href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard },
+  { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+  { href: '/intranet/dashboard/ausentes', label: 'Ausentes', icon: UserX },
+  { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
+];
+
+const SOMOSLUZ_NAV: NavItem[] = [
+  { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
+  { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+];
 
 interface DashboardSidebarProps {
   onClose?: () => void;
@@ -14,112 +38,91 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
-  const handleLogout = () => {
-    logout();
+  const isPastor = user?.role === 'pastor';
+  const navItems = isPastor ? PASTOR_NAV : SOMOSLUZ_NAV;
+
+  const handleLogout = async () => {
+    await logout();
     router.push('/intranet');
   };
-
-  const isAdmin = user?.role === 'admin';
 
   const handleNav = (href: string) => {
     router.push(href);
     onClose?.();
   };
 
+  const isActive = (href: string) =>
+    href === '/intranet/dashboard'
+      ? pathname === '/intranet/dashboard'
+      : pathname.startsWith(href);
+
   return (
     <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-border flex items-center justify-between">
-        <Image
-          src="/logo.png"
-          alt="Somos Luz"
-          width={150}
-          height={60}
-          className="mx-auto"
-        />
-        {/* Botón cerrar solo en móvil */}
+      <div className="p-5 border-b border-border flex items-center justify-between">
+        <Image src="/logo.png" alt="Somos Luz" width={130} height={52} />
         {onClose && (
-          <button
-            onClick={onClose}
-            className="md:hidden p-1 rounded-md hover:bg-secondary transition ml-2"
-          >
+          <button onClick={onClose} className="md:hidden p-1 rounded-md hover:bg-secondary transition ml-2">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         )}
       </div>
 
-      {/* User info */}
+      {/* Info del usuario */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            {isAdmin ? (
-              <Shield className="w-5 h-5 text-primary" />
-            ) : (
-              <User className="w-5 h-5 text-primary" />
-            )}
+        <div className={cn(
+          'flex items-center gap-3 p-3 rounded-xl border',
+          isPastor ? 'bg-yellow-500/5 border-yellow-500/15' : 'bg-blue-500/5 border-blue-500/15'
+        )}>
+          <div className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+            isPastor ? 'bg-yellow-500/15' : 'bg-blue-500/15'
+          )}>
+            {isPastor
+              ? <BookOpen className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              : <Sun className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {user?.name}
-            </p>
-            <Badge variant={isAdmin ? 'default' : 'secondary'} className="text-xs">
-              {isAdmin ? 'Administrador' : 'Usuario'}
+            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-xs mt-0.5 border-0',
+                isPastor
+                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+              )}
+            >
+              {isPastor ? 'Gerencial' : 'Operativo'}
             </Badge>
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
-          <li>
-            <button
-              onClick={() => handleNav('/intranet/dashboard')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
-            >
-              <Home className="w-4 h-4" />
-              Inicio
-            </button>
-          </li>
-          <li>
-            <button
-              onClick={() => handleNav('/intranet/dashboard/registro')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
-            >
-              <ClipboardList className="w-4 h-4" />
-              Registro
-            </button>
-          </li>
-          <li>
-            <button
-              onClick={() => handleNav('/intranet/dashboard/members')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
-            >
-              <Users className="w-4 h-4" />
-              Miembros
-            </button>
-          </li>
-          <li>
-            <button
-              onClick={() => handleNav('/intranet/dashboard/asistencia')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
-            >
-              <UserCheck className="w-4 h-4" />
-              Asistencia
-            </button>
-          </li>
-          {isAdmin && (
-            <li>
+      {/* Navegación */}
+      <nav className="flex-1 p-3">
+        <ul className="space-y-1">
+          {navItems.map((item) => (
+            <li key={item.href}>
               <button
-                onClick={() => handleNav('/intranet/dashboard/settings')}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-secondary transition"
+                onClick={() => handleNav(item.href)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
+                  isActive(item.href)
+                    ? isPastor
+                      ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-medium'
+                      : 'bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                )}
               >
-                <Settings className="w-4 h-4" />
-                Configuracion
+                <item.icon className="w-4 h-4 shrink-0" />
+                {item.label}
               </button>
             </li>
-          )}
+          ))}
         </ul>
       </nav>
 
@@ -127,17 +130,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       <div className="p-4 border-t border-border">
         <Button
           variant="ghost"
-          className="w-full justify-start text-muted-foreground hover:text-destructive"
+          className="w-full justify-start text-muted-foreground hover:text-destructive gap-2"
           onClick={handleLogout}
         >
-          <LogOut className="w-4 h-4 mr-2" />
-          Cerrar sesion
+          <LogOut className="w-4 h-4" />
+          Cerrar sesión
         </Button>
-        <a
-          href="/"
-          className="flex items-center gap-2 px-3 py-2 mt-2 text-sm text-muted-foreground hover:text-foreground transition"
-        >
-          Volver al sitio
+        <a href="/" className="flex items-center gap-2 px-3 py-2 mt-1 text-sm text-muted-foreground hover:text-foreground transition">
+          ← Volver al sitio
         </a>
       </div>
     </aside>

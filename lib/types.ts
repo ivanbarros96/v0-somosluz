@@ -1,4 +1,6 @@
-export type UserRole = 'admin' | 'user';
+// --- AUTH ---
+
+export type UserRole = 'pastor' | 'somosluz';
 
 export interface AuthUser {
   username: string;
@@ -8,10 +10,13 @@ export interface AuthUser {
 
 export interface AuthContextType {
   user: AuthUser | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
+
+// --- MEMBERS ---
 
 export type BautizadoStatus = 'si' | 'no' | 'en_proceso' | null;
 
@@ -34,8 +39,8 @@ export interface AdultoMember extends PersonaBase {
   tipo: 'adulto';
   bautizado: BautizadoStatus;
   tiempo_conversion: string | null;
-  fecha_nacimiento: string | null;  // ✅ AGREGADO
-  edad: number | null;              // ✅ AGREGADO
+  fecha_nacimiento: string | null;
+  edad: number | null;
 }
 
 export interface NinoMember extends PersonaBase {
