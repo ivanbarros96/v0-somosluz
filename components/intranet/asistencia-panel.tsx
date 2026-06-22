@@ -36,7 +36,10 @@ function tipoBadge(tipo: Persona['tipo']) {
 }
 
 function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString('es-CL', {
+  // Añadir T12:00:00 para evitar que fecha-only se interprete como UTC midnight
+  // y se desplace al día anterior en Chile (UTC-4)
+  const d = iso.length === 10 ? new Date(iso + 'T12:00:00') : new Date(iso);
+  return d.toLocaleDateString('es-CL', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 }
