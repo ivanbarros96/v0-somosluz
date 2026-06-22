@@ -5,7 +5,7 @@ import { MembersTable } from '@/components/intranet/members-table';
 
 export default function MembersPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'pastor';
 
   return (
     <div>

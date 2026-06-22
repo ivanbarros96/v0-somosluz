@@ -61,11 +61,20 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   const refreshMembers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const { data, error } = await supabase
-      .from('personas')
-      .select('*')
-      .order('created_at', { ascending: false });
 
+    // Excluir personas retiradas
+    const { data: retirosData } = await supabase
+      .from('retiros')
+      .select('persona_id')
+      .not('persona_id', 'is', null);
+    const retiradosIds = (retirosData ?? []).map((r: any) => Number(r.persona_id));
+
+    let query = supabase.from('personas').select('*').order('created_at', { ascending: false });
+    if (retiradosIds.length > 0) {
+      query = query.not('id', 'in', `(${retiradosIds.join(',')})`);
+    }
+
+    const { data, error } = await query;
     if (error) {
       setError(error.message);
     } else {
