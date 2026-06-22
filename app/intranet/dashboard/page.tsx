@@ -14,7 +14,7 @@ import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMont
 import { es } from 'date-fns/locale';
 
 const capMes = (d: Date) => {
-  const l = format(d, 'MMM yy', { locale: es });
+  const l = format(d, 'MMM', { locale: es });
   return l.charAt(0).toUpperCase() + l.slice(1);
 };
 
