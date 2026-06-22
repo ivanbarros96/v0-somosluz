@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, Loader2, Phone, CheckCircle2 } from 'lucide-react';
+import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Umbrales (ausencias consecutivas): 0-1 verde · 2 amarillo · 3+ rojo
 type Nivel = 'verde' | 'amarillo' | 'rojo';
@@ -162,7 +163,7 @@ export default function SeguimientoPage() {
                   {accionables.map((r) => {
                     const st = NIVEL_STYLE[r.nivel];
                     return (
-                      <div key={r.id} className="flex items-center justify-between px-4 md:px-6 py-4 hover:bg-secondary/50 transition-colors">
+                      <div key={r.id} className="flex items-center justify-between px-4 md:px-6 py-4 hover:bg-secondary/50 transition-colors gap-2">
                         <div className="flex items-center gap-3 min-w-0">
                           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${st.dot}`} />
                           <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
@@ -185,9 +186,25 @@ export default function SeguimientoPage() {
                           </div>
                         </div>
 
-                        <span className={`text-xs px-2 py-1 rounded-md font-medium shrink-0 ml-2 ${st.badge}`}>
-                          {r.streak} cultos seguidos
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs px-2 py-1 rounded-md font-medium ${st.badge}`}>
+                            {r.streak} cultos
+                          </span>
+                          {r.telefono ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 shrink-0"
+                              asChild
+                            >
+                              <a href={`tel:${r.telefono}`} aria-label={`Llamar a ${r.nombre}`}>
+                                <PhoneCall className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          ) : (
+                            <div className="w-8" />
+                          )}
+                        </div>
                       </div>
                     );
                   })}
