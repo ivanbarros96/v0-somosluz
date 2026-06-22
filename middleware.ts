@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 
-function verifySession(token: string): boolean {
+async function verifySession(token: string): Promise<boolean> {
   const secret = process.env.AUTH_SECRET;
   if (!secret) return false;
 
@@ -12,22 +11,35 @@ function verifySession(token: string): boolean {
   if (role !== 'pastor' && role !== 'somosluz') return false;
 
   const payload = `${role}:${timestamp}`;
-  const expected = createHmac('sha256', secret).update(payload).digest('hex');
+  const enc = new TextEncoder();
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payload));
+  const expected = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
   if (hash !== expected) return false;
 
-  // Sesión válida 8 horas
   const age = Date.now() - parseInt(timestamp, 10);
   if (age > 8 * 60 * 60 * 1000) return false;
 
   return true;
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith('/intranet/dashboard')) {
     const token = req.cookies.get('sl_session')?.value;
-    if (!token || !verifySession(token)) {
+    if (!token || !(await verifySession(token))) {
       return NextResponse.redirect(new URL('/intranet', req.url));
     }
   }
