@@ -94,21 +94,26 @@ function PastorDashboard() {
         descripcion: c.descripcion,
       }));
 
-      // Asistencia por MES (suma total mensual)
+      // Asistencia por MES (promedio por culto dentro del mes)
       const fechaPorCulto: Record<number, string> = {};
       for (const c of cultosOrden) fechaPorCulto[Number(c.id)] = c.fecha;
-      const totalPorMes: Record<string, { total: number; orden: number }> = {};
+      const porMes: Record<string, { total: number; cultos: Set<number>; orden: number }> = {};
       for (const a of rawAsist ?? []) {
-        const fecha = fechaPorCulto[Number(a.culto_id)];
+        const cId = Number(a.culto_id);
+        const fecha = fechaPorCulto[cId];
         if (!fecha) continue;
         const d = parseISO(fecha);
         const key = format(d, 'yyyy-MM');
-        if (!totalPorMes[key]) totalPorMes[key] = { total: 0, orden: d.getTime() };
-        totalPorMes[key].total += 1;
+        if (!porMes[key]) porMes[key] = { total: 0, cultos: new Set(), orden: d.getTime() };
+        porMes[key].total += 1;
+        porMes[key].cultos.add(cId);
       }
-      const mensual: AsistenciaMes[] = Object.entries(totalPorMes)
+      const mensual: AsistenciaMes[] = Object.entries(porMes)
         .sort((a, b) => a[1].orden - b[1].orden)
-        .map(([key, v]) => ({ mes: capMes(parseISO(key + '-01')), total: v.total }));
+        .map(([key, v]) => ({
+          mes: capMes(parseISO(key + '-01')),
+          total: Math.round(v.total / v.cultos.size),
+        }));
 
       // % asistencia promedio sobre últimos 8 cultos
       const totalPresencias = ultimos8.reduce((s, c) => s + (conteoPorCulto[Number(c.id)] ?? 0), 0);

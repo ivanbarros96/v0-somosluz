@@ -15,7 +15,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return (
     <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md space-y-0.5">
       <p className="text-muted-foreground">{label}</p>
-      <p className="font-semibold text-emerald-600">{payload[0]?.value} asistencias</p>
+      <p className="font-semibold text-emerald-600">{payload[0]?.value} promedio por culto</p>
     </div>
   );
 };
@@ -24,8 +24,8 @@ export function AsistenciaMensualChart({ data }: { data: AsistenciaMes[] }) {
   return (
     <Card>
       <CardHeader className="p-4 md:p-6">
-        <CardTitle className="text-base">Asistencia por Mes</CardTitle>
-        <p className="text-xs text-muted-foreground">Total de asistencias registradas cada mes</p>
+        <CardTitle className="text-base">Promedio de Asistencia por Mes</CardTitle>
+        <p className="text-xs text-muted-foreground">Promedio de asistentes por culto dentro de cada mes</p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
         <ResponsiveContainer width="100%" height={200}>
