@@ -20,6 +20,7 @@ interface NavItem {
 const PASTOR_NAV: NavItem[] = [
   { href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard },
   { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
   { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
   { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
   { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
