@@ -15,6 +15,18 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ElementType;
+  // Fecha 'YYYY-MM-DD' en que se agregó al menú. Muestra "Nuevo" por 1 mes.
+  addedAt?: string;
+}
+
+// Indica si un ítem sigue siendo "nuevo" (dentro de 1 mes calendario desde addedAt)
+function esNuevo(addedAt?: string): boolean {
+  if (!addedAt) return false;
+  const added = new Date(addedAt + 'T00:00:00');
+  if (isNaN(added.getTime())) return false;
+  const expira = new Date(added);
+  expira.setMonth(expira.getMonth() + 1);
+  return Date.now() < expira.getTime();
 }
 
 const PASTOR_NAV: NavItem[] = [
@@ -22,7 +34,7 @@ const PASTOR_NAV: NavItem[] = [
   { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
   { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
   { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
-  { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake },
+  { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake, addedAt: '2026-06-22' },
   { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
   { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
@@ -121,7 +133,19 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                 )}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
-                {item.label}
+                <span>{item.label}</span>
+                {esNuevo(item.addedAt) && (
+                  <span
+                    className={cn(
+                      'ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full leading-none',
+                      isPastor
+                        ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400'
+                        : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+                    )}
+                  >
+                    Nuevo
+                  </span>
+                )}
               </button>
             </li>
           ))}
