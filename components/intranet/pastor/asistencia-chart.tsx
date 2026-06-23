@@ -3,8 +3,6 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export interface CultoAsistencia {
@@ -26,7 +24,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function AsistenciaChart({ data }: { data: CultoAsistencia[] }) {
   const formatted = data.map((d) => ({
     ...d,
-    label: format(parseISO(d.fecha), "d MMM", { locale: es }),
+    // timeZone UTC: la fecha del culto está en medianoche UTC, evita desplazar el día
+    label: new Date(d.fecha).toLocaleDateString('es-CL', {
+      timeZone: 'UTC', day: 'numeric', month: 'short',
+    }),
   }));
 
   return (

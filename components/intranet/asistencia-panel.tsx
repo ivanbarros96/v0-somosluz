@@ -36,10 +36,11 @@ function tipoBadge(tipo: Persona['tipo']) {
 }
 
 function formatFecha(iso: string) {
-  // Añadir T12:00:00 para evitar que fecha-only se interprete como UTC midnight
-  // y se desplace al día anterior en Chile (UTC-4)
-  const d = iso.length === 10 ? new Date(iso + 'T12:00:00') : new Date(iso);
-  return d.toLocaleDateString('es-CL', {
+  // La fecha del culto se guarda como medianoche UTC (timestamptz).
+  // Formateamos en UTC para mostrar el día calendario tal cual fue elegido,
+  // sin que la zona del navegador (Chile UTC-4) lo desplace al día anterior.
+  return new Date(iso).toLocaleDateString('es-CL', {
+    timeZone: 'UTC',
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 }
