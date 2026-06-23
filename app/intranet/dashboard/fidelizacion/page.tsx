@@ -28,8 +28,8 @@ const NIVEL_STYLE: Record<FidelidadNivel, { dot: string; badge: string; label: s
 };
 
 function clasificar(pct: number): FidelidadNivel {
-  if (pct >= 80) return 'alta';
-  if (pct >= 50) return 'media';
+  if (pct >= 70) return 'alta';
+  if (pct >= 35) return 'media';
   return 'baja';
 }
 
@@ -104,9 +104,9 @@ function FidelizacionContent() {
   }), [rows]);
 
   const chartData: FidelidadData[] = [
-    { key: 'alta',  nivel: 'Alta (≥80%)',   total: conteos.alta,  color: NIVEL_STYLE.alta.color },
-    { key: 'media', nivel: 'Media (50-79%)', total: conteos.media, color: NIVEL_STYLE.media.color },
-    { key: 'baja',  nivel: 'Baja (<50%)',    total: conteos.baja,  color: NIVEL_STYLE.baja.color },
+    { key: 'alta',  nivel: 'Alta (≥70%)',    total: conteos.alta,  color: NIVEL_STYLE.alta.color },
+    { key: 'media', nivel: 'Media (35-69%)', total: conteos.media, color: NIVEL_STYLE.media.color },
+    { key: 'baja',  nivel: 'Baja (<35%)',    total: conteos.baja,  color: NIVEL_STYLE.baja.color },
   ];
 
   const lista = rows
@@ -128,7 +128,7 @@ function FidelizacionContent() {
           Fidelización
         </h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Constancia de asistencia por persona desde que se unió · Alta ≥80% · Media 50-79% · Baja &lt;50%
+          Constancia de asistencia por persona desde que se unió · Alta ≥70% · Media 35-69% · Baja &lt;35%
         </p>
       </div>
 

@@ -174,14 +174,14 @@ function PastorDashboard() {
         const presentes = elegibles.filter((c) => asistio.has(Number(c.id))).length;
         const pct = (presentes / elegibles.length) * 100;
         evaluadas++;
-        if (pct >= 80) alta++;
-        else if (pct >= 50) media++;
+        if (pct >= 70) alta++;
+        else if (pct >= 35) media++;
         else baja++;
       }
       const fidelidad: FidelidadData[] = [
-        { key: 'alta', nivel: 'Alta (≥80%)', total: alta, color: '#22c55e' },
-        { key: 'media', nivel: 'Media (50-79%)', total: media, color: '#f59e0b' },
-        { key: 'baja', nivel: 'Baja (<50%)', total: baja, color: '#ef4444' },
+        { key: 'alta', nivel: 'Alta (≥70%)', total: alta, color: '#22c55e' },
+        { key: 'media', nivel: 'Media (35-69%)', total: media, color: '#f59e0b' },
+        { key: 'baja', nivel: 'Baja (<35%)', total: baja, color: '#ef4444' },
       ];
 
       setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio });
