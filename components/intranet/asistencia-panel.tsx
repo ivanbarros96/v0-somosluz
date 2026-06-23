@@ -162,9 +162,12 @@ export function AsistenciaPanel() {
 
   const toggleAsistencia = async (persona: Persona) => {
     if (!cultoId) return;
-    const cultoActivo = cultos.find((c) => c.id === cultoId)?.activo;
-    if (!cultoActivo) {
-      toast.warning('Este culto está cerrado y no se puede modificar la asistencia.');
+    const cultoActual = cultos.find((c) => c.id === cultoId);
+    if (!cultoActual?.activo) {
+      toast.warning(
+        `"${cultoActual?.descripcion ?? 'Este culto'}" ya fue cerrado. No es posible modificar la asistencia. Habla con el administrador si necesitas hacer cambios.`,
+        { duration: 5000 }
+      );
       return;
     }
     const key = personaKey(persona);
@@ -339,7 +342,7 @@ export function AsistenciaPanel() {
                 {cultoId && (
                   <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setShowEliminar(true); setPwdEliminar(''); setErrorEliminar(''); }}>
                     <Trash2 className="w-4 h-4 mr-1" />
-                    Eliminar
+                    Eliminar Culto
                   </Button>
                 )}
               </div>
