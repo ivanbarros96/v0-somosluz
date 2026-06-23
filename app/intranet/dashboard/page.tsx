@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { KpiCards, type KpiData } from '@/components/intranet/pastor/kpi-cards';
@@ -25,6 +26,7 @@ const capMes = (d: Date) => {
 
 function PastorDashboard() {
   const { user } = useAuth();
+  const router = useRouter();
   const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, ninos: 0, pctAsistenciaPromedio: 0 });
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
@@ -177,9 +179,9 @@ function PastorDashboard() {
         else baja++;
       }
       const fidelidad: FidelidadData[] = [
-        { nivel: 'Alta (≥80%)', total: alta, color: '#22c55e' },
-        { nivel: 'Media (50-79%)', total: media, color: '#f59e0b' },
-        { nivel: 'Baja (<50%)', total: baja, color: '#ef4444' },
+        { key: 'alta', nivel: 'Alta (≥80%)', total: alta, color: '#22c55e' },
+        { key: 'media', nivel: 'Media (50-79%)', total: media, color: '#f59e0b' },
+        { key: 'baja', nivel: 'Baja (<50%)', total: baja, color: '#ef4444' },
       ];
 
       setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio });
@@ -240,7 +242,11 @@ function PastorDashboard() {
         <EdadChart data={edadData} sinDato={edadSinDato} />
       </div>
 
-      <FidelidadChart data={fidelidadData} evaluadas={fidelidadEval} />
+      <FidelidadChart
+        data={fidelidadData}
+        evaluadas={fidelidadEval}
+        onSelect={(nivel) => router.push(`/intranet/dashboard/fidelizacion?nivel=${nivel}`)}
+      />
 
       <Card>
         <CardHeader className="p-4 md:p-6">

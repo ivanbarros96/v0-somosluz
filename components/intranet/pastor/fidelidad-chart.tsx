@@ -5,7 +5,10 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+export type FidelidadNivel = 'alta' | 'media' | 'baja';
+
 export interface FidelidadData {
+  key: FidelidadNivel;
   nivel: string;
   total: number;
   color: string;
@@ -23,13 +26,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function FidelidadChart({ data, evaluadas }: { data: FidelidadData[]; evaluadas: number }) {
+export function FidelidadChart({
+  data,
+  evaluadas,
+  onSelect,
+}: {
+  data: FidelidadData[];
+  evaluadas: number;
+  onSelect?: (nivel: FidelidadNivel) => void;
+}) {
+  const clickable = !!onSelect;
   return (
     <Card>
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="text-base">Fidelidad de Asistencia</CardTitle>
         <p className="text-xs text-muted-foreground">
           % de cultos asistidos desde que cada persona se unió · {evaluadas} evaluadas
+          {clickable && <span className="text-primary"> · clic en una barra para ver el detalle</span>}
         </p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
@@ -39,7 +52,13 @@ export function FidelidadChart({ data, evaluadas }: { data: FidelidadData[]; eva
             <XAxis dataKey="nivel" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
             <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)', rx: 4 }} />
-            <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={64}>
+            <Bar
+              dataKey="total"
+              radius={[6, 6, 0, 0]}
+              maxBarSize={64}
+              cursor={clickable ? 'pointer' : undefined}
+              onClick={(d: any) => { if (onSelect && d?.payload?.key) onSelect(d.payload.key); }}
+            >
               {data.map((d, i) => <Cell key={i} fill={d.color} />)}
             </Bar>
           </BarChart>

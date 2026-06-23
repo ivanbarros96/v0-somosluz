@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
-  LogOut, UserPlus, X, BookOpen, Sun, Activity,
+  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ const PASTOR_NAV: NavItem[] = [
   { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
   { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
   { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
+  { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake },
   { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
   { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
