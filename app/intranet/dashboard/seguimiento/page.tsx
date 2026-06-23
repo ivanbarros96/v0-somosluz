@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -20,8 +21,15 @@ interface SeguimientoRow {
   nombre: string;
   source_tipo: string;
   telefono: string | null;
+  nombre_apoderado: string | null;
+  telefono_apoderado: string | null;
   streak: number;
   nivel: Nivel;
+}
+
+interface PendingCall {
+  tel: string;
+  label: string; // "nombre" o "Apoderado de nombre"
 }
 
 const NIVEL_STYLE: Record<Nivel, { dot: string; badge: string; label: string }> = {
@@ -33,6 +41,7 @@ const NIVEL_STYLE: Record<Nivel, { dot: string; badge: string; label: string }> 
 export default function SeguimientoPage() {
   const [rows, setRows] = useState<SeguimientoRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCall, setPendingCall] = useState<PendingCall | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -48,7 +57,7 @@ export default function SeguimientoPage() {
     // Personas activas
     const { data: personas } = await supabase
       .from('personas')
-      .select('id, nombre, source_tipo, telefono, fecha_registro, created_at');
+      .select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
     if (!personas) { setLoading(false); return; }
 
     // Cultos ya realizados (fecha <= ahora), más reciente primero
@@ -87,6 +96,8 @@ export default function SeguimientoPage() {
           nombre: p.nombre,
           source_tipo: p.source_tipo,
           telefono: p.telefono,
+          nombre_apoderado: p.nombre_apoderado ?? null,
+          telefono_apoderado: p.telefono_apoderado ?? null,
           streak,
           nivel: clasificar(streak),
         };
@@ -190,20 +201,24 @@ export default function SeguimientoPage() {
                           <span className={`text-xs px-2 py-1 rounded-md font-medium ${st.badge}`}>
                             {r.streak} cultos
                           </span>
-                          {r.telefono ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 w-8 p-0 shrink-0"
-                              asChild
-                            >
-                              <a href={`tel:${r.telefono}`} aria-label={`Llamar a ${r.nombre}`}>
+                          {(() => {
+                            const esNino = r.source_tipo === 'nino';
+                            const tel = esNino ? r.telefono_apoderado : r.telefono;
+                            const label = esNino
+                              ? `Apoderado de ${r.nombre}${r.nombre_apoderado ? ` (${r.nombre_apoderado})` : ''}`
+                              : r.nombre;
+                            return tel ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 shrink-0"
+                                onClick={() => setPendingCall({ tel, label })}
+                                aria-label={`Llamar a ${label}`}
+                              >
                                 <PhoneCall className="h-3.5 w-3.5" />
-                              </a>
-                            </Button>
-                          ) : (
-                            <div className="w-8" />
-                          )}
+                              </Button>
+                            ) : <div className="w-8" />;
+                          })()}
                         </div>
                       </div>
                     );
@@ -214,6 +229,29 @@ export default function SeguimientoPage() {
           )}
         </>
       )}
+
+      {/* Confirmación de llamada */}
+      <AlertDialog open={!!pendingCall} onOpenChange={(o) => { if (!o) setPendingCall(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <PhoneCall className="h-5 w-5 text-primary" />
+              Confirmar llamada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Está a punto de llamar a <span className="font-semibold text-foreground">{pendingCall?.label}</span> al número <span className="font-semibold text-foreground">{pendingCall?.tel}</span>. ¿Desea continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a href={`tel:${pendingCall?.tel}`} onClick={() => setPendingCall(null)}>
+                Llamar
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

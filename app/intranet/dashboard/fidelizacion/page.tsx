@@ -5,20 +5,29 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { HeartHandshake, Loader2, Phone, PhoneCall, CheckCircle2 } from 'lucide-react';
 import { FidelidadChart, type FidelidadData, type FidelidadNivel } from '@/components/intranet/pastor/fidelidad-chart';
 
 type Filtro = 'todas' | FidelidadNivel;
+type TipoFiltro = 'todos' | 'adulto' | 'nino';
 
 interface Row {
   id: number;
   nombre: string;
   source_tipo: string;
   telefono: string | null;
+  nombre_apoderado: string | null;
+  telefono_apoderado: string | null;
   presentes: number;
   elegibles: number;
   pct: number;
   nivel: FidelidadNivel;
+}
+
+interface PendingCall {
+  tel: string;
+  label: string;
 }
 
 const NIVEL_STYLE: Record<FidelidadNivel, { dot: string; badge: string; label: string; color: string }> = {
@@ -39,8 +48,10 @@ function FidelizacionContent() {
   const [filtro, setFiltro] = useState<Filtro>(
     nivelInicial === 'alta' || nivelInicial === 'media' || nivelInicial === 'baja' ? nivelInicial : 'todas',
   );
+  const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>('todos');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCall, setPendingCall] = useState<PendingCall | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -54,7 +65,7 @@ function FidelizacionContent() {
     const retirados = new Set((retirosData ?? []).map((r: any) => Number(r.persona_id)));
 
     const { data: personas } = await supabase
-      .from('personas').select('id, nombre, source_tipo, telefono, fecha_registro, created_at');
+      .from('personas').select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
     const { data: cultos } = await supabase
       .from('cultos').select('id, fecha').order('fecha', { ascending: false });
     const { data: asist } = await supabase
@@ -86,6 +97,8 @@ function FidelizacionContent() {
         nombre: p.nombre,
         source_tipo: p.source_tipo,
         telefono: p.telefono,
+        nombre_apoderado: p.nombre_apoderado ?? null,
+        telefono_apoderado: p.telefono_apoderado ?? null,
         presentes,
         elegibles: elegibles.length,
         pct,
@@ -97,11 +110,15 @@ function FidelizacionContent() {
     setLoading(false);
   }
 
+  const rowsFiltradosTipo = useMemo(() =>
+    tipoFiltro === 'todos' ? rows : rows.filter((r) => r.source_tipo === tipoFiltro),
+  [rows, tipoFiltro]);
+
   const conteos = useMemo(() => ({
-    alta: rows.filter((r) => r.nivel === 'alta').length,
-    media: rows.filter((r) => r.nivel === 'media').length,
-    baja: rows.filter((r) => r.nivel === 'baja').length,
-  }), [rows]);
+    alta: rowsFiltradosTipo.filter((r) => r.nivel === 'alta').length,
+    media: rowsFiltradosTipo.filter((r) => r.nivel === 'media').length,
+    baja: rowsFiltradosTipo.filter((r) => r.nivel === 'baja').length,
+  }), [rowsFiltradosTipo]);
 
   const chartData: FidelidadData[] = [
     { key: 'alta',  nivel: 'Alta (≥70%)',    total: conteos.alta,  color: NIVEL_STYLE.alta.color },
@@ -109,15 +126,21 @@ function FidelizacionContent() {
     { key: 'baja',  nivel: 'Baja (<35%)',    total: conteos.baja,  color: NIVEL_STYLE.baja.color },
   ];
 
-  const lista = rows
+  const lista = rowsFiltradosTipo
     .filter((r) => filtro === 'todas' || r.nivel === filtro)
-    .sort((a, b) => a.pct - b.pct); // más críticos primero
+    .sort((a, b) => a.pct - b.pct);
 
   const CHIPS: { key: Filtro; label: string; n: number }[] = [
-    { key: 'todas', label: 'Todas', n: rows.length },
+    { key: 'todas', label: 'Todas', n: rowsFiltradosTipo.length },
     { key: 'alta', label: 'Alta', n: conteos.alta },
     { key: 'media', label: 'Media', n: conteos.media },
     { key: 'baja', label: 'Baja', n: conteos.baja },
+  ];
+
+  const TIPO_CHIPS: { key: TipoFiltro; label: string }[] = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'adulto', label: 'Adultos' },
+    { key: 'nino', label: 'Niños' },
   ];
 
   return (
@@ -138,10 +161,26 @@ function FidelizacionContent() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Gráfico resumen — clic filtra la lista */}
-          <FidelidadChart data={chartData} evaluadas={rows.length} onSelect={(n) => setFiltro(n)} />
+          {/* Chips de tipo (adultos / niños / todos) */}
+          <div className="flex gap-2 flex-wrap">
+            {TIPO_CHIPS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => { setTipoFiltro(key); setFiltro('todas'); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+                  ${tipoFiltro === key
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-          {/* Chips de filtro */}
+          {/* Gráfico resumen — clic filtra la lista */}
+          <FidelidadChart data={chartData} evaluadas={rowsFiltradosTipo.length} onSelect={(n) => setFiltro(n)} />
+
+          {/* Chips de filtro por nivel */}
           <div className="flex gap-2 flex-wrap">
             {CHIPS.map(({ key, label, n }) => (
               <button
@@ -209,15 +248,24 @@ function FidelizacionContent() {
                           <span className={`text-sm font-bold tabular-nums px-2 py-1 rounded-md ${st.badge}`}>
                             {r.pct}%
                           </span>
-                          {r.telefono ? (
-                            <Button size="sm" variant="outline" className="h-8 w-8 p-0 shrink-0" asChild>
-                              <a href={`tel:${r.telefono}`} aria-label={`Llamar a ${r.nombre}`}>
+                          {(() => {
+                            const esNino = r.source_tipo === 'nino';
+                            const tel = esNino ? r.telefono_apoderado : r.telefono;
+                            const label = esNino
+                              ? `Apoderado de ${r.nombre}${r.nombre_apoderado ? ` (${r.nombre_apoderado})` : ''}`
+                              : r.nombre;
+                            return tel ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 shrink-0"
+                                onClick={() => setPendingCall({ tel, label })}
+                                aria-label={`Llamar a ${label}`}
+                              >
                                 <PhoneCall className="h-3.5 w-3.5" />
-                              </a>
-                            </Button>
-                          ) : (
-                            <div className="w-8" />
-                          )}
+                              </Button>
+                            ) : <div className="w-8" />;
+                          })()}
                         </div>
                       </div>
                     );
@@ -228,6 +276,29 @@ function FidelizacionContent() {
           )}
         </div>
       )}
+
+      {/* Confirmación de llamada */}
+      <AlertDialog open={!!pendingCall} onOpenChange={(o) => { if (!o) setPendingCall(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <PhoneCall className="h-5 w-5 text-primary" />
+              Confirmar llamada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Está a punto de llamar a <span className="font-semibold text-foreground">{pendingCall?.label}</span> al número <span className="font-semibold text-foreground">{pendingCall?.tel}</span>. ¿Desea continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <a href={`tel:${pendingCall?.tel}`} onClick={() => setPendingCall(null)}>
+                Llamar
+              </a>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

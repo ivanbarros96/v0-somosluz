@@ -7,7 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, CalendarPlus, Users, UserCheck, XCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
 
 type Persona = {
   id: number;
@@ -46,6 +49,9 @@ function formatFecha(iso: string) {
 }
 
 export function AsistenciaPanel() {
+  const { user } = useAuth();
+  const esPastor = user?.role === 'pastor';
+
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [cultoId, setCultoId] = useState<number | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -59,6 +65,12 @@ export function AsistenciaPanel() {
   const [creando, setCreando] = useState(false);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [cerrandoCulto, setCerrandoCulto] = useState(false);
+
+  // Estado para eliminar culto
+  const [showEliminar, setShowEliminar] = useState(false);
+  const [pwdEliminar, setPwdEliminar] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -126,8 +138,35 @@ export function AsistenciaPanel() {
     if (cultoId) cargarAsistencias(cultoId);
   }, [cultoId, cargarAsistencias]);
 
+  const eliminarCulto = async () => {
+    if (!cultoId) return;
+    setEliminando(true);
+    setErrorEliminar('');
+    const res = await fetch(`/api/cultos/${cultoId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: esPastor ? '' : pwdEliminar }),
+    });
+    if (res.ok) {
+      setCultos((prev) => prev.filter((c) => c.id !== cultoId));
+      setCultoId(null);
+      setShowEliminar(false);
+      setPwdEliminar('');
+      toast.success('Culto eliminado.');
+    } else {
+      const { error } = await res.json().catch(() => ({ error: 'Error al eliminar.' }));
+      setErrorEliminar(error ?? 'Error al eliminar.');
+    }
+    setEliminando(false);
+  };
+
   const toggleAsistencia = async (persona: Persona) => {
     if (!cultoId) return;
+    const cultoActivo = cultos.find((c) => c.id === cultoId)?.activo;
+    if (!cultoActivo) {
+      toast.warning('Este culto está cerrado y no se puede modificar la asistencia.');
+      return;
+    }
     const key = personaKey(persona);
     setSavingKey(key);
 
@@ -297,6 +336,12 @@ export function AsistenciaPanel() {
                     Cerrar culto
                   </Button>
                 )}
+                {cultoId && (
+                  <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setShowEliminar(true); setPwdEliminar(''); setErrorEliminar(''); }}>
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Eliminar
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -379,6 +424,54 @@ export function AsistenciaPanel() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog: confirmar eliminación de culto */}
+      <Dialog open={showEliminar} onOpenChange={(o) => { if (!o && !eliminando) { setShowEliminar(false); setPwdEliminar(''); setErrorEliminar(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Eliminar culto
+            </DialogTitle>
+            <DialogDescription>
+              Se eliminará <span className="font-semibold text-foreground">{cultos.find(c => c.id === cultoId)?.descripcion}</span> y todas sus asistencias registradas. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!esPastor && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Requiere autorización. Ingresa la <strong>contraseña del pastor</strong>.</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pwd-eliminar-culto">Contraseña del pastor</Label>
+                <Input
+                  id="pwd-eliminar-culto"
+                  type="password"
+                  value={pwdEliminar}
+                  autoFocus
+                  onChange={(e) => setPwdEliminar(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && pwdEliminar) eliminarCulto(); }}
+                  placeholder="••••••••"
+                  disabled={eliminando}
+                />
+              </div>
+            </div>
+          )}
+
+          {errorEliminar && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{errorEliminar}</p>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowEliminar(false)} disabled={eliminando}>Cancelar</Button>
+            <Button variant="destructive" onClick={eliminarCulto} disabled={eliminando || (!esPastor && !pwdEliminar)}>
+              {eliminando ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar culto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

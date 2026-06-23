@@ -591,7 +591,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
 
             <div className="space-y-1">
-              <Label>Email <span className="text-muted-foreground text-xs font-normal">(opcional)</span></Label>
+              <Label>Email {modo === 'nuevo' ? <span className="text-red-500">*</span> : <span className="text-muted-foreground text-xs font-normal">(opcional)</span>}</Label>
               <Input
                 type="email"
                 value={form.email}
