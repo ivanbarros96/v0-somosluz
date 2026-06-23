@@ -131,22 +131,23 @@ export function AsistenciaPanel() {
     const key = personaKey(persona);
     setSavingKey(key);
 
+    const idField = persona.tipo === 'nuevo'
+      ? { miembroNuevoId: persona.id }
+      : { personaId: persona.id };
+
     if (presentes.has(key)) {
-      const query = supabase.from('asistencias').delete().eq('culto_id', cultoId);
-      if (persona.tipo === 'nuevo') {
-        await query.eq('miembro_nuevo_id', persona.id);
-      } else {
-        await query.eq('persona_id', persona.id);
-      }
+      await fetch('/api/asistencias', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cultoId, ...idField }),
+      });
       setPresentes((prev) => { const n = new Set(prev); n.delete(key); return n; });
     } else {
-      const row: any = { culto_id: cultoId, fecha_registro: new Date().toISOString() };
-      if (persona.tipo === 'nuevo') {
-        row.miembro_nuevo_id = persona.id;
-      } else {
-        row.persona_id = persona.id;
-      }
-      await supabase.from('asistencias').insert(row);
+      await fetch('/api/asistencias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cultoId, ...idField }),
+      });
       setPresentes((prev) => new Set(prev).add(key));
     }
     setSavingKey(null);
@@ -158,16 +159,19 @@ export function AsistenciaPanel() {
     const desc = `Culto dominical ${new Date(nuevaFecha + 'T12:00:00').toLocaleDateString('es-ES', {
       day: 'numeric', month: 'long', year: 'numeric',
     })}`;
-    const { data, error } = await supabase
-      .from('cultos')
-      .insert({ fecha: nuevaFecha, descripcion: desc, activo: true })
-      .select()
-      .single();
-    if (!error && data) {
-      setCultos((prev) => [data, ...prev]);
-      setCultoId(data.id);
-      setNuevaFecha('');
-      setMostrarNuevo(false);
+    const res = await fetch('/api/cultos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha: nuevaFecha, descripcion: desc }),
+    });
+    if (res.ok) {
+      const { culto } = await res.json();
+      if (culto) {
+        setCultos((prev) => [culto, ...prev]);
+        setCultoId(culto.id);
+        setNuevaFecha('');
+        setMostrarNuevo(false);
+      }
     }
     setCreando(false);
   };
@@ -175,8 +179,12 @@ export function AsistenciaPanel() {
   const cerrarCulto = async () => {
     if (!cultoId) return;
     setCerrandoCulto(true);
-    const { error } = await supabase.from('cultos').update({ activo: false }).eq('id', cultoId);
-    if (!error) {
+    const res = await fetch(`/api/cultos/${cultoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activo: false }),
+    });
+    if (res.ok) {
       setCultos((prev) => prev.map((c) => c.id === cultoId ? { ...c, activo: false } : c));
     }
     setCerrandoCulto(false);

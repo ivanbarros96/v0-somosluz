@@ -115,15 +115,18 @@ export default function RetirosPage() {
     if (!selected || !puedeGuardar) return;
     setSaving(true);
 
-    const { error } = await supabase.from('retiros').insert({
-      persona_id: selected.id,
-      nombre: selected.nombre,
-      motivo: motivoFinal,
-      observaciones: observaciones || null,
-      fecha_retiro: new Date().toISOString().split('T')[0],
+    const res = await fetch('/api/retiros', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        persona_id: selected.id,
+        nombre: selected.nombre,
+        motivo: motivoFinal,
+        observaciones: observaciones || null,
+      }),
     });
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Error al guardar el retiro');
     } else {
       toast.success(`${selected.nombre} registrado como retirado`);

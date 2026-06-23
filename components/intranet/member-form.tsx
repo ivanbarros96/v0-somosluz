@@ -261,15 +261,19 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         }
 
         const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
-        const { error: insertError } = await supabase
-          .from('miembros_nuevos')
-          .insert({
+        const res = await fetch('/api/miembros-nuevos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             nombre: form.nombre.trim(),
             telefono: telFull,
             email: form.email.trim().toLowerCase(),
-            fecha_registro: new Date().toISOString(),
-          });
-        if (insertError) throw new Error(insertError.message);
+          }),
+        });
+        if (!res.ok) {
+          const { error } = await res.json().catch(() => ({ error: 'Error al registrar.' }));
+          throw new Error(error ?? 'Error al registrar.');
+        }
         setOk(true);
         setForm(emptyForm());
         onSuccess?.();

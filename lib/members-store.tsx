@@ -11,7 +11,7 @@ type MembersContextType = {
   refreshMembers: () => Promise<void>;
   addMember: (data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'>) => Promise<void>;
   updateMember: (id: string, data: Partial<Member>) => Promise<void>;
-  deleteMember: (id: string) => Promise<void>;
+  deleteMember: (id: string, pastorPassword?: string) => Promise<void>;
 };
 
 const MembersContext = createContext<MembersContextType | undefined>(undefined);
@@ -114,8 +114,15 @@ export function MembersProvider({ children }: { children: ReactNode }) {
       row.telefono_apoderado = n.telefono_apoderado;
     }
 
-    const { error } = await supabase.from('personas').insert(row);
-    if (error) throw new Error(error.message);
+    const res = await fetch('/api/personas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Error al crear el miembro.' }));
+      throw new Error(error ?? 'Error al crear el miembro.');
+    }
     await refreshMembers();
   }, [refreshMembers]);
 
@@ -137,14 +144,28 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     if ('nombre_apoderado' in data) row.nombre_apoderado = data.nombre_apoderado;
     if ('telefono_apoderado' in data) row.telefono_apoderado = data.telefono_apoderado;
 
-    const { error } = await supabase.from('personas').update(row).eq('id', id);
-    if (error) throw new Error(error.message);
+    const res = await fetch(`/api/personas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Error al actualizar.' }));
+      throw new Error(error ?? 'Error al actualizar.');
+    }
     await refreshMembers();
   }, [refreshMembers]);
 
-  const deleteMember = useCallback(async (id: string) => {
-    const { error } = await supabase.from('personas').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+  const deleteMember = useCallback(async (id: string, pastorPassword?: string) => {
+    const res = await fetch(`/api/personas/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pastorPassword ?? '' }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Error al eliminar.' }));
+      throw new Error(error ?? 'Error al eliminar.');
+    }
     await refreshMembers();
   }, [refreshMembers]);
 

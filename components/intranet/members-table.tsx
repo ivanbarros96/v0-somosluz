@@ -159,29 +159,9 @@ export function MembersTable() {
     setWorking(true);
     setDeleteError('');
 
-    // El perfil operativo requiere autorización con la clave del pastor
-    if (!esPastor) {
-      try {
-        const res = await fetch('/api/auth/verify-pastor', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: pwd }),
-        });
-        const { ok } = await res.json();
-        if (!ok) {
-          setDeleteError('Contraseña del pastor incorrecta.');
-          setWorking(false);
-          return;
-        }
-      } catch {
-        setDeleteError('No se pudo verificar la autorización.');
-        setWorking(false);
-        return;
-      }
-    }
-
+    // El perfil operativo envía la clave del pastor; el servidor la valida.
     try {
-      await deleteMember(deleting.id);
+      await deleteMember(deleting.id, esPastor ? undefined : pwd);
       setDeleting(null);
       setPwd('');
     } catch (e: any) {
