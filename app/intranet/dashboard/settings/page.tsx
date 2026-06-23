@@ -5,139 +5,139 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, Database, Info } from 'lucide-react';
+import { Shield, Users, Database, Info, BookOpen, Sun } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
 
+  // Solo el perfil gerencial (pastor) accede a configuración
   useEffect(() => {
-    if (user?.role !== 'admin') {
-      router.push('/intranet/dashboard');
+    if (user && user.role !== 'pastor') {
+      router.replace('/intranet/dashboard');
     }
   }, [user, router]);
 
-  if (user?.role !== 'admin') {
-    return null;
-  }
+  if (!user || user.role !== 'pastor') return null;
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">Configuracion</h1>
-        <p className="text-muted-foreground mt-1">
-          Panel de configuracion del sistema (solo administradores)
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Configuración</h1>
+        <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          Información del sistema y permisos de acceso
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Sesión actual */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
-              Credenciales del Sistema
+              Tu sesión
             </CardTitle>
-            <CardDescription>
-              Credenciales de acceso configuradas
-            </CardDescription>
+            <CardDescription>Perfil con el que ingresaste</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-secondary/50 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-1">Administrador</p>
-              <p className="text-xs text-muted-foreground">Usuario: ADMIN</p>
-              <p className="text-xs text-muted-foreground">Password: SOMOSLUZ</p>
-              <Badge className="mt-2">Admin</Badge>
+          <CardContent>
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/5 border border-yellow-500/15">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/15 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">{user.name}</p>
+                <Badge className="mt-1 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-0">
+                  Acceso gerencial
+                </Badge>
+              </div>
             </div>
-            <div className="p-4 bg-secondary/50 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-1">Usuario General</p>
-              <p className="text-xs text-muted-foreground">Usuario: somosluz</p>
-              <p className="text-xs text-muted-foreground">Password: somosluz</p>
-              <Badge variant="secondary" className="mt-2">User</Badge>
-            </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              La sesión se cierra automáticamente tras 8 horas de inactividad.
+            </p>
           </CardContent>
         </Card>
 
+        {/* Permisos por rol */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Permisos por Rol
+              Permisos por perfil
             </CardTitle>
-            <CardDescription>
-              Capacidades de cada tipo de usuario
-            </CardDescription>
+            <CardDescription>Qué puede hacer cada acceso</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="p-4 bg-secondary/50 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-2">Administrador</p>
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="w-4 h-4 text-yellow-600" />
+                <p className="text-sm font-medium text-foreground">Pastor · Gerencial</p>
+              </div>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>- Ver todos los miembros</li>
-                <li>- Agregar nuevos miembros</li>
-                <li>- Editar cualquier miembro</li>
-                <li>- Eliminar miembros</li>
-                <li>- Acceso a configuracion</li>
+                <li>• Estadísticas, gráficos y reportes</li>
+                <li>• Seguimiento de ausencias y retiros</li>
+                <li>• Ver y administrar miembros (incl. eliminar)</li>
               </ul>
             </div>
             <div className="p-4 bg-secondary/50 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-2">Usuario</p>
+              <div className="flex items-center gap-2 mb-2">
+                <Sun className="w-4 h-4 text-blue-600" />
+                <p className="text-sm font-medium text-foreground">Somos Luz · Operativo</p>
+              </div>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>- Ver todos los miembros</li>
-                <li>- Editar informacion de miembros</li>
-                <li>- Sin acceso a eliminar</li>
-                <li>- Sin acceso a configuracion</li>
+                <li>• Registrar miembros y visitantes</li>
+                <li>• Tomar asistencia de los cultos</li>
+                <li>• Eliminar requiere autorización del pastor</li>
               </ul>
             </div>
           </CardContent>
         </Card>
 
+        {/* Almacenamiento */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5 text-primary" />
               Almacenamiento
             </CardTitle>
-            <CardDescription>
-              Informacion sobre el almacenamiento de datos
-            </CardDescription>
+            <CardDescription>Dónde viven los datos</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="p-4 bg-secondary/50 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-2">localStorage</p>
+              <p className="text-sm font-medium text-foreground mb-2">Supabase (PostgreSQL)</p>
               <p className="text-xs text-muted-foreground">
-                Los datos de miembros y sesiones se almacenan localmente en el navegador. 
-                Los datos persisten entre sesiones pero son especificos del dispositivo.
+                Los miembros, cultos, asistencias y retiros se guardan en la nube y
+                se comparten entre todos los dispositivos en tiempo real.
               </p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Información del sistema */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
-              Informacion del Sistema
+              Información del sistema
             </CardTitle>
-            <CardDescription>
-              Detalles tecnicos
-            </CardDescription>
+            <CardDescription>Detalles técnicos</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Version</span>
-                <span className="text-foreground">1.0.0</span>
+                <span className="text-muted-foreground">Versión</span>
+                <span className="text-foreground">1.1.0</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Framework</span>
                 <span className="text-foreground">Next.js 16</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">UI</span>
-                <span className="text-foreground">shadcn/ui</span>
+                <span className="text-muted-foreground">Base de datos</span>
+                <span className="text-foreground">Supabase</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Autenticacion</span>
-                <span className="text-foreground">Hardcoded</span>
+                <span className="text-muted-foreground">Autenticación</span>
+                <span className="text-foreground">Sesión cifrada (HMAC)</span>
               </div>
             </div>
           </CardContent>

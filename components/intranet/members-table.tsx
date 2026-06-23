@@ -1,16 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Eye, Pencil, Search, Trash2, UserRound, X } from 'lucide-react';
+import { Eye, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMembers } from '@/lib/members-store';
+import { useAuth } from '@/lib/auth-context';
 import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember } from '@/lib/types';
 import { MemberForm } from '@/components/intranet/member-form';
 
@@ -117,14 +119,76 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
 
 export function MembersTable() {
   const { members, isLoading, error, deleteMember } = useMembers();
+  const { user } = useAuth();
+  const esPastor = user?.role === 'pastor';
+
   const [viewing, setViewing] = useState<Member | null>(null);
   const [editing, setEditing] = useState<Member | null>(null); // ✅ un solo estado
+  const [query, setQuery] = useState('');
 
-  const adultos = useMemo(() => members.filter(isAdultoMember), [members]);
-  const ninos = useMemo(() => members.filter(isNinoMember), [members]);
+  // Estado del flujo de eliminación
+  const [deleting, setDeleting] = useState<Member | null>(null);
+  const [pwd, setPwd] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [working, setWorking] = useState(false);
 
-  const handleDelete = async (m: Member) => {
-    if (window.confirm(`¿Eliminar a ${m.nombre}?`)) await deleteMember(m.id);
+  const coincide = (m: Member) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [m.nombre, m.telefono, m.email, m.comuna, m.region]
+      .some((v) => (v ?? '').toLowerCase().includes(q));
+  };
+
+  const adultos = useMemo(
+    () => members.filter(isAdultoMember).filter(coincide),
+    [members, query],
+  );
+  const ninos = useMemo(
+    () => members.filter(isNinoMember).filter(coincide),
+    [members, query],
+  );
+
+  const abrirEliminar = (m: Member) => {
+    setDeleting(m);
+    setPwd('');
+    setDeleteError('');
+  };
+
+  const confirmarEliminar = async () => {
+    if (!deleting) return;
+    setWorking(true);
+    setDeleteError('');
+
+    // El perfil operativo requiere autorización con la clave del pastor
+    if (!esPastor) {
+      try {
+        const res = await fetch('/api/auth/verify-pastor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd }),
+        });
+        const { ok } = await res.json();
+        if (!ok) {
+          setDeleteError('Contraseña del pastor incorrecta.');
+          setWorking(false);
+          return;
+        }
+      } catch {
+        setDeleteError('No se pudo verificar la autorización.');
+        setWorking(false);
+        return;
+      }
+    }
+
+    try {
+      await deleteMember(deleting.id);
+      setDeleting(null);
+      setPwd('');
+    } catch (e: any) {
+      setDeleteError(e?.message ?? 'Error al eliminar.');
+    } finally {
+      setWorking(false);
+    }
   };
 
   const Actions = ({ m }: { m: Member }) => (
@@ -135,7 +199,7 @@ export function MembersTable() {
       <Button variant="ghost" size="icon" onClick={() => setEditing(m)}>
         <Pencil className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(m)}>
+      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => abrirEliminar(m)}>
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
@@ -155,6 +219,15 @@ export function MembersTable() {
         <CardHeader>
           <CardTitle>Miembros</CardTitle>
           <p className="text-sm text-muted-foreground">Adultos y niños separados en tabs.</p>
+          <div className="relative mt-3 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por nombre, teléfono, email o comuna..."
+              className="pl-9"
+            />
+          </div>
         </CardHeader>
         <CardContent className="px-0 pt-0">
           <Tabs defaultValue="adultos">
@@ -249,6 +322,60 @@ export function MembersTable() {
       </Card>
 
       <ViewDialog member={viewing} open={!!viewing} onClose={() => setViewing(null)} />
+
+      {/* Confirmar eliminación — el perfil operativo requiere clave del pastor */}
+      <Dialog open={!!deleting} onOpenChange={(o) => { if (!o && !working) { setDeleting(null); setPwd(''); setDeleteError(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Eliminar miembro
+            </DialogTitle>
+            <DialogDescription>
+              Vas a eliminar a <span className="font-semibold text-foreground">{deleting?.nombre}</span>. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!esPastor && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>Eliminar requiere autorización. Ingresa la <strong>contraseña del pastor</strong> para continuar.</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pwd-pastor">Contraseña del pastor</Label>
+                <Input
+                  id="pwd-pastor"
+                  type="password"
+                  value={pwd}
+                  autoFocus
+                  onChange={(e) => setPwd(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && pwd) confirmarEliminar(); }}
+                  placeholder="••••••••"
+                  disabled={working}
+                />
+              </div>
+            </div>
+          )}
+
+          {deleteError && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{deleteError}</p>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDeleting(null); setPwd(''); setDeleteError(''); }} disabled={working}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarEliminar}
+              disabled={working || (!esPastor && !pwd)}
+            >
+              {working ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ FIX CRÍTICO: key={editing.id} fuerza recrear el MemberForm cada vez */}
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
