@@ -8,6 +8,9 @@ import { AsistenciaChart, type CultoAsistencia } from '@/components/intranet/pas
 import { AsistenciaMensualChart, type AsistenciaMes } from '@/components/intranet/pastor/asistencia-mensual-chart';
 import { CrecimientoChart, type CrecimientoMes } from '@/components/intranet/pastor/crecimiento-chart';
 import { BautizadosChart, type BautizadosData } from '@/components/intranet/pastor/bautizados-chart';
+import { SexoChart, type SexoData } from '@/components/intranet/pastor/sexo-chart';
+import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-chart';
+import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserPlus, ClipboardList, UserX, Settings, Activity } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
@@ -27,6 +30,11 @@ function PastorDashboard() {
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
+  const [sexoData, setSexoData] = useState<SexoData>({ femenino: 0, masculino: 0, sin_dato: 0 });
+  const [edadData, setEdadData] = useState<EdadRango[]>([]);
+  const [edadSinDato, setEdadSinDato] = useState(0);
+  const [fidelidadData, setFidelidadData] = useState<FidelidadData[]>([]);
+  const [fidelidadEval, setFidelidadEval] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,17 +42,41 @@ function PastorDashboard() {
       // Personas
       const { data: personas } = await supabase
         .from('personas')
-        .select('id, source_tipo, bautizado, created_at');
+        .select('id, source_tipo, bautizado, sexo, edad, fecha_registro, created_at');
 
       const total = personas?.length ?? 0;
       const adultos = personas?.filter((p) => p.source_tipo === 'adulto').length ?? 0;
       const ninos = personas?.filter((p) => p.source_tipo === 'nino').length ?? 0;
 
+      // Normalización defensiva: comparar siempre en minúscula
+      const baut = (v: any) => (v == null ? null : String(v).trim().toLowerCase());
+
       // Bautismo (adultos)
       const adultoRows = personas?.filter((p) => p.source_tipo === 'adulto') ?? [];
-      const bautizados = adultoRows.filter((p) => p.bautizado === 'si').length;
-      const en_proceso = adultoRows.filter((p) => p.bautizado === 'en_proceso').length;
-      const no_bautizados = adultoRows.filter((p) => p.bautizado === 'no' || p.bautizado == null).length;
+      const bautizados = adultoRows.filter((p) => baut(p.bautizado) === 'si').length;
+      const en_proceso = adultoRows.filter((p) => baut(p.bautizado) === 'en_proceso').length;
+      const no_bautizados = adultoRows.filter((p) => baut(p.bautizado) === 'no' || p.bautizado == null).length;
+
+      // Distribución por sexo (toda la congregación)
+      const sexoNorm = (v: any) => String(v ?? '').trim().toLowerCase();
+      const femenino = personas?.filter((p) => sexoNorm(p.sexo) === 'femenino').length ?? 0;
+      const masculino = personas?.filter((p) => sexoNorm(p.sexo) === 'masculino').length ?? 0;
+      const sexoSinDato = total - femenino - masculino;
+
+      // Rangos de edad
+      const RANGOS = [
+        { rango: '0-12', min: 0, max: 12 },
+        { rango: '13-17', min: 13, max: 17 },
+        { rango: '18-30', min: 18, max: 30 },
+        { rango: '31-50', min: 31, max: 50 },
+        { rango: '51+', min: 51, max: 200 },
+      ];
+      const conEdad = (personas ?? []).filter((p) => typeof p.edad === 'number' && p.edad >= 0);
+      const edadRangos: EdadRango[] = RANGOS.map((r) => ({
+        rango: r.rango,
+        total: conEdad.filter((p) => p.edad >= r.min && p.edad <= r.max).length,
+      }));
+      const sinEdad = total - conEdad.length;
 
       // Crecimiento ACUMULADO desde el inicio de la iglesia (primer registro)
       const now = new Date();
@@ -76,7 +108,7 @@ function PastorDashboard() {
 
       const { data: rawAsist } = await supabase
         .from('asistencias')
-        .select('culto_id');
+        .select('culto_id, persona_id');
 
       // Conteo por culto
       const conteoPorCulto: Record<number, number> = {};
@@ -121,11 +153,45 @@ function PastorDashboard() {
         ? Math.round((totalPresencias / ultimos8.length / total) * 100)
         : 0;
 
+      // Fidelidad: % de cultos asistidos desde que cada persona se unió
+      const ahora = Date.now();
+      const cultosPasados = cultosOrden.filter((c) => new Date(c.fecha).getTime() <= ahora);
+      const asistPorPersona = new Map<number, Set<number>>();
+      for (const a of rawAsist ?? []) {
+        if (a.persona_id == null) continue;
+        const pid = Number(a.persona_id);
+        if (!asistPorPersona.has(pid)) asistPorPersona.set(pid, new Set());
+        asistPorPersona.get(pid)!.add(Number(a.culto_id));
+      }
+      let alta = 0, media = 0, baja = 0, evaluadas = 0;
+      for (const p of personas ?? []) {
+        const join = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
+        const elegibles = cultosPasados.filter((c) => new Date(c.fecha).getTime() >= join);
+        if (elegibles.length === 0) continue; // se unió después del último culto
+        const asistio = asistPorPersona.get(Number(p.id)) ?? new Set();
+        const presentes = elegibles.filter((c) => asistio.has(Number(c.id))).length;
+        const pct = (presentes / elegibles.length) * 100;
+        evaluadas++;
+        if (pct >= 80) alta++;
+        else if (pct >= 50) media++;
+        else baja++;
+      }
+      const fidelidad: FidelidadData[] = [
+        { nivel: 'Alta (≥80%)', total: alta, color: '#22c55e' },
+        { nivel: 'Media (50-79%)', total: media, color: '#f59e0b' },
+        { nivel: 'Baja (<50%)', total: baja, color: '#ef4444' },
+      ];
+
       setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio });
       setAsistenciaData(asistencias);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
+      setSexoData({ femenino, masculino, sin_dato: sexoSinDato });
+      setEdadData(edadRangos);
+      setEdadSinDato(sinEdad);
+      setFidelidadData(fidelidad);
+      setFidelidadEval(evaluadas);
       setLoading(false);
     }
 
@@ -168,6 +234,13 @@ function PastorDashboard() {
         <CrecimientoChart data={crecimientoData} />
         <BautizadosChart data={bautizadosData} />
       </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <SexoChart data={sexoData} />
+        <EdadChart data={edadData} sinDato={edadSinDato} />
+      </div>
+
+      <FidelidadChart data={fidelidadData} evaluadas={fidelidadEval} />
 
       <Card>
         <CardHeader className="p-4 md:p-6">
