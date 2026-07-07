@@ -4,25 +4,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.98 0.001 70);
-  --foreground: oklch(0.25 0.05 35);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.05 35);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.05 35);
-  --primary: oklch(0.45 0.08 35);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.92 0.02 45);
-  --secondary-foreground: oklch(0.35 0.06 35);
-  --muted: oklch(0.88 0.01 50);
-  --muted-foreground: oklch(0.55 0.02 40);
-  --accent: oklch(0.55 0.1 40);
-  --accent-foreground: oklch(0.98 0 0);
+  /* Paleta de marca Somos Luz — extraída del Instagram (verde salvia + mocha + crema) */
+  --background: oklch(0.965 0.012 85); /* crema / marfil cálido */
+  --foreground: oklch(0.27 0.012 55); /* negro cálido */
+  --card: oklch(0.99 0.006 85);
+  --card-foreground: oklch(0.27 0.012 55);
+  --popover: oklch(0.99 0.006 85);
+  --popover-foreground: oklch(0.27 0.012 55);
+  --primary: oklch(0.5 0.045 130); /* verde salvia / oliva */
+  --primary-foreground: oklch(0.98 0.01 90);
+  --secondary: oklch(0.9 0.018 75); /* arena cálida */
+  --secondary-foreground: oklch(0.35 0.03 60);
+  --muted: oklch(0.92 0.012 78);
+  --muted-foreground: oklch(0.5 0.015 60);
+  --accent: oklch(0.45 0.038 60); /* mocha / tierra */
+  --accent-foreground: oklch(0.98 0.01 90);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.01 50);
-  --input: oklch(0.96 0.01 55);
-  --ring: oklch(0.45 0.08 35);
+  --border: oklch(0.88 0.012 75);
+  --input: oklch(0.94 0.01 78);
+  --ring: oklch(0.5 0.045 130);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -40,20 +41,20 @@
 }
 
 .dark {
-  --background: oklch(0.2 0.02 35);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.25 0.02 35);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.25 0.02 35);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.65 0.1 40);
-  --primary-foreground: oklch(0.2 0.02 35);
-  --secondary: oklch(0.35 0.05 38);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.35 0.02 35);
-  --muted-foreground: oklch(0.65 0.02 40);
-  --accent: oklch(0.65 0.1 40);
-  --accent-foreground: oklch(0.2 0.02 35);
+  --background: oklch(0.22 0.012 55); /* café muy oscuro cálido */
+  --foreground: oklch(0.95 0.006 85);
+  --card: oklch(0.26 0.012 55);
+  --card-foreground: oklch(0.95 0.006 85);
+  --popover: oklch(0.26 0.012 55);
+  --popover-foreground: oklch(0.95 0.006 85);
+  --primary: oklch(0.62 0.05 130); /* salvia más claro para contraste */
+  --primary-foreground: oklch(0.22 0.012 55);
+  --secondary: oklch(0.36 0.02 60);
+  --secondary-foreground: oklch(0.95 0.006 85);
+  --muted: oklch(0.34 0.014 58);
+  --muted-foreground: oklch(0.68 0.014 70);
+  --accent: oklch(0.6 0.04 65); /* mocha claro */
+  --accent-foreground: oklch(0.22 0.012 55);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.35 0.02 35);
@@ -77,6 +78,7 @@
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-serif: var(--font-playfair), Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

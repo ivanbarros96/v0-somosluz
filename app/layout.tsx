@@ -1,16 +1,25 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
 
 export const metadata: Metadata = {
   title: 'Somos Luz Iglesia',
-  description: 'Iglesia Cristiana Somos Luz - Chile',
+  description:
+    'Iglesia Cristiana Somos Luz en Valparaíso, Chile. Una generación que manifiesta el Reino de Dios en la tierra. Culto general los domingos 11:30 hrs.',
   generator: 'v0.app',
+  openGraph: {
+    title: 'Somos Luz Iglesia',
+    description:
+      'Una generación que manifiesta el Reino de Dios en la tierra. Visítanos en Valparaíso, Chile.',
+    locale: 'es_CL',
+    type: 'website',
+  },
   icons: {
     icon: [
       {
@@ -36,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" className={playfair.variable}>
       <body className="font-sans antialiased">
         {children}
         <Toaster richColors position="top-center" />
