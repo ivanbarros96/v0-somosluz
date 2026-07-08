@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Playfair_Display, Great_Vibes } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
@@ -9,6 +9,11 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
 // Script manuscrita — hermana tipográfica del wordmark del logo
 const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400', variable: '--font-script' });
+
+// Barra del navegador móvil en crema de marca (guía: theme-color acorde al fondo)
+export const viewport: Viewport = {
+  themeColor: '#f6f2e8',
+}
 
 export const metadata: Metadata = {
   title: 'Somos Luz Iglesia',

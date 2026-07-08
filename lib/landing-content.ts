@@ -28,14 +28,14 @@ export const PULL_QUOTE = {
   contexto: 'Fuimos llamados a reflejar Su Reino. A manifestar Su vida. A llevar Su luz.',
 } as const;
 
-// Serie de predicación actual (del feed y highlights de IG)
+// Serie de predicación actual
 export const SERIE = {
   etiqueta: 'Serie actual',
-  nombre: 'Estamos en Construcción',
-  bajada: 'La Fábrica de Guerreros — Dios está construyendo valientes.',
+  nombre: 'No Pierdas la Esencia',
+  bajada: 'Sal y luz — lo que eres en Cristo no se negocia.',
   descripcion:
-    'Toda obra de Dios comienza mucho antes de que pueda verse. Mientras levantamos un templo en Valparaíso, Dios está construyendo algo más importante: vidas rendidas a Cristo, formadas a Su imagen.',
-  versiculo: '1 Corintios 3:11',
+    'Vivimos rodeados de voces que intentan moldear quiénes somos. En esta serie volvemos a lo esencial: una identidad que nace en la presencia de Dios, un primer amor que no se apaga y una luz que no se esconde. Porque cuando la sal conserva su sabor, transforma todo lo que toca.',
+  versiculo: 'Mateo 5:13',
 } as const;
 
 export const SOBRE_NOSOTROS = {
@@ -133,8 +133,8 @@ export const UBICACION = {
   ciudad: 'Valparaíso, Chile',
   direccion: 'Almirante Goñi 251, esquina Cochrane, Valparaíso',
   mapsQuery: 'Almirante Goñi 251, Valparaíso, Chile',
-  // Pin exacto entregado por la iglesia
-  mapsUrl: 'https://maps.app.goo.gl/PCzdzhC4jkdBdqzN9',
-  lat: -33.03724,
-  lon: -71.629914,
+  // Ficha de Google Maps de la iglesia (negocio registrado jul-2026)
+  mapsUrl: 'https://maps.app.goo.gl/xFLZAB7GXtCm3ZeaA',
+  lat: -33.0372517,
+  lon: -71.629905,
 } as const;
