@@ -17,7 +17,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return (
     <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md space-y-0.5">
       <p className="text-muted-foreground">{label}</p>
-      <p className="font-semibold text-blue-600">{punto?.acumulado} miembros en total</p>
+      <p className="font-semibold text-primary">{punto?.acumulado} miembros en total</p>
       <p className="text-muted-foreground text-xs">+{punto?.nuevos} ese mes</p>
     </div>
   );
@@ -35,15 +35,15 @@ export function CrecimientoChart({ data }: { data: CrecimientoMes[] }) {
           <AreaChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="gradAcumulado" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor="#6f814f" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#6f814f" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
             <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
             <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="acumulado" stroke="#3b82f6" fill="url(#gradAcumulado)" strokeWidth={2.5} dot={{ fill: '#3b82f6', r: 3, strokeWidth: 0 }} />
+            <Area type="monotone" dataKey="acumulado" stroke="#6f814f" fill="url(#gradAcumulado)" strokeWidth={2.5} dot={{ fill: '#6f814f', r: 3, strokeWidth: 0 }} />
           </AreaChart>
         </ResponsiveContainer>
       </CardContent>

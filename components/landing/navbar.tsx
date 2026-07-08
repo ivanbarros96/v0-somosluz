@@ -1,9 +1,9 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const LINKS = [
   { href: '#nosotros', label: 'Nosotros' },
@@ -16,32 +16,65 @@ const LINKS = [
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Sobre el hero oscuro: texto crema. Con scroll: fondo crema, texto de marca.
+  const solid = scrolled || menuOpen;
+
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-sm bg-background/95 border-b border-border">
+    <nav
+      className={cn(
+        'fixed top-0 inset-x-0 z-50 transition-colors duration-300',
+        solid
+          ? 'bg-background/92 backdrop-blur-md border-b border-border shadow-sm'
+          : 'bg-transparent border-b border-transparent',
+      )}
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2" onClick={closeMenu}>
-          <Image
-            src="/logo.png"
-            alt="Somos Luz Iglesia"
-            width={120}
-            height={75}
-            className="h-12 w-auto mix-blend-multiply"
-            priority
-          />
+        <Link
+          href="/"
+          onClick={closeMenu}
+          className={cn(
+            'flex items-baseline gap-2 transition-colors',
+            solid ? 'text-foreground' : 'text-[oklch(0.95_0.01_85)]',
+          )}
+        >
+          <span className="font-script text-3xl leading-none">Somos Luz</span>
+          <span className="text-[0.55rem] uppercase tracking-[0.3em] opacity-70">Iglesia</span>
         </Link>
 
         {/* Desktop */}
         <div className="hidden md:flex gap-7 items-center">
           {LINKS.map((l) => (
-            <a key={l.href} href={l.href} className="text-sm hover:text-primary transition">
+            <a
+              key={l.href}
+              href={l.href}
+              className={cn(
+                'text-sm transition-colors',
+                solid
+                  ? 'text-foreground/80 hover:text-primary'
+                  : 'text-[oklch(0.88_0.01_85)] hover:text-[oklch(1_0_0)]',
+              )}
+            >
               {l.label}
             </a>
           ))}
           <Link
             href="/intranet"
-            className="text-sm font-medium text-primary hover:text-primary/80 transition"
+            className={cn(
+              'text-sm font-medium px-4 py-1.5 rounded-full border transition-colors',
+              solid
+                ? 'border-primary/40 text-primary hover:bg-primary/10'
+                : 'border-[oklch(0.85_0.02_85_/_0.4)] text-[oklch(0.92_0.01_85)] hover:bg-[oklch(0.92_0.01_85_/_0.12)]',
+            )}
           >
             Intranet
           </Link>
@@ -49,11 +82,17 @@ export function Navbar() {
 
         {/* Mobile — hamburguesa */}
         <button
-          className="md:hidden p-2 rounded-md hover:bg-secondary transition"
+          className={cn(
+            'md:hidden p-2 rounded-md transition-colors',
+            solid
+              ? 'text-foreground hover:bg-secondary'
+              : 'text-[oklch(0.95_0.01_85)] hover:bg-[oklch(0.92_0.01_85_/_0.12)]',
+          )}
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={menuOpen}
         >
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {menuOpen ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
         </button>
       </div>
 
@@ -65,7 +104,7 @@ export function Navbar() {
               key={l.href}
               href={l.href}
               onClick={closeMenu}
-              className="text-sm font-medium hover:text-primary transition py-2.5 border-b border-border"
+              className="text-sm font-medium hover:text-primary transition-colors py-2.5 border-b border-border"
             >
               {l.label}
             </a>

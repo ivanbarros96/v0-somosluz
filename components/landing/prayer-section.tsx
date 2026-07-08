@@ -3,9 +3,10 @@
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { HandHeart } from 'lucide-react';
 
 const inputCls =
-  'w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary';
+  'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function PrayerSection() {
   const [form, setForm] = useState({ nombre: '', email: '', peticion: '', telefono: '' });
@@ -35,91 +36,109 @@ export function PrayerSection() {
   };
 
   return (
-    <section id="oracion" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-center mb-3">
-          Envíanos tu Petición de Oración
-        </h2>
-        <p className="text-center text-muted-foreground mb-10 text-pretty">
-          Queremos orar contigo y por ti. Comparte tu necesidad y nuestro equipo pastoral se unirá
-          en oración.
-        </p>
+    <section
+      id="oracion"
+      className="relative overflow-hidden py-20 sm:py-32 px-4 sm:px-6 lg:px-8"
+    >
+      {/* Luz cálida de fondo */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(ellipse_50%_45%_at_50%_100%,oklch(0.9_0.05_85/.4),transparent_65%)] pointer-events-none"
+      />
 
-        {enviado ? (
-          <div className="bg-secondary/60 border border-border rounded-lg p-8 text-center">
-            <p className="font-serif italic text-xl text-primary mb-2">¡Gracias por tu petición!</p>
-            <p className="text-muted-foreground text-sm">
-              Nos uniremos en oración por ti. Que Dios te bendiga.
-            </p>
-            <Button variant="link" className="mt-3 text-primary" onClick={() => setEnviado(false)}>
-              Enviar otra petición
-            </Button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="oracion-nombre" className="block text-sm font-medium mb-2">
-                Tu nombre
-              </label>
+      <div className="relative max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <p className="font-script text-4xl text-primary mb-3">Queremos orar contigo</p>
+          <h2 className="font-serif text-4xl sm:text-5xl font-semibold text-balance">
+            Envíanos tu petición de oración
+          </h2>
+          <p className="mt-5 text-muted-foreground text-pretty max-w-md mx-auto">
+            Comparte tu necesidad y nuestro equipo pastoral se unirá en oración por ti.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card shadow-sm p-6 sm:p-10">
+          {enviado ? (
+            <div className="text-center py-6" aria-live="polite">
+              <HandHeart className="w-10 h-10 text-primary mx-auto mb-4" aria-hidden="true" />
+              <p className="font-serif italic text-2xl text-primary mb-2">¡Gracias por tu petición!</p>
+              <p className="text-muted-foreground text-sm">
+                Nos uniremos en oración por ti. Que Dios te bendiga.
+              </p>
+              <Button variant="link" className="mt-3 text-primary" onClick={() => setEnviado(false)}>
+                Enviar otra petición
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="oracion-nombre" className="block text-sm font-medium mb-2">
+                  Tu nombre
+                </label>
+                <input
+                  id="oracion-nombre"
+                  type="text"
+                  name="nombre"
+                  autoComplete="name"
+                  required
+                  maxLength={100}
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  className={inputCls}
+                  placeholder="Tu nombre…"
+                />
+              </div>
+              <div>
+                <label htmlFor="oracion-email" className="block text-sm font-medium mb-2">
+                  Email <span className="text-muted-foreground font-normal">(opcional)</span>
+                </label>
+                <input
+                  id="oracion-email"
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  maxLength={200}
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className={inputCls}
+                  placeholder="tu@email.com"
+                />
+              </div>
+              {/* Honeypot antispam: invisible para humanos, los bots lo rellenan */}
               <input
-                id="oracion-nombre"
                 type="text"
-                required
-                maxLength={100}
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className={inputCls}
-                placeholder="Tu nombre"
+                name="telefono"
+                tabIndex={-1}
+                autoComplete="off"
+                value={form.telefono}
+                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                className="hidden"
+                aria-hidden="true"
               />
-            </div>
-            <div>
-              <label htmlFor="oracion-email" className="block text-sm font-medium mb-2">
-                Email (opcional)
-              </label>
-              <input
-                id="oracion-email"
-                type="email"
-                maxLength={200}
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className={inputCls}
-                placeholder="tu@email.com"
-              />
-            </div>
-            {/* Honeypot antispam: invisible para humanos, los bots lo rellenan */}
-            <input
-              type="text"
-              name="telefono"
-              tabIndex={-1}
-              autoComplete="off"
-              value={form.telefono}
-              onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-              className="hidden"
-              aria-hidden="true"
-            />
-            <div>
-              <label htmlFor="oracion-texto" className="block text-sm font-medium mb-2">
-                Tu petición de oración
-              </label>
-              <textarea
-                id="oracion-texto"
-                required
-                maxLength={2000}
-                value={form.peticion}
-                onChange={(e) => setForm({ ...form, peticion: e.target.value })}
-                className={`${inputCls} min-h-28`}
-                placeholder="Cuéntanos por qué podemos orar..."
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={enviando}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {enviando ? 'Enviando...' : 'Enviar Petición'}
-            </Button>
-          </form>
-        )}
+              <div>
+                <label htmlFor="oracion-texto" className="block text-sm font-medium mb-2">
+                  Tu petición de oración
+                </label>
+                <textarea
+                  id="oracion-texto"
+                  required
+                  maxLength={2000}
+                  value={form.peticion}
+                  onChange={(e) => setForm({ ...form, peticion: e.target.value })}
+                  className={`${inputCls} min-h-28`}
+                  placeholder="Cuéntanos por qué podemos orar…"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={enviando}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-11 text-base"
+              >
+                {enviando ? 'Enviando…' : 'Enviar petición'}
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
     </section>
   );

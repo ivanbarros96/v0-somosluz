@@ -13,6 +13,31 @@ export const HERO = {
   subtitulo: 'Una generación que manifiesta el Reino de Dios en la tierra.',
 } as const;
 
+// Frases de identidad tomadas del Instagram (bio, captions y highlights)
+export const FRASES_MARQUEE = [
+  'Identidad y Propósito',
+  'Somos Familia',
+  'Fe · Familia · Propósito',
+  'Siempre habrá un lugar para ti',
+  'Una familia para crecer, servir y caminar juntos',
+] as const;
+
+// Cita del post sobre la construcción del templo (jun-2026)
+export const PULL_QUOTE = {
+  texto: 'Antes de levantar un templo, Dios levanta personas.',
+  contexto: 'Fuimos llamados a reflejar Su Reino. A manifestar Su vida. A llevar Su luz.',
+} as const;
+
+// Serie de predicación actual (del feed y highlights de IG)
+export const SERIE = {
+  etiqueta: 'Serie actual',
+  nombre: 'Estamos en Construcción',
+  bajada: 'La Fábrica de Guerreros — Dios está construyendo valientes.',
+  descripcion:
+    'Toda obra de Dios comienza mucho antes de que pueda verse. Mientras levantamos un templo en Valparaíso, Dios está construyendo algo más importante: vidas rendidas a Cristo, formadas a Su imagen.',
+  versiculo: '1 Corintios 3:11',
+} as const;
+
 export const SOBRE_NOSOTROS = {
   parrafo:
     'En Somos Luz creemos que la transformación de una persona comienza en la presencia de Dios. Por eso, nuestra visión es formar discípulos que busquen a Dios por sobre todas las cosas, vivan llenos del Espíritu Santo, reflejen el carácter de Cristo y manifiesten el Reino de Dios en cada área de su vida. Nuestro anhelo es levantar líderes que amen a Jesús, vivan para hacer la voluntad del Padre y sean luz donde Dios los ha puesto.',

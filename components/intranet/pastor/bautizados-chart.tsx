@@ -10,9 +10,9 @@ export interface BautizadosData {
 }
 
 const SLICES = [
-  { key: 'bautizados' as keyof BautizadosData, label: 'Bautizados', color: '#22c55e' },
-  { key: 'en_proceso' as keyof BautizadosData, label: 'En proceso', color: '#f59e0b' },
-  { key: 'no_bautizados' as keyof BautizadosData, label: 'Sin bautizar', color: '#94a3b8' },
+  { key: 'bautizados' as keyof BautizadosData, label: 'Bautizados', color: '#6f814f' },
+  { key: 'en_proceso' as keyof BautizadosData, label: 'En proceso', color: '#c08a3e' },
+  { key: 'no_bautizados' as keyof BautizadosData, label: 'Sin bautizar', color: '#a8a093' },
 ];
 
 const CustomTooltip = ({ active, payload }: any) => {

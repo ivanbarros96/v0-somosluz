@@ -21,7 +21,7 @@ function fmt(v: string | number | null | undefined) {
 }
 
 function MemberAvatar({ member }: { member: Member }) {
-  const cls = member.tipo === 'adulto' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white';
+  const cls = member.tipo === 'adulto' ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground';
   return (
     <Avatar className="h-9 w-9 border">
       <AvatarFallback className={cls}>
@@ -33,7 +33,7 @@ function MemberAvatar({ member }: { member: Member }) {
 
 function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' }) {
   return (
-    <Badge variant="outline" className={tipo === 'adulto' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-purple-100 text-purple-700 border-purple-200'}>
+    <Badge variant="outline" className={tipo === 'adulto' ? 'bg-primary/10 text-primary border-primary/25' : 'bg-accent/10 text-accent border-accent/25'}>
       {tipo === 'adulto' ? 'Adulto' : 'Niño'}
     </Badge>
   );

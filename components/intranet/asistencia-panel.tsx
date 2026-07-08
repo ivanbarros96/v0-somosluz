@@ -33,8 +33,8 @@ function personaKey(p: Persona) {
 }
 
 function tipoBadge(tipo: Persona['tipo']) {
-  if (tipo === 'adulto') return <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">Adulto</Badge>;
-  if (tipo === 'nino') return <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">Niño</Badge>;
+  if (tipo === 'adulto') return <Badge className="bg-primary/10 text-primary border-primary/25 text-xs">Adulto</Badge>;
+  if (tipo === 'nino') return <Badge className="bg-accent/10 text-accent border-accent/25 text-xs">Niño</Badge>;
   return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">Nuevo</Badge>;
 }
 

@@ -38,7 +38,7 @@ export function EdadChart({ data, sinDato }: { data: EdadRango[]; sinDato: numbe
             <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)', rx: 4 }} />
             <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={48}>
-              {data.map((_, i) => <Cell key={i} fill="#6366f1" />)}
+              {data.map((_, i) => <Cell key={i} fill="#8a6d55" />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

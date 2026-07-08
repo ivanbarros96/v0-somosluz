@@ -1,87 +1,93 @@
 import { Instagram, MapPin, Youtube, Navigation } from 'lucide-react';
 import { REDES, UBICACION } from '@/lib/landing-content';
+import { Reveal } from './reveal';
 
 const MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
   UBICACION.mapsQuery,
 )}`;
 
+// Cierre oscuro cálido: contacto + invitación, continúa en el footer.
 export function Contact() {
   return (
-    <section id="contacto" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 bg-card">
-      <div className="max-w-4xl mx-auto">
-        <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-center mb-12">
-          Conecta con Nosotros
-        </h2>
+    <section
+      id="contacto"
+      className="relative overflow-hidden pt-20 sm:pt-32 pb-16 px-4 sm:px-6 lg:px-8 bg-[oklch(0.23_0.015_60)]"
+    >
+      {/* Brillo dorado inferior — la luz permanece encendida */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_115%,oklch(0.7_0.08_80/.3),transparent_65%)] pointer-events-none"
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-          <div className="text-center">
-            <Instagram className="w-10 h-10 text-primary mx-auto mb-4" />
-            <h3 className="font-semibold mb-2">Instagram</h3>
-            <div className="flex flex-col gap-1">
-              <a
-                href={REDES.instagramIglesia}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline text-sm font-medium"
-              >
-                @somosluz.iglesia
-              </a>
-              <a
-                href={REDES.instagramYouth}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline text-sm font-medium"
-              >
-                @somosluz.youth
-              </a>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Youtube className="w-10 h-10 text-primary mx-auto mb-4" />
-            <h3 className="font-semibold mb-2">YouTube</h3>
-            <a
-              href={REDES.youtube}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline text-sm font-medium"
-            >
-              Somos Luz Iglesia
-            </a>
-          </div>
-
-          <div className="text-center">
-            <MapPin className="w-10 h-10 text-primary mx-auto mb-4" />
-            <h3 className="font-semibold mb-2">Ubicación</h3>
-            <p className="text-muted-foreground text-sm mb-1">
-              {UBICACION.direccion ?? UBICACION.ciudad}
+      <div className="relative max-w-6xl mx-auto">
+        <Reveal>
+          <div className="text-center mb-16">
+            <p className="text-xs uppercase tracking-[0.35em] text-[oklch(0.75_0.04_85)] mb-6">
+              Conecta con nosotros
             </p>
-            <p className="text-sm font-semibold">¡Ven a visitarnos!</p>
+            <h2 className="font-serif text-4xl sm:text-6xl font-semibold text-[oklch(0.96_0.01_88)] text-balance">
+              Siempre habrá{' '}
+              <span className="italic text-[oklch(0.85_0.07_85)]">un lugar para ti.</span>
+            </h2>
           </div>
-        </div>
+        </Reveal>
 
-        {/* Cómo llegar — enlace a Google Maps (su geocoder resuelve la intersección
-            y en móvil abre la app). Embed real pendiente del pin exacto de la iglesia. */}
-        <a
-          href={MAPS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-border bg-gradient-to-r from-secondary/50 to-card p-6 sm:p-8 shadow-sm hover:shadow-md transition"
-        >
-          <div className="flex items-center gap-4 text-center sm:text-left">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 shrink-0">
-              <MapPin className="w-6 h-6 text-primary" />
-            </div>
+        <Reveal delay={1}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-8 text-center">
             <div>
-              <p className="font-semibold">Nos reunimos en</p>
-              <p className="text-muted-foreground text-sm">{UBICACION.direccion}</p>
+              <Instagram className="w-8 h-8 text-[oklch(0.82_0.06_85)] mx-auto mb-4" aria-hidden="true" />
+              <h3 className="font-medium text-[oklch(0.95_0.01_88)] mb-2">Instagram</h3>
+              <div className="flex flex-col gap-1.5">
+                <a
+                  href={REDES.instagramIglesia}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[oklch(0.8_0.03_85)] hover:text-[oklch(0.95_0.01_88)] transition-colors focus-visible:outline-2 focus-visible:outline-[oklch(0.95_0.01_88)] rounded"
+                >
+                  @somosluz.iglesia
+                </a>
+                <a
+                  href={REDES.instagramYouth}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[oklch(0.8_0.03_85)] hover:text-[oklch(0.95_0.01_88)] transition-colors focus-visible:outline-2 focus-visible:outline-[oklch(0.95_0.01_88)] rounded"
+                >
+                  @somosluz.youth
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <Youtube className="w-8 h-8 text-[oklch(0.82_0.06_85)] mx-auto mb-4" aria-hidden="true" />
+              <h3 className="font-medium text-[oklch(0.95_0.01_88)] mb-2">YouTube</h3>
+              <a
+                href={REDES.youtube}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[oklch(0.8_0.03_85)] hover:text-[oklch(0.95_0.01_88)] transition-colors focus-visible:outline-2 focus-visible:outline-[oklch(0.95_0.01_88)] rounded"
+              >
+                Somos Luz Iglesia
+              </a>
+            </div>
+
+            <div>
+              <MapPin className="w-8 h-8 text-[oklch(0.82_0.06_85)] mx-auto mb-4" aria-hidden="true" />
+              <h3 className="font-medium text-[oklch(0.95_0.01_88)] mb-2">Ubicación</h3>
+              <p className="text-sm text-[oklch(0.8_0.03_85)] mb-3 text-pretty">
+                {UBICACION.direccion}
+              </p>
+              <a
+                href={MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-[oklch(0.9_0.05_90)] hover:text-[oklch(0.97_0.02_90)] transition-colors focus-visible:outline-2 focus-visible:outline-[oklch(0.95_0.01_88)] rounded"
+              >
+                <Navigation className="w-4 h-4" aria-hidden="true" />
+                Cómo llegar
+              </a>
             </div>
           </div>
-          <span className="inline-flex items-center gap-2 text-primary font-medium group-hover:gap-3 transition-all">
-            <Navigation className="w-4 h-4" />
-            Cómo llegar
-          </span>
-        </a>
+        </Reveal>
       </div>
     </section>
   );

@@ -10,9 +10,9 @@ export interface SexoData {
 }
 
 const SLICES = [
-  { key: 'femenino' as keyof SexoData, label: 'Femenino', color: '#ec4899' },
-  { key: 'masculino' as keyof SexoData, label: 'Masculino', color: '#3b82f6' },
-  { key: 'sin_dato' as keyof SexoData, label: 'Sin dato', color: '#94a3b8' },
+  { key: 'femenino' as keyof SexoData, label: 'Femenino', color: '#b08072' },
+  { key: 'masculino' as keyof SexoData, label: 'Masculino', color: '#6f814f' },
+  { key: 'sin_dato' as keyof SexoData, label: 'Sin dato', color: '#a8a093' },
 ];
 
 const CustomTooltip = ({ active, payload }: any) => {

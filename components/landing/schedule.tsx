@@ -1,69 +1,76 @@
-import { Card } from '@/components/ui/card';
-import { Church, Clock, MapPin, Wifi } from 'lucide-react';
+import { Wifi, MapPin, ArrowDownRight } from 'lucide-react';
 import { AGENDA_SEMANAL, CULTO_GENERAL, UBICACION } from '@/lib/landing-content';
+import { Reveal } from './reveal';
 
 export function Schedule() {
   const cultoGeneral = AGENDA_SEMANAL.find((a) => a.destacado);
   const resto = AGENDA_SEMANAL.filter((a) => !a.destacado);
 
   return (
-    <section id="horarios" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
+    <section id="horarios" className="py-20 sm:py-32 px-4 sm:px-6 lg:px-8 bg-card border-y border-border">
       <div className="max-w-6xl mx-auto">
-        <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-center mb-4">
-          Planea tu Visita
-        </h2>
-        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto text-pretty">
-          Nos reunimos cada semana para adorar, crecer y compartir. Te esperamos.
-        </p>
-
-        {/* Culto General — destacado */}
-        {cultoGeneral && (
-          <Card className="p-8 sm:p-10 mb-10 border-l-4 border-l-primary bg-gradient-to-r from-secondary/60 to-card">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 shrink-0">
-                <Church className="w-8 h-8 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">
-                  {cultoGeneral.tipo}
-                </p>
-                <h3 className="font-serif text-2xl sm:text-3xl font-semibold mb-2">
-                  {cultoGeneral.nombre} ·{' '}
-                  <span className="text-primary">
-                    {cultoGeneral.dia}s {cultoGeneral.hora} hrs
-                  </span>
-                </h3>
-                <p className="text-muted-foreground text-pretty">{CULTO_GENERAL.descripcion}</p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Agenda semanal */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {resto.map((act) => (
-            <Card key={`${act.dia}-${act.hora}`} className="p-5 hover:shadow-md transition">
-              <div className="flex items-center gap-2 text-primary mb-2">
-                {act.online ? <Wifi className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-                <span className="text-sm font-semibold">
-                  {act.dia} · {act.hora} hrs
-                </span>
-              </div>
-              <h3 className="font-semibold mb-1">{act.nombre}</h3>
-              <p className="text-xs text-muted-foreground">
-                {act.tipo}
-                {act.online && ' · Online'}
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-14 lg:gap-20 items-start">
+          {/* Culto General — protagonista tipográfico */}
+          {cultoGeneral && (
+            <Reveal>
+              <p className="text-xs uppercase tracking-[0.35em] text-primary mb-6">
+                Planea tu visita
               </p>
-            </Card>
-          ))}
-        </div>
+              <h2 className="font-serif font-semibold leading-none">
+                <span className="block text-5xl sm:text-6xl text-foreground">
+                  {cultoGeneral.dia}s
+                </span>
+                <span className="mt-2 block text-7xl sm:text-8xl lg:text-9xl text-primary tabular-nums tracking-tight">
+                  {cultoGeneral.hora}
+                </span>
+              </h2>
+              <p className="mt-3 text-sm uppercase tracking-[0.25em] text-muted-foreground">
+                {cultoGeneral.nombre} · {cultoGeneral.tipo}
+              </p>
+              <p className="mt-6 max-w-lg text-muted-foreground leading-relaxed text-pretty">
+                {CULTO_GENERAL.descripcion}
+              </p>
+              <p className="mt-8 inline-flex items-center gap-2 text-sm text-foreground">
+                <MapPin className="w-4 h-4 text-primary" aria-hidden="true" />
+                {UBICACION.direccion}
+              </p>
+            </Reveal>
+          )}
 
-        <div className="mt-12 text-center">
-          <MapPin className="w-6 h-6 text-primary mx-auto mb-3" />
-          <p className="text-muted-foreground">
-            <span className="font-semibold text-foreground">Ubicación:</span>{' '}
-            {UBICACION.direccion ?? UBICACION.ciudad}
-          </p>
+          {/* Semana — timeline editorial */}
+          <Reveal delay={1}>
+            <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Durante la semana
+              <ArrowDownRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </div>
+            <ul className="divide-y divide-border">
+              {resto.map((act) => (
+                <li key={`${act.dia}-${act.hora}`} className="py-5 flex items-baseline gap-4">
+                  <span className="w-14 shrink-0 text-xs uppercase tracking-wider text-muted-foreground">
+                    {act.dia.slice(0, 3)}
+                  </span>
+                  <span className="w-16 shrink-0 font-serif text-2xl text-primary tabular-nums">
+                    {act.hora}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground leading-tight">{act.nombre}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                      {act.tipo}
+                      {act.online && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span className="inline-flex items-center gap-1 text-primary">
+                            <Wifi className="w-3.5 h-3.5" aria-hidden="true" />
+                            Online
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
         </div>
       </div>
     </section>

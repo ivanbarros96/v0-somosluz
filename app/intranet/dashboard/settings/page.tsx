@@ -40,13 +40,13 @@ export default function SettingsPage() {
             <CardDescription>Perfil con el que ingresaste</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/5 border border-yellow-500/15">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/15 flex items-center justify-center shrink-0">
-                <BookOpen className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-accent/5 border border-accent/15">
+              <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5 text-accent" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">{user.name}</p>
-                <Badge className="mt-1 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-0">
+                <Badge className="mt-1 bg-accent/10 text-accent border-0">
                   Acceso gerencial
                 </Badge>
               </div>
@@ -69,7 +69,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-3">
             <div className="p-4 bg-secondary/50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="w-4 h-4 text-yellow-600" />
+                <BookOpen className="w-4 h-4 text-accent" />
                 <p className="text-sm font-medium text-foreground">Pastor · Gerencial</p>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1">
@@ -80,7 +80,7 @@ export default function SettingsPage() {
             </div>
             <div className="p-4 bg-secondary/50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <Sun className="w-4 h-4 text-blue-600" />
+                <Sun className="w-4 h-4 text-primary" />
                 <p className="text-sm font-medium text-foreground">Somos Luz · Operativo</p>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1">

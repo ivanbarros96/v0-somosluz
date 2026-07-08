@@ -24,11 +24,12 @@
   --border: oklch(0.88 0.012 75);
   --input: oklch(0.94 0.01 78);
   --ring: oklch(0.5 0.045 130);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* Charts en paleta de marca: salvia, mocha, arena, oliva profundo, rosa tierra */
+  --chart-1: oklch(0.55 0.06 130);
+  --chart-2: oklch(0.5 0.05 60);
+  --chart-3: oklch(0.75 0.04 85);
+  --chart-4: oklch(0.4 0.05 135);
+  --chart-5: oklch(0.6 0.05 30);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -79,6 +80,7 @@
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --font-serif: var(--font-playfair), Georgia, serif;
+  --font-script: var(--font-script), cursive;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -135,4 +137,76 @@
 
 .animate-shake {
   animation: shake 0.5s ease-in-out;
+}
+
+/* ==========================================================================
+   Sistema visual de la landing — Somos Luz
+   ========================================================================== */
+
+/* Scroll suave y anclas con margen (navbar fija) — respeta reduced-motion */
+html {
+  scroll-behavior: smooth;
+}
+section[id] {
+  scroll-margin-top: 5rem;
+}
+
+::selection {
+  background: oklch(0.5 0.045 130 / 0.25);
+}
+
+/* Revelado al hacer scroll (IntersectionObserver agrega .in-view).
+   Solo transform/opacity: compositor-friendly. */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+
+/* Marquee de frases de identidad */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 36s linear infinite;
+}
+
+/* Resplandor del hero: la "luz" como motivo de marca sobre fondo oscuro cálido */
+.hero-luz {
+  background:
+    radial-gradient(ellipse 55% 45% at 50% -8%, oklch(0.78 0.09 80 / 0.5), transparent 65%),
+    radial-gradient(ellipse 70% 60% at 50% 0%, oklch(0.6 0.07 75 / 0.25), transparent 70%),
+    radial-gradient(ellipse 100% 80% at 50% 120%, oklch(0.3 0.03 130 / 0.5), transparent 60%),
+    oklch(0.23 0.015 60);
+}
+
+/* Rayos suaves de luz (decorativo) */
+.hero-rayos {
+  background: conic-gradient(
+    from 180deg at 50% -10%,
+    transparent 40%,
+    oklch(0.85 0.08 85 / 0.08) 45%,
+    transparent 50%,
+    oklch(0.85 0.08 85 / 0.06) 55%,
+    transparent 60%
+  );
+  filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .animate-marquee { animation: none; }
 }

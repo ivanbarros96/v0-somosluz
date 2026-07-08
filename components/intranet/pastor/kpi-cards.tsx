@@ -16,7 +16,7 @@ interface KpiCardsProps {
 
 const CARDS = [
   { key: 'totalMiembros' as keyof KpiData, label: 'Total Miembros', icon: Users, color: 'text-primary' },
-  { key: 'adultos' as keyof KpiData, label: 'Adultos', icon: UserCheck, color: 'text-blue-600' },
+  { key: 'adultos' as keyof KpiData, label: 'Adultos', icon: UserCheck, color: 'text-accent' },
   { key: 'ninos' as keyof KpiData, label: 'Niños', icon: Baby, color: 'text-green-600' },
   { key: 'pctAsistenciaPromedio' as keyof KpiData, label: 'Asistencia Prom.', icon: TrendingUp, color: 'text-orange-500', suffix: '%' },
 ] as const;

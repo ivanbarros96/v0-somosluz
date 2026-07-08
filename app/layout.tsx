@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
+import { Geist, Geist_Mono, Playfair_Display, Great_Vibes } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import './globals.css'
@@ -7,6 +7,8 @@ import './globals.css'
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
+// Script manuscrita — hermana tipográfica del wordmark del logo
+const greatVibes = Great_Vibes({ subsets: ['latin'], weight: '400', variable: '--font-script' });
 
 export const metadata: Metadata = {
   title: 'Somos Luz Iglesia',
@@ -45,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={playfair.variable}>
+    <html lang="es" className={`${playfair.variable} ${greatVibes.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Toaster richColors position="top-center" />

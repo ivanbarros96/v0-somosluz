@@ -1,29 +1,41 @@
 import { Button } from '@/components/ui/button';
-import { Instagram, CalendarDays } from 'lucide-react';
-import { HERO, REDES } from '@/lib/landing-content';
+import { Instagram, CalendarDays, MapPin } from 'lucide-react';
+import { HERO, REDES, UBICACION, AGENDA_SEMANAL } from '@/lib/landing-content';
 
 export function Hero() {
+  const culto = AGENDA_SEMANAL.find((a) => a.destacado);
+
   return (
-    <section className="relative overflow-hidden py-24 sm:py-36 px-4 sm:px-6 lg:px-8">
-      {/* Resplandor cálido: "luz" como concepto visual */}
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,oklch(0.9_0.06_75/.55),transparent)]"
-      />
-      <div className="relative max-w-6xl mx-auto text-center">
-        <p className="text-xs sm:text-sm uppercase tracking-[0.25em] text-muted-foreground mb-6">
+    <section className="hero-luz relative overflow-hidden min-h-[92svh] flex flex-col justify-center px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+      {/* Rayos de luz decorativos */}
+      <div aria-hidden className="hero-rayos absolute inset-0 pointer-events-none" />
+
+      <div className="relative max-w-6xl mx-auto text-center w-full">
+        <p className="reveal in-view text-[0.7rem] sm:text-xs uppercase tracking-[0.35em] text-[oklch(0.8_0.04_85)] mb-8">
           {HERO.overline}
         </p>
-        <h1 className="font-serif text-5xl sm:text-7xl lg:text-8xl italic font-medium text-primary mb-6 text-balance">
-          {HERO.titulo}
+
+        {/* Wordmark: script como el logo, con brillo dorado */}
+        <h1 className="mb-4">
+          <span className="block font-script text-7xl sm:text-8xl lg:text-9xl leading-none text-transparent bg-clip-text bg-gradient-to-b from-[oklch(0.97_0.02_90)] via-[oklch(0.92_0.05_85)] to-[oklch(0.75_0.07_80)] drop-shadow-[0_0_45px_oklch(0.8_0.08_80_/_0.35)] text-balance">
+            {HERO.titulo}
+          </span>
+          <span className="block mt-3 text-[0.65rem] sm:text-xs uppercase tracking-[0.6em] text-[oklch(0.72_0.03_85)]">
+            Iglesia
+          </span>
         </h1>
-        <p className="text-lg sm:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 text-pretty">
+
+        <p className="font-serif italic text-xl sm:text-3xl text-[oklch(0.88_0.02_85)] max-w-3xl mx-auto mt-8 mb-12 text-pretty">
           {HERO.subtitulo}
         </p>
+
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a href="#horarios">
-            <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
-              <CalendarDays className="w-5 h-5 mr-2" />
+            <Button
+              size="lg"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 h-12 text-base"
+            >
+              <CalendarDays className="w-5 h-5 mr-2" aria-hidden="true" />
               Planea tu visita
             </Button>
           </a>
@@ -31,12 +43,27 @@ export function Hero() {
             <Button
               size="lg"
               variant="outline"
-              className="w-full sm:w-auto border-primary text-primary hover:bg-primary/10"
+              className="w-full sm:w-auto border-[oklch(0.85_0.02_85_/_0.4)] bg-transparent text-[oklch(0.92_0.01_85)] hover:bg-[oklch(0.92_0.01_85_/_0.1)] hover:text-[oklch(0.97_0.01_85)] px-8 h-12 text-base"
             >
-              <Instagram className="w-5 h-5 mr-2" />
+              <Instagram className="w-5 h-5 mr-2" aria-hidden="true" />
               Síguenos en Instagram
             </Button>
           </a>
+        </div>
+
+        {/* Datos esenciales: cuándo y dónde */}
+        <div className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8 text-sm text-[oklch(0.78_0.02_85)]">
+          {culto && (
+            <span className="inline-flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-[oklch(0.8_0.06_85)]" aria-hidden="true" />
+              {culto.dia}s · <span className="tabular-nums">{culto.hora}</span> hrs
+            </span>
+          )}
+          <span aria-hidden className="hidden sm:block w-px h-4 bg-[oklch(0.5_0.02_80)]" />
+          <span className="inline-flex items-center gap-2 text-center">
+            <MapPin className="w-4 h-4 text-[oklch(0.8_0.06_85)]" aria-hidden="true" />
+            {UBICACION.direccion}
+          </span>
         </div>
       </div>
     </section>

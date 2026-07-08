@@ -89,15 +89,15 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       <div className="p-4 border-b border-border">
         <div className={cn(
           'flex items-center gap-3 p-3 rounded-xl border',
-          isPastor ? 'bg-yellow-500/5 border-yellow-500/15' : 'bg-blue-500/5 border-blue-500/15'
+          isPastor ? 'bg-accent/5 border-accent/15' : 'bg-primary/5 border-primary/15'
         )}>
           <div className={cn(
             'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-            isPastor ? 'bg-yellow-500/15' : 'bg-blue-500/15'
+            isPastor ? 'bg-accent/15' : 'bg-primary/15'
           )}>
             {isPastor
-              ? <BookOpen className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-              : <Sun className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              ? <BookOpen className="w-5 h-5 text-accent" />
+              : <Sun className="w-5 h-5 text-primary" />
             }
           </div>
           <div className="flex-1 min-w-0">
@@ -107,8 +107,8 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
               className={cn(
                 'text-xs mt-0.5 border-0',
                 isPastor
-                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
-                  : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                  ? 'bg-accent/10 text-accent'
+                  : 'bg-primary/10 text-primary'
               )}
             >
               {isPastor ? 'Gerencial' : 'Operativo'}
@@ -128,8 +128,8 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                   'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
                   isActive(item.href)
                     ? isPastor
-                      ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-medium'
-                      : 'bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium'
+                      ? 'bg-accent/10 text-accent font-medium'
+                      : 'bg-primary/10 text-primary font-medium'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                 )}
               >
@@ -140,8 +140,8 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                     className={cn(
                       'ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full leading-none',
                       isPastor
-                        ? 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400'
-                        : 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+                        ? 'bg-accent/15 text-accent'
+                        : 'bg-primary/15 text-primary'
                     )}
                   >
                     Nuevo

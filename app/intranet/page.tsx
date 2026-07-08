@@ -123,11 +123,11 @@ export default function IntranetLoginPage() {
 
             <button
               onClick={() => selectProfile('pastor')}
-              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-yellow-500/50 transition-all duration-200 text-left group"
+              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-accent/50 transition-all duration-200 text-left group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center group-hover:bg-yellow-500/20 transition-colors shrink-0">
-                  <BookOpen className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors shrink-0">
+                  <BookOpen className="h-5 w-5 text-accent" />
                 </div>
                 <div>
                   <p className="text-foreground font-semibold">Pastor</p>
@@ -138,11 +138,11 @@ export default function IntranetLoginPage() {
 
             <button
               onClick={() => selectProfile('somosluz')}
-              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-blue-500/50 transition-all duration-200 text-left group"
+              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors shrink-0">
-                  <Sun className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
+                  <Sun className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-foreground font-semibold">Somos Luz</p>
@@ -166,16 +166,16 @@ export default function IntranetLoginPage() {
             <div className={cn(
               'p-4 rounded-xl border mb-6 flex items-center gap-3',
               selectedProfile === 'pastor'
-                ? 'border-yellow-500/20 bg-yellow-500/5'
-                : 'border-blue-500/20 bg-blue-500/5'
+                ? 'border-accent/20 bg-accent/5'
+                : 'border-primary/20 bg-primary/5'
             )}>
               <div className={cn(
                 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                selectedProfile === 'pastor' ? 'bg-yellow-500/10' : 'bg-blue-500/10'
+                selectedProfile === 'pastor' ? 'bg-accent/10' : 'bg-primary/10'
               )}>
                 {selectedProfile === 'pastor'
-                  ? <BookOpen className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                  : <Sun className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  ? <BookOpen className="h-5 w-5 text-accent" />
+                  : <Sun className="h-5 w-5 text-primary" />
                 }
               </div>
               <div>
@@ -221,7 +221,7 @@ export default function IntranetLoginPage() {
                 className={cn(
                   'w-full h-11 font-semibold',
                   selectedProfile === 'pastor'
-                    ? 'bg-yellow-500 hover:bg-yellow-400 text-black'
+                    ? 'bg-accent hover:bg-accent/90 text-accent-foreground'
                     : ''
                 )}
                 disabled={isSubmitting || !password}
