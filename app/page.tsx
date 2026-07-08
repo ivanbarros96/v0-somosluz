@@ -19,9 +19,9 @@ export default function Home() {
         <Hero />
         <Marquee />
         <About />
+        <Pastors />
         <Schedule />
         <Ministries />
-        <Pastors />
         <Media />
         <PrayerSection />
         <Contact />

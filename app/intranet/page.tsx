@@ -97,7 +97,7 @@ export default function IntranetLoginPage() {
           </span>
         </div>
 
-        <Image src="/logo.png" alt="Somos Luz" width={140} height={56} className="mb-3 opacity-95" />
+        <Image src="/logo-trans.png" alt="Somos Luz" width={140} height={91} className="mb-3 opacity-95 h-14 w-auto" />
         <p className="text-muted-foreground text-sm">
           {isPastor ? 'Preparando tu panel gerencial' : 'Cargando panel operativo'}
         </p>
@@ -110,7 +110,7 @@ export default function IntranetLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
-          <Image src="/logo.png" alt="Somos Luz" width={180} height={72} className="mx-auto mb-3" />
+          <Image src="/logo-trans.png" alt="Somos Luz" width={180} height={117} className="mx-auto mb-3 h-20 w-auto" />
           <p className="text-muted-foreground text-sm">Sistema de Gestión Interna</p>
         </div>
 

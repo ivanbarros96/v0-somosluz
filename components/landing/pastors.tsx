@@ -22,7 +22,7 @@ export function Pastors() {
                 src={PASTORES.foto}
                 alt={`Pastores ${PASTORES.nombres}`}
                 fill
-                className="object-cover"
+                className="object-cover object-top"
                 sizes="(max-width: 768px) 100vw, 40vw"
               />
             </div>

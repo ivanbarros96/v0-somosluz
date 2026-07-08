@@ -77,7 +77,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
     <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">
       {/* Header */}
       <div className="p-5 border-b border-border flex items-center justify-between">
-        <Image src="/logo.png" alt="Somos Luz" width={130} height={52} />
+        <Image src="/logo-trans.png" alt="Somos Luz" width={130} height={84} className="h-12 w-auto" />
         {onClose && (
           <button onClick={onClose} className="md:hidden p-1 rounded-md hover:bg-secondary transition ml-2">
             <X className="w-5 h-5 text-muted-foreground" />

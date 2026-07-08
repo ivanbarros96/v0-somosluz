@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Instagram, CalendarDays, MapPin } from 'lucide-react';
 import { HERO, REDES, UBICACION, AGENDA_SEMANAL } from '@/lib/landing-content';
@@ -15,14 +16,18 @@ export function Hero() {
           {HERO.overline}
         </p>
 
-        {/* Wordmark: script como el logo, con brillo dorado */}
+        {/* Logo real de la iglesia, versión crema para fondo oscuro */}
         <h1 className="mb-4">
-          <span className="block font-script text-7xl sm:text-8xl lg:text-9xl leading-none text-transparent bg-clip-text bg-gradient-to-b from-[oklch(0.97_0.02_90)] via-[oklch(0.92_0.05_85)] to-[oklch(0.75_0.07_80)] drop-shadow-[0_0_45px_oklch(0.8_0.08_80_/_0.35)] text-balance">
-            {HERO.titulo}
-          </span>
-          <span className="block mt-3 text-[0.65rem] sm:text-xs uppercase tracking-[0.6em] text-[oklch(0.72_0.03_85)]">
-            Iglesia
-          </span>
+          <span className="sr-only">{HERO.titulo} Iglesia</span>
+          <Image
+            src="/logo-cream.png"
+            alt=""
+            aria-hidden="true"
+            width={1600}
+            height={1036}
+            priority
+            className="mx-auto w-[19rem] sm:w-[26rem] lg:w-[32rem] h-auto drop-shadow-[0_0_45px_oklch(0.8_0.08_80_/_0.35)]"
+          />
         </h1>
 
         <p className="font-serif italic text-xl sm:text-3xl text-[oklch(0.88_0.02_85)] max-w-3xl mx-auto mt-8 mb-12 text-pretty">

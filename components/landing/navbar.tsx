@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -39,16 +40,16 @@ export function Navbar() {
       )}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-        <Link
-          href="/"
-          onClick={closeMenu}
-          className={cn(
-            'flex items-baseline gap-2 transition-colors',
-            solid ? 'text-foreground' : 'text-[oklch(0.95_0.01_85)]',
-          )}
-        >
-          <span className="font-script text-3xl leading-none">Somos Luz</span>
-          <span className="text-[0.55rem] uppercase tracking-[0.3em] opacity-70">Iglesia</span>
+        <Link href="/" onClick={closeMenu} className="flex items-center" aria-label="Somos Luz Iglesia — inicio">
+          {/* Logo real: versión mocha sobre claro, crema sobre el hero oscuro */}
+          <Image
+            src={solid ? '/logo-trans.png' : '/logo-cream.png'}
+            alt="Somos Luz Iglesia"
+            width={1600}
+            height={1036}
+            priority
+            className="h-12 w-auto"
+          />
         </Link>
 
         {/* Desktop */}
