@@ -134,7 +134,7 @@ export const UBICACION = {
   direccion: 'Almirante Goñi 251, esquina Cochrane, Valparaíso',
   mapsQuery: 'Almirante Goñi 251, Valparaíso, Chile',
   // Pin exacto entregado por la iglesia
-  mapsUrl: 'https://maps.app.goo.gl/8HWqkVuTfJDTifp97',
-  lat: -33.0372409,
-  lon: -71.6296221,
+  mapsUrl: 'https://maps.app.goo.gl/PCzdzhC4jkdBdqzN9',
+  lat: -33.03724,
+  lon: -71.629914,
 } as const;
