@@ -1,6 +1,15 @@
-import { Wifi, MapPin, ArrowDownRight } from 'lucide-react';
+import { Wifi, MapPin, ArrowDownRight, Navigation } from 'lucide-react';
 import { AGENDA_SEMANAL, CULTO_GENERAL, UBICACION } from '@/lib/landing-content';
 import { Reveal } from './reveal';
+
+// Mapa embebido keyless (OpenStreetMap) centrado en el pin exacto de la iglesia.
+const D_LON = 0.004;
+const D_LAT = 0.0025;
+const OSM_EMBED = `https://www.openstreetmap.org/export/embed.html?bbox=${
+  UBICACION.lon - D_LON
+},${UBICACION.lat - D_LAT},${UBICACION.lon + D_LON},${
+  UBICACION.lat + D_LAT
+}&layer=mapnik&marker=${UBICACION.lat},${UBICACION.lon}`;
 
 export function Schedule() {
   const cultoGeneral = AGENDA_SEMANAL.find((a) => a.destacado);
@@ -30,10 +39,21 @@ export function Schedule() {
               <p className="mt-6 max-w-lg text-muted-foreground leading-relaxed text-pretty">
                 {CULTO_GENERAL.descripcion}
               </p>
-              <p className="mt-8 inline-flex items-center gap-2 text-sm text-foreground">
-                <MapPin className="w-4 h-4 text-primary" aria-hidden="true" />
-                {UBICACION.direccion}
-              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="inline-flex items-center gap-2 text-foreground">
+                  <MapPin className="w-4 h-4 text-primary" aria-hidden="true" />
+                  {UBICACION.direccion}
+                </span>
+                <a
+                  href={UBICACION.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary rounded"
+                >
+                  <Navigation className="w-4 h-4" aria-hidden="true" />
+                  Cómo llegar
+                </a>
+              </div>
             </Reveal>
           )}
 
@@ -72,6 +92,19 @@ export function Schedule() {
             </ul>
           </Reveal>
         </div>
+
+        {/* Mapa embebido — pin exacto de la iglesia */}
+        <Reveal>
+          <div className="mt-14 rounded-2xl overflow-hidden border border-border shadow-sm bg-background">
+            <iframe
+              title="Ubicación de Somos Luz Iglesia — Almirante Goñi 251, Valparaíso"
+              src={OSM_EMBED}
+              className="w-full h-[300px] sm:h-[380px]"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </Reveal>
       </div>
     </section>
   );

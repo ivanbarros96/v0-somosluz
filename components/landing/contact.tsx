@@ -2,9 +2,7 @@ import { Instagram, MapPin, Youtube, Navigation } from 'lucide-react';
 import { REDES, UBICACION } from '@/lib/landing-content';
 import { Reveal } from './reveal';
 
-const MAPS_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-  UBICACION.mapsQuery,
-)}`;
+const MAPS_URL = UBICACION.mapsUrl;
 
 // Cierre oscuro cálido: contacto + invitación, continúa en el footer.
 export function Contact() {
