@@ -6,11 +6,13 @@ import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
+// El orden sigue el flujo real de la página (funnel: quiénes somos → líderes →
+// cuándo/dónde → ministerios → oración → contacto).
 const LINKS = [
   { href: '#nosotros', label: 'Nosotros' },
+  { href: '#pastores', label: 'Pastores' },
   { href: '#horarios', label: 'Horarios' },
   { href: '#ministerios', label: 'Ministerios' },
-  { href: '#pastores', label: 'Pastores' },
   { href: '#oracion', label: 'Oración' },
   { href: '#contacto', label: 'Contacto' },
 ];

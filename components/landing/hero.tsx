@@ -41,7 +41,7 @@ export function Hero() {
               className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 h-12 text-base"
             >
               <CalendarDays className="w-5 h-5 mr-2" aria-hidden="true" />
-              Planea tu visita
+              Quiero visitar
             </Button>
           </a>
           <a href={REDES.instagramIglesia} target="_blank" rel="noopener noreferrer">

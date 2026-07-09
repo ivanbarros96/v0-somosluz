@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Instagram, Youtube, Play } from 'lucide-react';
+import { Instagram, Youtube, Play, Music } from 'lucide-react';
 import { REDES, SERIE } from '@/lib/landing-content';
 import { Reveal } from './reveal';
 
@@ -102,9 +102,30 @@ export function Media() {
           </Reveal>
         </div>
 
+        {/* Nuestra música — player de Spotify de la iglesia */}
+        <Reveal>
+          <div className="mt-16">
+            <div className="flex items-center gap-2 mb-4">
+              <Music className="w-5 h-5 text-[oklch(0.88_0.05_95)]" aria-hidden="true" />
+              <h3 className="text-sm uppercase tracking-[0.3em] text-[oklch(0.88_0.05_95)]">
+                Nuestra música
+              </h3>
+            </div>
+            <div className="rounded-2xl overflow-hidden shadow-xl border border-[oklch(0.85_0.02_100_/_0.2)]">
+              <iframe
+                title="Somos Luz en Spotify"
+                src={`https://open.spotify.com/embed/artist/${REDES.spotifyArtistId}?utm_source=generator&theme=0`}
+                className="w-full h-[352px]"
+                loading="lazy"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              />
+            </div>
+          </div>
+        </Reveal>
+
         {/* Canales */}
         <Reveal>
-          <ul className="mt-16 grid sm:grid-cols-3 gap-3">
+          <ul className="mt-8 grid sm:grid-cols-3 gap-3">
             {CANALES.map((c) => (
               <li key={c.titulo}>
                 <a

@@ -10,11 +10,13 @@ import { Media } from '@/components/landing/media';
 import { PrayerSection } from '@/components/landing/prayer-section';
 import { Contact } from '@/components/landing/contact';
 import { Footer } from '@/components/landing/footer';
+import { JsonLd } from '@/components/seo/json-ld';
 
 // Ritmo visual: luz sobre oscuro → crema editorial → salvia profundo → cierre oscuro.
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <JsonLd />
       {/* Skip link para navegación por teclado */}
       <a
         href="#contenido"

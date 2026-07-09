@@ -5,6 +5,8 @@ export const REDES = {
   instagramIglesia: 'https://www.instagram.com/somosluz.iglesia/',
   instagramYouth: 'https://www.instagram.com/somosluz.youth/',
   youtube: 'https://youtube.com/@somosluz-iglesia',
+  spotify: 'https://open.spotify.com/artist/2wX0Vu0yhd8BEr7cIvDj9j',
+  spotifyArtistId: '2wX0Vu0yhd8BEr7cIvDj9j',
 } as const;
 
 export const HERO = {
@@ -137,4 +139,11 @@ export const UBICACION = {
   mapsUrl: 'https://maps.app.goo.gl/xFLZAB7GXtCm3ZeaA',
   lat: -33.0372517,
   lon: -71.629905,
+} as const;
+
+// Deep links a apps de navegación — abren la app nativa con la ruta en móvil.
+export const COMO_LLEGAR = {
+  googleMaps: `https://www.google.com/maps/dir/?api=1&destination=${UBICACION.lat},${UBICACION.lon}`,
+  waze: `https://waze.com/ul?ll=${UBICACION.lat},${UBICACION.lon}&navigate=yes`,
+  ficha: UBICACION.mapsUrl,
 } as const;
