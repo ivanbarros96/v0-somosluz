@@ -21,7 +21,7 @@ const CARDS = [
   { key: 'adultos' as const, label: 'Adultos', icon: UserCheck, color: 'text-accent' },
   { key: 'ninos' as const, label: 'Niños', icon: Baby, color: 'text-green-600' },
   { key: 'pctAsistenciaPromedio' as const, label: 'Asistencia Prom.', icon: TrendingUp, color: 'text-orange-500', suffix: '%' },
-  { key: 'retencionVisitantes' as const, label: 'Retención Visitantes', icon: Repeat, color: 'text-primary', suffix: '%', title: 'Porcentaje de visitantes nuevos que volvieron al menos una segunda vez' },
+  { key: 'retencionVisitantes' as const, label: 'Retención Visitantes', icon: Repeat, color: 'text-primary', suffix: '%', title: 'Porcentaje de visitantes nuevos que volvieron una segunda vez. Se calcula al registrar la asistencia de los visitantes cada culto. Muestra "—" hasta tener datos suficientes.' },
 ];
 
 export function KpiCards({ data }: KpiCardsProps) {

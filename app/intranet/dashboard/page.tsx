@@ -195,7 +195,10 @@ function PastorDashboard() {
       }
       const visitantesConAsistencia = asistPorVisitante.size;
       const visitantesQueVolvieron = [...asistPorVisitante.values()].filter((n) => n >= 2).length;
-      const retencionVisitantes = visitantesConAsistencia > 0
+      // Muestra mínima: con muy pocos visitantes registrados el % no es fiable
+      // y un "0%" resulta engañoso. Mostramos "—" hasta tener datos suficientes.
+      const MIN_MUESTRA_RETENCION = 5;
+      const retencionVisitantes = visitantesConAsistencia >= MIN_MUESTRA_RETENCION
         ? Math.round((visitantesQueVolvieron / visitantesConAsistencia) * 100)
         : null;
 
