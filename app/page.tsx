@@ -2,6 +2,7 @@ import { Navbar } from '@/components/landing/navbar';
 import { Hero } from '@/components/landing/hero';
 import { Marquee } from '@/components/landing/marquee';
 import { About } from '@/components/landing/about';
+import { Community } from '@/components/landing/community';
 import { Schedule } from '@/components/landing/schedule';
 import { Ministries } from '@/components/landing/ministries';
 import { Pastors } from '@/components/landing/pastors';
@@ -26,6 +27,7 @@ export default function Home() {
         <Hero />
         <Marquee />
         <About />
+        <Community />
         <Pastors />
         <Schedule />
         <Ministries />

@@ -26,6 +26,11 @@ export const metadata: Metadata = {
       'Una generación que manifiesta el Reino de Dios en la tierra. Visítanos en Valparaíso, Chile.',
     locale: 'es_CL',
     type: 'website',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Somos Luz Iglesia — Valparaíso, Chile' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og.png'],
   },
   icons: {
     icon: [

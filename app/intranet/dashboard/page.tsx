@@ -13,7 +13,7 @@ import { SexoChart, type SexoData } from '@/components/intranet/pastor/sexo-char
 import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-chart';
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, UserPlus, ClipboardList, UserX, Settings, Activity } from 'lucide-react';
+import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -27,7 +27,8 @@ const capMes = (d: Date) => {
 function PastorDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, ninos: 0, pctAsistenciaPromedio: 0 });
+  const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, ninos: 0, pctAsistenciaPromedio: 0, retencionVisitantes: null });
+  const [oracionPendientes, setOracionPendientes] = useState(0);
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
@@ -110,7 +111,7 @@ function PastorDashboard() {
 
       const { data: rawAsist } = await supabase
         .from('asistencias')
-        .select('culto_id, persona_id');
+        .select('culto_id, persona_id, miembro_nuevo_id');
 
       // Conteo por culto
       const conteoPorCulto: Record<number, number> = {};
@@ -184,7 +185,34 @@ function PastorDashboard() {
         { key: 'baja', nivel: 'Baja (<35%)', total: baja, color: '#ef4444' },
       ];
 
-      setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio });
+      // Retención de visitantes: de los visitantes nuevos con al menos una
+      // asistencia registrada, % que volvió una segunda vez o más.
+      const asistPorVisitante = new Map<number, number>();
+      for (const a of rawAsist ?? []) {
+        if (a.miembro_nuevo_id == null) continue;
+        const vid = Number(a.miembro_nuevo_id);
+        asistPorVisitante.set(vid, (asistPorVisitante.get(vid) ?? 0) + 1);
+      }
+      const visitantesConAsistencia = asistPorVisitante.size;
+      const visitantesQueVolvieron = [...asistPorVisitante.values()].filter((n) => n >= 2).length;
+      const retencionVisitantes = visitantesConAsistencia > 0
+        ? Math.round((visitantesQueVolvieron / visitantesConAsistencia) * 100)
+        : null;
+
+      // Peticiones de oración pendientes (endpoint solo-pastor)
+      try {
+        const res = await fetch('/api/oracion');
+        if (res.ok) {
+          const { peticiones } = await res.json();
+          setOracionPendientes(
+            (peticiones ?? []).filter((p: { estado: string }) => p.estado === 'pendiente').length,
+          );
+        }
+      } catch {
+        // sin bloqueo: el banner simplemente no se muestra
+      }
+
+      setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
@@ -224,6 +252,24 @@ function PastorDashboard() {
           Panel gerencial · Somos Luz Iglesia
         </p>
       </div>
+
+      {oracionPendientes > 0 && (
+        <a
+          href="/intranet/dashboard/oracion"
+          className="flex items-center justify-between gap-3 p-4 rounded-xl border border-primary/25 bg-primary/5 hover:bg-primary/10 transition-colors"
+        >
+          <span className="flex items-center gap-3 min-w-0">
+            <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/15 shrink-0">
+              <HandHeart className="w-5 h-5 text-primary" aria-hidden="true" />
+            </span>
+            <span className="text-sm text-foreground">
+              <span className="font-semibold">{oracionPendientes} {oracionPendientes === 1 ? 'petición de oración' : 'peticiones de oración'}</span>
+              {' '}sin revisar desde el sitio web
+            </span>
+          </span>
+          <ArrowRight className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+        </a>
+      )}
 
       <KpiCards data={kpis} />
 
