@@ -12,6 +12,8 @@ import { BautizadosChart, type BautizadosData } from '@/components/intranet/past
 import { SexoChart, type SexoData } from '@/components/intranet/pastor/sexo-chart';
 import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-chart';
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
+import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
+import { CULTO_TIPOS, MINISTERIO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
@@ -38,6 +40,7 @@ function PastorDashboard() {
   const [edadSinDato, setEdadSinDato] = useState(0);
   const [fidelidadData, setFidelidadData] = useState<FidelidadData[]>([]);
   const [fidelidadEval, setFidelidadEval] = useState(0);
+  const [ministerios, setMinisterios] = useState<MinisterioStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -103,15 +106,24 @@ function PastorDashboard() {
         meses.push({ mes: capMes(mes), nuevos, acumulado });
       }
 
-      // Todos los cultos + todas las asistencias
+      // Cultos GENERALES (dominicales) — las métricas congregacionales se anclan
+      // a ellos para no distorsionarse con reuniones de público parcial (ministerios).
       const { data: cultos } = await supabase
         .from('cultos')
         .select('id, fecha, descripcion')
+        .eq('tipo', 'general')
         .order('fecha', { ascending: true });
 
       const { data: rawAsist } = await supabase
         .from('asistencias')
         .select('culto_id, persona_id, miembro_nuevo_id');
+
+      // Reuniones de ministerio (todo lo que no es culto general)
+      const { data: cultosMinisterio } = await supabase
+        .from('cultos')
+        .select('id, tipo, fecha')
+        .neq('tipo', 'general')
+        .order('fecha', { ascending: true });
 
       // Conteo por culto
       const conteoPorCulto: Record<number, number> = {};
@@ -202,6 +214,40 @@ function PastorDashboard() {
         ? Math.round((visitantesQueVolvieron / visitantesConAsistencia) * 100)
         : null;
 
+      // Vida de Ministerios: participación = asistentes promedio / público elegible
+      const conteoTodosCultos: Record<number, number> = {};
+      for (const a of rawAsist ?? []) {
+        const cId = Number(a.culto_id);
+        conteoTodosCultos[cId] = (conteoTodosCultos[cId] ?? 0) + 1;
+      }
+      const statsMinisterios: MinisterioStat[] = MINISTERIO_KEYS.map((tipo) => {
+        const def = CULTO_TIPOS[tipo as CultoTipo];
+        const reuniones = (cultosMinisterio ?? []).filter(
+          (c) => c.tipo === tipo && new Date(c.fecha).getTime() <= ahora,
+        );
+        const totalAsist = reuniones.reduce((s, c) => s + (conteoTodosCultos[Number(c.id)] ?? 0), 0);
+        const promedio = reuniones.length ? Math.round(totalAsist / reuniones.length) : 0;
+        const elegibles = (personas ?? []).filter(
+          (p) =>
+            def.elegibilidad({
+              source_tipo: p.source_tipo as 'adulto' | 'nino',
+              sexo: p.sexo ?? null,
+              edad: typeof p.edad === 'number' ? p.edad : null,
+            }) === 'si',
+        ).length;
+        return {
+          tipo,
+          label: def.label,
+          publico: def.publico,
+          reuniones: reuniones.length,
+          promedio,
+          elegibles,
+          participacion:
+            reuniones.length && elegibles > 0 ? Math.round((promedio / elegibles) * 100) : null,
+          ultimaFecha: reuniones.length ? reuniones[reuniones.length - 1].fecha : null,
+        };
+      });
+
       // Peticiones de oración pendientes (endpoint solo-pastor)
       try {
         const res = await fetch('/api/oracion');
@@ -225,6 +271,7 @@ function PastorDashboard() {
       setEdadSinDato(sinEdad);
       setFidelidadData(fidelidad);
       setFidelidadEval(evaluadas);
+      setMinisterios(statsMinisterios);
       setLoading(false);
     }
 
@@ -296,6 +343,8 @@ function PastorDashboard() {
         evaluadas={fidelidadEval}
         onSelect={(nivel) => router.push(`/intranet/dashboard/fidelizacion?nivel=${nivel}`)}
       />
+
+      <MinisteriosPanel data={ministerios} />
 
       <Card>
         <CardHeader className="p-4 md:p-6">

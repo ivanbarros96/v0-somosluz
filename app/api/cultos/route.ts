@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { esCultoTipo } from '@/lib/cultos-tipos';
 
 // POST /api/cultos — crear culto. Devuelve la fila creada (el cliente la necesita).
 export async function POST(req: NextRequest) {
@@ -8,14 +9,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const { fecha, descripcion } = await req.json().catch(() => ({}));
+  const { fecha, descripcion, tipo } = await req.json().catch(() => ({}));
   if (!fecha) {
     return NextResponse.json({ error: 'Falta la fecha' }, { status: 400 });
+  }
+  if (tipo !== undefined && !esCultoTipo(tipo)) {
+    return NextResponse.json({ error: 'Tipo de culto inválido' }, { status: 400 });
   }
 
   const { data, error } = await getSupabaseAdmin()
     .from('cultos')
-    .insert({ fecha, descripcion, activo: true })
+    .insert({ fecha, descripcion, activo: true, tipo: tipo ?? 'general' })
     .select()
     .single();
 

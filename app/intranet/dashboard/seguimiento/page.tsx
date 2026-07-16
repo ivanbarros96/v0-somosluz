@@ -60,9 +60,11 @@ export default function SeguimientoPage() {
       .select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
     if (!personas) { setLoading(false); return; }
 
-    // Cultos ya realizados (fecha <= ahora), más reciente primero
+    // Cultos GENERALES ya realizados (fecha <= ahora), más reciente primero.
+    // Las ausencias consecutivas se miden sobre el culto dominical, no sobre
+    // reuniones de ministerio (público parcial).
     const { data: cultos } = await supabase
-      .from('cultos').select('id, fecha').order('fecha', { ascending: false });
+      .from('cultos').select('id, fecha').eq('tipo', 'general').order('fecha', { ascending: false });
     const cultosPasados = (cultos ?? []).filter((c) => new Date(c.fecha).getTime() <= ahora);
 
     // Asistencias → Map persona -> Set(culto_id)

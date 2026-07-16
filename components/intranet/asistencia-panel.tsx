@@ -8,15 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert } from 'lucide-react';
+import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
+import {
+  CULTO_TIPOS, CULTO_TIPO_KEYS, descripcionCulto,
+  type CultoTipo, type Elegibilidad,
+} from '@/lib/cultos-tipos';
 
 type Persona = {
   id: number;
   nombre: string;
   tipo: 'adulto' | 'nino' | 'nuevo';
   telefono: string | null;
+  sexo: string | null;
+  edad: number | null;
 };
 
 type Culto = {
@@ -24,6 +30,7 @@ type Culto = {
   fecha: string;
   descripcion: string;
   activo: boolean;
+  tipo: CultoTipo;
 };
 
 type Filtro = 'todos' | 'adulto' | 'nino' | 'nuevo';
@@ -62,9 +69,12 @@ export function AsistenciaPanel() {
   const [busqueda, setBusqueda] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [nuevaFecha, setNuevaFecha] = useState('');
+  const [nuevoTipo, setNuevoTipo] = useState<CultoTipo>('general');
   const [creando, setCreando] = useState(false);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [cerrandoCulto, setCerrandoCulto] = useState(false);
+  // Excepciones (ej. jóvenes fuera de rango): mostrar también a los no elegibles
+  const [verTodos, setVerTodos] = useState(false);
 
   // Estado para eliminar culto
   const [showEliminar, setShowEliminar] = useState(false);
@@ -77,7 +87,7 @@ export function AsistenciaPanel() {
       setLoadingCultos(true);
       const { data } = await supabase
         .from('cultos')
-        .select('id, fecha, descripcion, activo')
+        .select('id, fecha, descripcion, activo, tipo')
         .order('fecha', { ascending: false });
       setCultos(data ?? []);
       if (data && data.length > 0) setCultoId(data[0].id);
@@ -90,7 +100,7 @@ export function AsistenciaPanel() {
     const load = async () => {
       setLoadingPersonas(true);
       const [{ data: pdata }, { data: ndata }] = await Promise.all([
-        supabase.from('personas').select('id, nombre, source_tipo, telefono').order('nombre'),
+        supabase.from('personas').select('id, nombre, source_tipo, telefono, sexo, edad').order('nombre'),
         supabase.from('miembros_nuevos').select('id, nombre, telefono').order('nombre'),
       ]);
 
@@ -100,12 +110,16 @@ export function AsistenciaPanel() {
           nombre: p.nombre,
           tipo: p.source_tipo as 'adulto' | 'nino',
           telefono: p.telefono,
+          sexo: p.sexo ?? null,
+          edad: typeof p.edad === 'number' ? p.edad : null,
         })),
         ...(ndata ?? []).map((p: any) => ({
           id: p.id,
           nombre: p.nombre,
           tipo: 'nuevo' as const,
           telefono: p.telefono,
+          sexo: null,
+          edad: null,
         })),
       ].sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -198,13 +212,14 @@ export function AsistenciaPanel() {
   const crearCulto = async () => {
     if (!nuevaFecha) return;
     setCreando(true);
-    const desc = `Culto dominical ${new Date(nuevaFecha + 'T12:00:00').toLocaleDateString('es-ES', {
-      day: 'numeric', month: 'long', year: 'numeric',
-    })}`;
     const res = await fetch('/api/cultos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha: nuevaFecha, descripcion: desc }),
+      body: JSON.stringify({
+        fecha: nuevaFecha,
+        descripcion: descripcionCulto(nuevoTipo, nuevaFecha),
+        tipo: nuevoTipo,
+      }),
     });
     if (res.ok) {
       const { culto } = await res.json();
@@ -212,6 +227,7 @@ export function AsistenciaPanel() {
         setCultos((prev) => [culto, ...prev]);
         setCultoId(culto.id);
         setNuevaFecha('');
+        setNuevoTipo('general');
         setMostrarNuevo(false);
       }
     }
@@ -232,12 +248,27 @@ export function AsistenciaPanel() {
     setCerrandoCulto(false);
   };
 
-  const filtradas = personas
-    .filter((p) => filtro === 'todos' || p.tipo === filtro)
-    .filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-
   const totalPresentes = presentes.size;
   const cultoActual = cultos.find((c) => c.id === cultoId);
+
+  // Audiencia del culto seleccionado: pre-filtra la lista según el público.
+  // 'incompleto' (falta sexo/edad en la ficha) se muestra con aviso, al final.
+  const tipoCulto: CultoTipo = cultoActual?.tipo ?? 'general';
+  const elegibilidadDe = (p: Persona): Elegibilidad =>
+    CULTO_TIPOS[tipoCulto].elegibilidad({ source_tipo: p.tipo, sexo: p.sexo, edad: p.edad });
+
+  const filtradas = personas
+    .filter((p) => filtro === 'todos' || p.tipo === filtro)
+    .filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    .filter((p) => verTodos || elegibilidadDe(p) !== 'no')
+    .sort((a, b) => {
+      // Los de ficha incompleta van al final (dentro del orden alfabético existente)
+      const ia = elegibilidadDe(a) === 'incompleto' ? 1 : 0;
+      const ib = elegibilidadDe(b) === 'incompleto' ? 1 : 0;
+      return ia - ib;
+    });
+
+  const totalElegibles = personas.filter((p) => elegibilidadDe(p) !== 'no').length;
 
   const FILTROS: { key: Filtro; label: string }[] = [
     { key: 'todos', label: 'Todos' },
@@ -265,6 +296,27 @@ export function AsistenciaPanel() {
         <CardContent className="space-y-3">
           {mostrarNuevo && (
             <div className="grid gap-3 p-4 rounded-lg bg-muted/50 border">
+              <div className="space-y-1.5">
+                <Label>Tipo de reunión <span className="text-red-500">*</span></Label>
+                <div className="flex gap-2 flex-wrap">
+                  {CULTO_TIPO_KEYS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setNuevoTipo(t)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+                        ${nuevoTipo === t
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+                    >
+                      {CULTO_TIPOS[t].label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Público: {CULTO_TIPOS[nuevoTipo].publico}
+                </p>
+              </div>
               <div className="space-y-1">
                 <Label>Fecha <span className="text-red-500">*</span></Label>
                 <Input
@@ -295,11 +347,18 @@ export function AsistenciaPanel() {
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-background hover:bg-muted border-border'}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{c.descripcion}</p>
-                    {c.activo && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Abierto</span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium truncate">{c.descripcion}</p>
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      {c.tipo !== 'general' && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${cultoId === c.id ? 'bg-primary-foreground/20' : 'bg-accent/10 text-accent'}`}>
+                          {CULTO_TIPOS[c.tipo].publico}
+                        </span>
+                      )}
+                      {c.activo && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Abierto</span>
+                      )}
+                    </span>
                   </div>
                   <p className={`text-xs mt-0.5 ${cultoId === c.id ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                     {formatFecha(c.fecha)}
@@ -320,6 +379,11 @@ export function AsistenciaPanel() {
                 <CardTitle className="text-base">{cultoActual?.descripcion ?? 'Asistencia'}</CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {cultoActual ? formatFecha(cultoActual.fecha) : ''}
+                  {tipoCulto !== 'general' && (
+                    <span className="ml-2 text-accent font-medium">
+                      · {CULTO_TIPOS[tipoCulto].publico}
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -329,7 +393,7 @@ export function AsistenciaPanel() {
                 </Badge>
                 <Badge variant="outline" className="gap-1">
                   <Users className="w-3 h-3" />
-                  {personas.length} total
+                  {totalElegibles} {tipoCulto === 'general' ? 'total' : 'del público'}
                 </Badge>
                 {cultoActual?.activo && (
                   <Button size="sm" variant="destructive" onClick={cerrarCulto} disabled={cerrandoCulto}>
@@ -357,7 +421,7 @@ export function AsistenciaPanel() {
             />
 
             {/* Filtros por tipo */}
-            <div className="flex gap-2 mt-2 flex-wrap">
+            <div className="flex gap-2 mt-2 flex-wrap items-center">
               {FILTROS.map(({ key, label }) => (
                 <button
                   key={key}
@@ -370,6 +434,19 @@ export function AsistenciaPanel() {
                   {label}
                 </button>
               ))}
+              {tipoCulto !== 'general' && (
+                <button
+                  onClick={() => setVerTodos((v) => !v)}
+                  className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                    ${verTodos
+                      ? 'bg-accent text-accent-foreground border-accent'
+                      : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+                  title="Muestra también a quienes no calzan con el público (para excepciones)"
+                >
+                  {verTodos ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {verTodos ? 'Solo el público' : 'Ver todos'}
+                </button>
+              )}
             </div>
           </CardHeader>
 
@@ -384,6 +461,7 @@ export function AsistenciaPanel() {
                   const key = personaKey(persona);
                   const presente = presentes.has(key);
                   const saving = savingKey === key;
+                  const eleg = elegibilidadDe(persona);
 
                   return (
                     <div
@@ -410,6 +488,16 @@ export function AsistenciaPanel() {
                           <p className="text-xs text-muted-foreground">{persona.telefono}</p>
                         )}
                       </div>
+                      {eleg === 'incompleto' && (
+                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200" title="Completa sexo/edad en su ficha para clasificarla en este culto">
+                          Dato incompleto
+                        </Badge>
+                      )}
+                      {verTodos && eleg === 'no' && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          Fuera del público
+                        </Badge>
+                      )}
                       {tipoBadge(persona.tipo)}
                       {presente && !saving && (
                         <span className="text-xs text-green-600 font-medium">✓ Presente</span>

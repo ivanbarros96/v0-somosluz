@@ -66,8 +66,9 @@ function FidelizacionContent() {
 
     const { data: personas } = await supabase
       .from('personas').select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
+    // Solo cultos generales: la fidelidad se mide sobre el culto dominical
     const { data: cultos } = await supabase
-      .from('cultos').select('id, fecha').order('fecha', { ascending: false });
+      .from('cultos').select('id, fecha').eq('tipo', 'general').order('fecha', { ascending: false });
     const { data: asist } = await supabase
       .from('asistencias').select('persona_id, culto_id').not('persona_id', 'is', null);
 
