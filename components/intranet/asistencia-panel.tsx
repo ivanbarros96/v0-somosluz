@@ -8,18 +8,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import {
   CULTO_TIPOS, CULTO_TIPO_KEYS, descripcionCulto,
   type CultoTipo, type Elegibilidad,
 } from '@/lib/cultos-tipos';
+import { ministerioDeRol } from '@/lib/roles';
 
 type Persona = {
   id: number;
   nombre: string;
-  tipo: 'adulto' | 'nino' | 'nuevo';
+  tipo: 'adulto' | 'nino' | 'joven' | 'nuevo';
   telefono: string | null;
   sexo: string | null;
   edad: number | null;
@@ -33,7 +34,7 @@ type Culto = {
   tipo: CultoTipo;
 };
 
-type Filtro = 'todos' | 'adulto' | 'nino' | 'nuevo';
+type Filtro = 'todos' | 'adulto' | 'joven' | 'nino' | 'nuevo';
 
 function personaKey(p: Persona) {
   return `${p.tipo}::${p.id}`;
@@ -41,6 +42,7 @@ function personaKey(p: Persona) {
 
 function tipoBadge(tipo: Persona['tipo']) {
   if (tipo === 'adulto') return <Badge className="bg-primary/10 text-primary border-primary/25 text-xs">Adulto</Badge>;
+  if (tipo === 'joven') return <Badge className="bg-[#c08a3e]/10 text-[#a06f2e] border-[#c08a3e]/25 text-xs">Joven</Badge>;
   if (tipo === 'nino') return <Badge className="bg-accent/10 text-accent border-accent/25 text-xs">Niño</Badge>;
   return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">Nuevo</Badge>;
 }
@@ -58,6 +60,9 @@ function formatFecha(iso: string) {
 export function AsistenciaPanel() {
   const { user } = useAuth();
   const esPastor = user?.role === 'pastor';
+  // Rol de ministerio: limitado a su propio tipo de culto
+  const ministerio = ministerioDeRol(user?.role ?? '');
+  const esSomosluz = user?.role === 'somosluz';
 
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [cultoId, setCultoId] = useState<number | null>(null);
@@ -81,6 +86,33 @@ export function AsistenciaPanel() {
   const [pwdEliminar, setPwdEliminar] = useState('');
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState('');
+
+  // Candado de ministerios (rol somosluz): ocultos hasta ingresar la clave del pastor
+  const [ministeriosDesbloqueados, setMinisteriosDesbloqueados] = useState(false);
+  const [showDesbloquear, setShowDesbloquear] = useState(false);
+  const [pwdDesbloquear, setPwdDesbloquear] = useState('');
+  const [desbloqueando, setDesbloqueando] = useState(false);
+  const [errorDesbloquear, setErrorDesbloquear] = useState('');
+
+  const desbloquearMinisterios = async () => {
+    setDesbloqueando(true);
+    setErrorDesbloquear('');
+    const res = await fetch('/api/auth/verify-pastor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwdDesbloquear }),
+    });
+    const { ok } = await res.json().catch(() => ({ ok: false }));
+    if (ok) {
+      setMinisteriosDesbloqueados(true);
+      setShowDesbloquear(false);
+      setPwdDesbloquear('');
+      toast.success('Reuniones de ministerios visibles.');
+    } else {
+      setErrorDesbloquear('Contraseña incorrecta.');
+    }
+    setDesbloqueando(false);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -108,7 +140,7 @@ export function AsistenciaPanel() {
         ...(pdata ?? []).map((p: any) => ({
           id: p.id,
           nombre: p.nombre,
-          tipo: p.source_tipo as 'adulto' | 'nino',
+          tipo: p.source_tipo as 'adulto' | 'nino' | 'joven',
           telefono: p.telefono,
           sexo: p.sexo ?? null,
           edad: typeof p.edad === 'number' ? p.edad : null,
@@ -212,13 +244,15 @@ export function AsistenciaPanel() {
   const crearCulto = async () => {
     if (!nuevaFecha) return;
     setCreando(true);
+    // El rol limita qué tipos puede crear (también se valida en el servidor)
+    const tipo = tiposDisponibles.includes(nuevoTipo) ? nuevoTipo : tiposDisponibles[0];
     const res = await fetch('/api/cultos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fecha: nuevaFecha,
-        descripcion: descripcionCulto(nuevoTipo, nuevaFecha),
-        tipo: nuevoTipo,
+        descripcion: descripcionCulto(tipo, nuevaFecha),
+        tipo,
       }),
     });
     if (res.ok) {
@@ -248,6 +282,34 @@ export function AsistenciaPanel() {
     setCerrandoCulto(false);
   };
 
+  // Cultos visibles según el rol:
+  // - pastor: todos · ministerio: solo su tipo
+  // - somosluz: solo generales (ministerios ocultos hasta desbloquear con clave del pastor)
+  const cultosVisibles = cultos.filter((c) => {
+    if (esPastor) return true;
+    if (ministerio) return c.tipo === ministerio;
+    return ministeriosDesbloqueados || c.tipo === 'general';
+  });
+
+  // Si el culto seleccionado dejó de ser visible (cambio de rol/candado), re-seleccionar
+  useEffect(() => {
+    if (cultoId && !cultosVisibles.some((c) => c.id === cultoId)) {
+      setCultoId(cultosVisibles[0]?.id ?? null);
+    } else if (!cultoId && cultosVisibles.length > 0) {
+      setCultoId(cultosVisibles[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cultos, user?.role, ministeriosDesbloqueados]);
+
+  // Tipos que este rol puede crear
+  const tiposDisponibles: CultoTipo[] = esPastor
+    ? CULTO_TIPO_KEYS
+    : ministerio
+      ? [ministerio]
+      : ministeriosDesbloqueados
+        ? CULTO_TIPO_KEYS
+        : ['general'];
+
   const totalPresentes = presentes.size;
   const cultoActual = cultos.find((c) => c.id === cultoId);
 
@@ -273,6 +335,7 @@ export function AsistenciaPanel() {
   const FILTROS: { key: Filtro; label: string }[] = [
     { key: 'todos', label: 'Todos' },
     { key: 'adulto', label: 'Adultos' },
+    { key: 'joven', label: 'Jóvenes' },
     { key: 'nino', label: 'Niños' },
     { key: 'nuevo', label: 'Nuevos' },
   ];
@@ -287,10 +350,30 @@ export function AsistenciaPanel() {
             <CardTitle className="text-sm uppercase tracking-widest text-muted-foreground">
               Culto / Fecha
             </CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setMostrarNuevo(!mostrarNuevo)}>
-              <CalendarPlus className="w-4 h-4 mr-1" />
-              Nuevo culto
-            </Button>
+            <div className="flex items-center gap-2">
+              {esSomosluz && !ministeriosDesbloqueados && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => { setShowDesbloquear(true); setPwdDesbloquear(''); setErrorDesbloquear(''); }}
+                  title="Las reuniones de ministerios están ocultas. Requiere la contraseña del pastor."
+                >
+                  <Lock className="w-4 h-4 mr-1" />
+                  Ministerios
+                </Button>
+              )}
+              {esSomosluz && ministeriosDesbloqueados && (
+                <span className="inline-flex items-center gap-1 text-xs text-primary">
+                  <Unlock className="w-3.5 h-3.5" />
+                  Ministerios visibles
+                </span>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setMostrarNuevo(!mostrarNuevo)}>
+                <CalendarPlus className="w-4 h-4 mr-1" />
+                Nuevo culto
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -298,24 +381,33 @@ export function AsistenciaPanel() {
             <div className="grid gap-3 p-4 rounded-lg bg-muted/50 border">
               <div className="space-y-1.5">
                 <Label>Tipo de reunión <span className="text-red-500">*</span></Label>
-                <div className="flex gap-2 flex-wrap">
-                  {CULTO_TIPO_KEYS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setNuevoTipo(t)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
-                        ${nuevoTipo === t
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
-                    >
-                      {CULTO_TIPOS[t].label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Público: {CULTO_TIPOS[nuevoTipo].publico}
-                </p>
+                {tiposDisponibles.length === 1 ? (
+                  <p className="text-sm font-medium text-foreground">
+                    {CULTO_TIPOS[tiposDisponibles[0]].label}
+                    <span className="text-muted-foreground font-normal"> · {CULTO_TIPOS[tiposDisponibles[0]].publico}</span>
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex gap-2 flex-wrap">
+                      {tiposDisponibles.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setNuevoTipo(t)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors
+                            ${nuevoTipo === t
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
+                        >
+                          {CULTO_TIPOS[t].label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Público: {CULTO_TIPOS[tiposDisponibles.includes(nuevoTipo) ? nuevoTipo : tiposDisponibles[0]].publico}
+                    </p>
+                  </>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Fecha <span className="text-red-500">*</span></Label>
@@ -338,7 +430,7 @@ export function AsistenciaPanel() {
             </div>
           ) : (
             <div className="grid gap-2 max-h-48 overflow-y-auto pr-1">
-              {cultos.map((c) => (
+              {cultosVisibles.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setCultoId(c.id)}
@@ -515,6 +607,44 @@ export function AsistenciaPanel() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog: desbloquear reuniones de ministerios (rol somosluz) */}
+      <Dialog open={showDesbloquear} onOpenChange={(o) => { if (!o && !desbloqueando) setShowDesbloquear(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              Reuniones de ministerios
+            </DialogTitle>
+            <DialogDescription>
+              Las asistencias de Amadas, Hombría, Discipulado y Youth están reservadas.
+              Ingresa la <span className="font-semibold text-foreground">contraseña del pastor</span> para verlas en esta sesión.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="pwd-ministerios">Contraseña del pastor</Label>
+            <Input
+              id="pwd-ministerios"
+              type="password"
+              value={pwdDesbloquear}
+              autoFocus
+              onChange={(e) => setPwdDesbloquear(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && pwdDesbloquear) desbloquearMinisterios(); }}
+              placeholder="••••••••"
+              disabled={desbloqueando}
+            />
+          </div>
+          {errorDesbloquear && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{errorDesbloquear}</p>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDesbloquear(false)} disabled={desbloqueando}>Cancelar</Button>
+            <Button onClick={desbloquearMinisterios} disabled={desbloqueando || !pwdDesbloquear}>
+              {desbloqueando ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verificando...</> : 'Mostrar ministerios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: confirmar eliminación de culto */}
       <Dialog open={showEliminar} onOpenChange={(o) => { if (!o && !eliminando) { setShowEliminar(false); setPwdEliminar(''); setErrorEliminar(''); } }}>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
+import { esRolValido } from '@/lib/roles';
 
 // Valida que exista una sesión activa (cualquier rol) antes de comprobar la clave
 function hasValidSession(token: string | undefined): boolean {
@@ -9,7 +10,7 @@ function hasValidSession(token: string | undefined): boolean {
   const parts = token.split(':');
   if (parts.length !== 3) return false;
   const [role, timestamp, hash] = parts;
-  if (role !== 'pastor' && role !== 'somosluz') return false;
+  if (!esRolValido(role)) return false;
   const payload = `${role}:${timestamp}`;
   const expected = createHmac('sha256', secret).update(payload).digest('hex');
   if (hash !== expected) return false;

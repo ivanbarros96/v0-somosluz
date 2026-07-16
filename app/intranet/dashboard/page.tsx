@@ -29,7 +29,7 @@ const capMes = (d: Date) => {
 function PastorDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, ninos: 0, pctAsistenciaPromedio: 0, retencionVisitantes: null });
+  const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, jovenes: 0, ninos: 0, pctAsistenciaPromedio: 0, retencionVisitantes: null });
   const [oracionPendientes, setOracionPendientes] = useState(0);
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
@@ -52,6 +52,7 @@ function PastorDashboard() {
 
       const total = personas?.length ?? 0;
       const adultos = personas?.filter((p) => p.source_tipo === 'adulto').length ?? 0;
+      const jovenes = personas?.filter((p) => p.source_tipo === 'joven').length ?? 0;
       const ninos = personas?.filter((p) => p.source_tipo === 'nino').length ?? 0;
 
       // Normalización defensiva: comparar siempre en minúscula
@@ -261,7 +262,7 @@ function PastorDashboard() {
         // sin bloqueo: el banner simplemente no se muestra
       }
 
-      setKpis({ totalMiembros: total, adultos, ninos, pctAsistenciaPromedio, retencionVisitantes });
+      setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);

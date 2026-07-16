@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { esRolValido } from '@/lib/roles';
 
 async function verifySession(token: string): Promise<boolean> {
   const secret = process.env.AUTH_SECRET;
@@ -8,7 +9,7 @@ async function verifySession(token: string): Promise<boolean> {
   if (parts.length !== 3) return false;
 
   const [role, timestamp, hash] = parts;
-  if (role !== 'pastor' && role !== 'somosluz') return false;
+  if (!esRolValido(role)) return false;
 
   const payload = `${role}:${timestamp}`;
   const enc = new TextEncoder();

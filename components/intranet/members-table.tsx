@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Eye, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMembers } from '@/lib/members-store';
 import { useAuth } from '@/lib/auth-context';
-import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember } from '@/lib/types';
+import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember, isJovenMember } from '@/lib/types';
+import { ministerioDeRol } from '@/lib/roles';
+import { CULTO_TIPOS } from '@/lib/cultos-tipos';
 import { MemberForm } from '@/components/intranet/member-form';
 
 function fmt(v: string | number | null | undefined) {
@@ -21,7 +23,10 @@ function fmt(v: string | number | null | undefined) {
 }
 
 function MemberAvatar({ member }: { member: Member }) {
-  const cls = member.tipo === 'adulto' ? 'bg-primary text-primary-foreground' : 'bg-accent text-accent-foreground';
+  const cls =
+    member.tipo === 'adulto' ? 'bg-primary text-primary-foreground'
+    : member.tipo === 'joven' ? 'bg-[#c08a3e] text-white'
+    : 'bg-accent text-accent-foreground';
   return (
     <Avatar className="h-9 w-9 border">
       <AvatarFallback className={cls}>
@@ -31,10 +36,15 @@ function MemberAvatar({ member }: { member: Member }) {
   );
 }
 
-function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' }) {
+function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' | 'joven' }) {
+  const cls =
+    tipo === 'adulto' ? 'bg-primary/10 text-primary border-primary/25'
+    : tipo === 'joven' ? 'bg-[#c08a3e]/10 text-[#a06f2e] border-[#c08a3e]/25'
+    : 'bg-accent/10 text-accent border-accent/25';
+  const label = tipo === 'adulto' ? 'Adulto' : tipo === 'joven' ? 'Joven' : 'Niño';
   return (
-    <Badge variant="outline" className={tipo === 'adulto' ? 'bg-primary/10 text-primary border-primary/25' : 'bg-accent/10 text-accent border-accent/25'}>
-      {tipo === 'adulto' ? 'Adulto' : 'Niño'}
+    <Badge variant="outline" className={cls}>
+      {label}
     </Badge>
   );
 }
@@ -132,6 +142,19 @@ export function MembersTable() {
   const [deleteError, setDeleteError] = useState('');
   const [working, setWorking] = useState(false);
 
+  // Rol de ministerio: la lista sale filtrada a su público, con toggle "Ver todos"
+  const ministerio = ministerioDeRol(user?.role ?? '');
+  const [verTodosMiembros, setVerTodosMiembros] = useState(false);
+
+  const enAudiencia = (m: Member) => {
+    if (!ministerio || verTodosMiembros) return true;
+    return CULTO_TIPOS[ministerio].elegibilidad({
+      source_tipo: m.tipo,
+      sexo: m.sexo,
+      edad: 'edad' in m ? (m.edad ?? null) : null,
+    }) !== 'no';
+  };
+
   const coincide = (m: Member) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
@@ -140,12 +163,16 @@ export function MembersTable() {
   };
 
   const adultos = useMemo(
-    () => members.filter(isAdultoMember).filter(coincide),
-    [members, query],
+    () => members.filter(isAdultoMember).filter(coincide).filter(enAudiencia),
+    [members, query, ministerio, verTodosMiembros],
+  );
+  const jovenes = useMemo(
+    () => members.filter(isJovenMember).filter(coincide).filter(enAudiencia),
+    [members, query, ministerio, verTodosMiembros],
   );
   const ninos = useMemo(
-    () => members.filter(isNinoMember).filter(coincide),
-    [members, query],
+    () => members.filter(isNinoMember).filter(coincide).filter(enAudiencia),
+    [members, query, ministerio, verTodosMiembros],
   );
 
   const abrirEliminar = (m: Member) => {
@@ -198,23 +225,42 @@ export function MembersTable() {
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle>Miembros</CardTitle>
-          <p className="text-sm text-muted-foreground">Adultos y niños separados en tabs.</p>
-          <div className="relative mt-3 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nombre, teléfono, email o comuna..."
-              className="pl-9"
-            />
+          <p className="text-sm text-muted-foreground">
+            {ministerio && !verTodosMiembros
+              ? `Mostrando el público de ${CULTO_TIPOS[ministerio].label} (${CULTO_TIPOS[ministerio].publico}).`
+              : 'Adultos, jóvenes y niños separados en tabs.'}
+          </p>
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <div className="relative max-w-sm flex-1 min-w-52">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nombre, teléfono, email o comuna..."
+                className="pl-9"
+              />
+            </div>
+            {ministerio && (
+              <Button
+                size="sm"
+                variant={verTodosMiembros ? 'default' : 'outline'}
+                onClick={() => setVerTodosMiembros((v) => !v)}
+              >
+                {verTodosMiembros ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+                {verTodosMiembros ? 'Solo mi público' : 'Ver todos'}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="px-0 pt-0">
           <Tabs defaultValue="adultos">
             <div className="px-6 pb-4">
-              <TabsList className="grid w-full max-w-xs grid-cols-2">
+              <TabsList className="grid w-full max-w-md grid-cols-3">
                 <TabsTrigger value="adultos" className="gap-2">
                   Adultos <Badge variant="secondary">{adultos.length}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="jovenes" className="gap-2">
+                  Jóvenes <Badge variant="secondary">{jovenes.length}</Badge>
                 </TabsTrigger>
                 <TabsTrigger value="ninos" className="gap-2">
                   Niños <Badge variant="secondary">{ninos.length}</Badge>
@@ -257,6 +303,40 @@ export function MembersTable() {
                               ? <span className="text-muted-foreground">No</span>
                               : '—'}
                         </TableCell>
+                        <TableCell><Actions m={m} /></TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TabsContent>
+
+            <TabsContent value="jovenes" className="mt-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Edad</TableHead>
+                    <TableHead>Sexo</TableHead>
+                    <TableHead>Apoderado</TableHead>
+                    <TableHead>Tel. apoderado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jovenes.length === 0
+                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin jóvenes registrados.</TableCell></TableRow>
+                    : jovenes.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MemberAvatar member={m} />
+                            <span className="font-medium">{m.nombre}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{fmt(m.edad)}</TableCell>
+                        <TableCell>{fmt(m.sexo)}</TableCell>
+                        <TableCell>{fmt(m.nombre_apoderado)}</TableCell>
+                        <TableCell>{fmt(m.telefono_apoderado)}</TableCell>
                         <TableCell><Actions m={m} /></TableCell>
                       </TableRow>
                     ))}

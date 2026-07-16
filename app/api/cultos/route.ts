@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { esCultoTipo } from '@/lib/cultos-tipos';
+import { ministerioDeRol } from '@/lib/roles';
 
 // POST /api/cultos — crear culto. Devuelve la fila creada (el cliente la necesita).
 export async function POST(req: NextRequest) {
-  if (!getSession(req)) {
+  const session = getSession(req);
+  if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
@@ -15,6 +17,12 @@ export async function POST(req: NextRequest) {
   }
   if (tipo !== undefined && !esCultoTipo(tipo)) {
     return NextResponse.json({ error: 'Tipo de culto inválido' }, { status: 400 });
+  }
+
+  // Un rol de ministerio solo puede crear reuniones de su propio tipo
+  const ministerio = ministerioDeRol(session.role);
+  if (ministerio && tipo !== ministerio) {
+    return NextResponse.json({ error: 'Tu perfil solo puede crear reuniones de su ministerio' }, { status: 403 });
   }
 
   const { data, error } = await getSupabaseAdmin()

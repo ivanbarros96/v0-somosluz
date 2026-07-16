@@ -6,16 +6,27 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ROLES, type UserRole } from '@/lib/roles';
 
-type Profile = 'pastor' | 'somosluz' | null;
+type Profile = UserRole | null;
+
+// Perfiles del equipo (todo lo que no es pastor) con su ícono
+const EQUIPO: { role: UserRole; icon: React.ElementType; desc: string }[] = [
+  { role: 'somosluz', icon: Sun, desc: 'Acceso operativo · Registro y asistencia general' },
+  { role: 'amadas', icon: Heart, desc: 'Ministerio de mujeres' },
+  { role: 'hombres', icon: Shield, desc: 'Ministerio de varones' },
+  { role: 'discipulado', icon: GraduationCap, desc: 'Formación espiritual · Adultos' },
+  { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
+];
 
 export default function IntranetLoginPage() {
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
 
   const [selectedProfile, setSelectedProfile] = useState<Profile>(null);
+  const [mostrarEquipo, setMostrarEquipo] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +59,7 @@ export default function IntranetLoginPage() {
     if (progress >= 100) router.replace('/intranet/dashboard');
   }, [progress, router]);
 
-  function selectProfile(p: 'pastor' | 'somosluz') {
+  function selectProfile(p: UserRole) {
     setSelectedProfile(p);
     setPassword('');
     setError('');
@@ -76,7 +87,7 @@ export default function IntranetLoginPage() {
   // Pantalla de transición — anillo de progreso minimalista
   if (showTransition) {
     const isPastor = selectedProfile === 'pastor';
-    const accent = isPastor ? '#f59e0b' : '#3b82f6';
+    const accent = isPastor ? '#8a6d55' : '#6f814f'; // mocha pastor · salvia equipo
     const radius = 30;
     const circ = 2 * Math.PI * radius;
     const offset = circ * (1 - progress / 100);
@@ -115,7 +126,7 @@ export default function IntranetLoginPage() {
         </div>
 
         {/* Selector de perfil */}
-        {!selectedProfile ? (
+        {!selectedProfile && !mostrarEquipo ? (
           <div className="space-y-3">
             <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-5">
               Selecciona tu perfil de acceso
@@ -137,19 +148,49 @@ export default function IntranetLoginPage() {
             </button>
 
             <button
-              onClick={() => selectProfile('somosluz')}
+              onClick={() => setMostrarEquipo(true)}
               className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                  <Sun className="h-5 w-5 text-primary" />
+                  <Users2 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-foreground font-semibold">Somos Luz</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">Acceso operativo · Registro y asistencia</p>
+                  <p className="text-foreground font-semibold">Equipo y Ministerios</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">Operativo · Amadas · Hombría · Discipulado · Youth</p>
                 </div>
               </div>
             </button>
+          </div>
+        ) : !selectedProfile && mostrarEquipo ? (
+          <div className="space-y-2">
+            <button
+              onClick={() => setMostrarEquipo(false)}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-3 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Volver
+            </button>
+            <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-4">
+              ¿Quién toma el servicio hoy?
+            </p>
+            {EQUIPO.map(({ role, icon: Icon, desc }) => (
+              <button
+                key={role}
+                onClick={() => selectProfile(role)}
+                className="w-full p-4 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
+                    <Icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         ) : (
           /* Formulario de contraseña */
@@ -173,17 +214,18 @@ export default function IntranetLoginPage() {
                 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
                 selectedProfile === 'pastor' ? 'bg-accent/10' : 'bg-primary/10'
               )}>
-                {selectedProfile === 'pastor'
-                  ? <BookOpen className="h-5 w-5 text-accent" />
-                  : <Sun className="h-5 w-5 text-primary" />
-                }
+                {(() => {
+                  if (selectedProfile === 'pastor') return <BookOpen className="h-5 w-5 text-accent" />;
+                  const Icon = EQUIPO.find((e) => e.role === selectedProfile)?.icon ?? Sun;
+                  return <Icon className="h-5 w-5 text-primary" />;
+                })()}
               </div>
               <div>
                 <p className="text-foreground font-medium text-sm">
-                  {selectedProfile === 'pastor' ? 'Pastor' : 'Somos Luz'}
+                  {selectedProfile ? ROLES[selectedProfile].name : ''}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  {selectedProfile === 'pastor' ? 'Acceso gerencial' : 'Acceso operativo'}
+                  {selectedProfile ? `Acceso ${ROLES[selectedProfile].badge.toLowerCase()}` : ''}
                 </p>
               </div>
             </div>

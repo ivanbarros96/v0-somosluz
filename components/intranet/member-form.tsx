@@ -99,7 +99,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
   const [modo, setModo] = useState<Modo>(() => {
     if (!member) return 'adulto';
-    return member.tipo === 'nino' ? 'nino' : 'adulto';
+    // Los jóvenes se editan en la pestaña Niño/Joven (mismos campos + apoderado)
+    return member.tipo === 'nino' || member.tipo === 'joven' ? 'nino' : 'adulto';
   });
 
   const [form, setForm] = useState(emptyForm);
@@ -150,7 +151,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       }
     }
 
-    if (member.tipo === 'nino') {
+    if (member.tipo === 'nino' || member.tipo === 'joven') {
       const n = member as NinoMember;
       if (n.fecha_nacimiento) {
         const parts = n.fecha_nacimiento.split('/');
@@ -301,7 +302,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       }
 
 
-      // Niño: usar apoderado seleccionado del autocomplete
+      // Niño/Joven: usar apoderado seleccionado del autocomplete.
+      // La categoría se deriva de la edad: 3-14 niño, 15+ joven (rangos de la iglesia).
       if (modo === 'nino') {
         const fecha = (form.dia && form.mes && form.anio)
           ? `${form.dia}/${form.mes}/${form.anio}` : null;
@@ -309,7 +311,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
 
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
-          tipo: 'nino',
+          tipo: (edad != null && edad >= 15 ? 'joven' : 'nino') as 'nino',
           source_id: member?.source_id ?? undefined,
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),

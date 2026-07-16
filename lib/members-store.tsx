@@ -2,14 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Member, AdultoMember, NinoMember } from '@/lib/types';
+import type { Member, AdultoMember, NinoMember, JovenMember } from '@/lib/types';
 
 type MembersContextType = {
   members: Member[];
   isLoading: boolean;
   error: string | null;
   refreshMembers: () => Promise<void>;
-  addMember: (data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'>) => Promise<void>;
+  addMember: (data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'> | Omit<JovenMember, 'id' | 'created_at'>) => Promise<void>;
   updateMember: (id: string, data: Partial<Member>) => Promise<void>;
   deleteMember: (id: string, pastorPassword?: string) => Promise<void>;
 };
@@ -41,6 +41,18 @@ function mapToMember(row: any): Member {
       nombre_apoderado: row.nombre_apoderado ?? null,
       telefono_apoderado: row.telefono_apoderado ?? null,
     } as NinoMember;
+  }
+
+  if (row.source_tipo === 'joven') {
+    return {
+      ...base,
+      tipo: 'joven',
+      bautizado: row.bautizado ?? null,
+      fecha_nacimiento: row.fecha_nacimiento ?? null,
+      edad: row.edad ?? null,
+      nombre_apoderado: row.nombre_apoderado ?? null,
+      telefono_apoderado: row.telefono_apoderado ?? null,
+    } as JovenMember;
   }
 
   return {
@@ -84,7 +96,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addMember = useCallback(async (
-    data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'>
+    data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'> | Omit<JovenMember, 'id' | 'created_at'>
   ) => {
     const row: any = {
       source_tipo: data.tipo,
@@ -106,6 +118,13 @@ export function MembersProvider({ children }: { children: ReactNode }) {
       row.tiempo_conversion = a.tiempo_conversion;
       row.fecha_nacimiento = a.fecha_nacimiento ?? null; // ✅ sin as any
       row.edad = a.edad ?? null;                         // ✅ sin as any
+    } else if (data.tipo === 'joven') {
+      const j = data as Omit<JovenMember, 'id' | 'created_at'>;
+      row.bautizado = j.bautizado;
+      row.fecha_nacimiento = j.fecha_nacimiento ?? null;
+      row.edad = j.edad ?? null;
+      row.nombre_apoderado = j.nombre_apoderado ?? null;
+      row.telefono_apoderado = j.telefono_apoderado ?? null;
     } else {
       const n = data as Omit<NinoMember, 'id' | 'created_at'>;
       row.fecha_nacimiento = n.fecha_nacimiento;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
+import { ROLES, esRolValido } from '@/lib/roles';
 
 function verifySession(token: string): { role: string } | null {
   const secret = process.env.AUTH_SECRET;
@@ -9,7 +10,7 @@ function verifySession(token: string): { role: string } | null {
   if (parts.length !== 3) return null;
 
   const [role, timestamp, hash] = parts;
-  if (role !== 'pastor' && role !== 'somosluz') return null;
+  if (!esRolValido(role)) return null;
 
   const payload = `${role}:${timestamp}`;
   const expected = createHmac('sha256', secret).update(payload).digest('hex');
@@ -31,6 +32,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     username: session.role,
     role: session.role,
-    name: session.role === 'pastor' ? 'Pastor' : 'Somos Luz',
+    name: esRolValido(session.role) ? ROLES[session.role].name : session.role,
   });
 }

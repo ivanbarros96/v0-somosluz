@@ -1,11 +1,12 @@
 'use client';
 
-import { Users, Baby, UserCheck, TrendingUp, Repeat } from 'lucide-react';
+import { Users, Baby, UserCheck, TrendingUp, Repeat, Flame } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export interface KpiData {
   totalMiembros: number;
   adultos: number;
+  jovenes: number;
   ninos: number;
   pctAsistenciaPromedio: number;
   // % de visitantes nuevos que volvieron al menos una segunda vez. null = aún sin datos.
@@ -19,6 +20,7 @@ interface KpiCardsProps {
 const CARDS = [
   { key: 'totalMiembros' as const, label: 'Total Miembros', icon: Users, color: 'text-primary' },
   { key: 'adultos' as const, label: 'Adultos', icon: UserCheck, color: 'text-accent' },
+  { key: 'jovenes' as const, label: 'Jóvenes', icon: Flame, color: 'text-[#c08a3e]' },
   { key: 'ninos' as const, label: 'Niños', icon: Baby, color: 'text-green-600' },
   { key: 'pctAsistenciaPromedio' as const, label: 'Asistencia Prom.', icon: TrendingUp, color: 'text-orange-500', suffix: '%' },
   { key: 'retencionVisitantes' as const, label: 'Retención Visitantes', icon: Repeat, color: 'text-primary', suffix: '%', title: 'Porcentaje de visitantes nuevos que volvieron una segunda vez. Se calcula al registrar la asistencia de los visitantes cada culto. Muestra "—" hasta tener datos suficientes.' },
@@ -26,7 +28,7 @@ const CARDS = [
 
 export function KpiCards({ data }: KpiCardsProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-6">
       {CARDS.map((card) => {
         const Icon = card.icon;
         const valor = data[card.key];

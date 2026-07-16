@@ -5,7 +5,7 @@
 export type CultoTipo = 'general' | 'hombres' | 'mujeres' | 'discipulado' | 'youth';
 
 export interface PersonaAudiencia {
-  source_tipo: 'adulto' | 'nino' | 'nuevo';
+  source_tipo: 'adulto' | 'nino' | 'joven' | 'nuevo';
   sexo: string | null;
   edad: number | null;
 }
@@ -60,7 +60,10 @@ export const CULTO_TIPOS: Record<
     publico: 'Adultos',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'si';
-      return p.source_tipo === 'adulto' ? 'si' : 'no';
+      if (p.source_tipo === 'adulto') return 'si';
+      // Jóvenes mayores de edad también son adultos (rango adultos: 18+)
+      if (p.source_tipo === 'joven') return p.edad != null && p.edad >= 18 ? 'si' : 'no';
+      return 'no';
     },
   },
   youth: {
@@ -68,6 +71,7 @@ export const CULTO_TIPOS: Record<
     publico: 'Jóvenes 15–20',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'si';
+      if (p.source_tipo === 'joven') return 'si'; // la categoría manda sobre la edad
       if (p.edad == null) return 'incompleto';
       return p.edad >= 15 && p.edad <= 20 ? 'si' : 'no';
     },

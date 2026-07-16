@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
+import { ROLES, esRolValido } from '@/lib/roles';
 
 function buildToken(role: string): string {
   const secret = process.env.AUTH_SECRET!;
@@ -12,22 +13,22 @@ function buildToken(role: string): string {
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
 
+  // Cada rol tiene su contraseña en una env var propia (ver lib/roles.ts).
+  // Si la env var no está configurada, ese usuario simplemente no puede entrar.
   let role: string | null = null;
-
-  if (username === 'pastor' && password === process.env.PASTOR_PASSWORD) {
-    role = 'pastor';
-  } else if (username === 'somosluz' && password === process.env.SOMOSLUZ_PASSWORD) {
-    role = 'somosluz';
+  if (esRolValido(username) && typeof password === 'string' && password.length > 0) {
+    const esperada = process.env[ROLES[username].envVar];
+    if (esperada && password === esperada) role = username;
   }
 
-  if (!role) {
+  if (!role || !esRolValido(role)) {
     return NextResponse.json({ error: 'Credenciales incorrectas' }, { status: 401 });
   }
 
   const user = {
     username: role,
     role,
-    name: role === 'pastor' ? 'Pastor' : 'Somos Luz',
+    name: ROLES[role].name,
   };
 
   const res = NextResponse.json(user);

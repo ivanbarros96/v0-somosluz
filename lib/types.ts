@@ -1,6 +1,8 @@
 // --- AUTH ---
 
-export type UserRole = 'pastor' | 'somosluz';
+// El catálogo de roles vive en lib/roles.ts (fuente única de verdad)
+export type { UserRole } from './roles';
+import type { UserRole } from './roles';
 
 export interface AuthUser {
   username: string;
@@ -51,7 +53,18 @@ export interface NinoMember extends PersonaBase {
   telefono_apoderado: string | null;
 }
 
-export type Member = AdultoMember | NinoMember;
+// Jóvenes (15-20): mismos campos que niño (pueden tener apoderado si son menores)
+// más el estado de bautismo de adulto.
+export interface JovenMember extends PersonaBase {
+  tipo: 'joven';
+  bautizado: BautizadoStatus;
+  fecha_nacimiento: string | null;
+  edad: number | null;
+  nombre_apoderado: string | null;
+  telefono_apoderado: string | null;
+}
+
+export type Member = AdultoMember | NinoMember | JovenMember;
 
 export function isAdultoMember(m: Member): m is AdultoMember {
   return m.tipo === 'adulto';
@@ -59,6 +72,10 @@ export function isAdultoMember(m: Member): m is AdultoMember {
 
 export function isNinoMember(m: Member): m is NinoMember {
   return m.tipo === 'nino';
+}
+
+export function isJovenMember(m: Member): m is JovenMember {
+  return m.tipo === 'joven';
 }
 
 export function getMemberInitials(nombre: string) {

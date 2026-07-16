@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { esRolValido, type UserRole } from './roles';
 
-export type SessionRole = 'pastor' | 'somosluz';
+export type SessionRole = UserRole;
 export interface Session {
   role: SessionRole;
 }
@@ -18,7 +19,7 @@ export function verifySessionToken(token: string | undefined): Session | null {
   if (parts.length !== 3) return null;
 
   const [role, timestamp, hash] = parts;
-  if (role !== 'pastor' && role !== 'somosluz') return null;
+  if (!esRolValido(role)) return null;
 
   const payload = `${role}:${timestamp}`;
   const expected = createHmac('sha256', secret).update(payload).digest('hex');

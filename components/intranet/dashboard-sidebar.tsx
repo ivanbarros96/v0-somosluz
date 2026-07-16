@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
+import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -10,6 +12,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ROLES, esRolValido } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -57,6 +60,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
   const isPastor = user?.role === 'pastor';
   const navItems = isPastor ? PASTOR_NAV : SOMOSLUZ_NAV;
+
+  // Peticiones de oración sin revisar (solo pastor). Alimenta el badge y el título de pestaña.
+  const oracionPendientes = usePeticionesPendientes(isPastor);
+
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\)\s*/, '');
+    document.title = oracionPendientes > 0 ? `(${oracionPendientes}) ${base}` : base;
+  }, [oracionPendientes, pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -111,7 +122,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                   : 'bg-primary/10 text-primary'
               )}
             >
-              {isPastor ? 'Gerencial' : 'Operativo'}
+              {user && esRolValido(user.role) ? ROLES[user.role].badge : 'Operativo'}
             </Badge>
           </div>
         </div>
@@ -120,36 +131,46 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       {/* Navegación */}
       <nav className="flex-1 p-3">
         <ul className="space-y-1">
-          {navItems.map((item) => (
-            <li key={item.href}>
-              <button
-                onClick={() => handleNav(item.href)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                  isActive(item.href)
-                    ? isPastor
-                      ? 'bg-accent/10 text-accent font-medium'
-                      : 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                )}
-              >
-                <item.icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
-                {esNuevo(item.addedAt) && (
-                  <span
-                    className={cn(
-                      'ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full leading-none',
-                      isPastor
-                        ? 'bg-accent/15 text-accent'
-                        : 'bg-primary/15 text-primary'
-                    )}
-                  >
-                    Nuevo
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
+          {navItems.map((item) => {
+            const pendientes = item.href === '/intranet/dashboard/oracion' ? oracionPendientes : 0;
+            return (
+              <li key={item.href}>
+                <button
+                  onClick={() => handleNav(item.href)}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
+                    isActive(item.href)
+                      ? isPastor
+                        ? 'bg-accent/10 text-accent font-medium'
+                        : 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  )}
+                >
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                  {pendientes > 0 ? (
+                    <span
+                      className="ml-auto min-w-5 h-5 px-1.5 inline-flex items-center justify-center text-[11px] font-semibold rounded-full bg-orange-500 text-white leading-none"
+                      aria-label={`${pendientes} peticiones sin revisar`}
+                    >
+                      {pendientes > 9 ? '9+' : pendientes}
+                    </span>
+                  ) : esNuevo(item.addedAt) ? (
+                    <span
+                      className={cn(
+                        'ml-auto text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full leading-none',
+                        isPastor
+                          ? 'bg-accent/15 text-accent'
+                          : 'bg-primary/15 text-primary'
+                      )}
+                    >
+                      Nuevo
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
