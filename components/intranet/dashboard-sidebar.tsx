@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
-  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart,
+  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, esRolValido } from '@/lib/roles';
@@ -39,7 +39,7 @@ const PASTOR_NAV: NavItem[] = [
   { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
   { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake, addedAt: '2026-06-22' },
   { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart, addedAt: '2026-07-07' },
-  { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
+  { href: '/intranet/dashboard/finanzas', label: 'Finanzas', icon: Wallet, addedAt: '2026-07-23' },{ href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
   { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
