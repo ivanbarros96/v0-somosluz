@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { rangoMes } from '@/lib/finanzas';
+import { rangoMes, esCategoriaEgreso } from '@/lib/finanzas';
 
 // Margen bajo el límite de payload de Vercel Serverless Functions (ver advertencia
 // al usuario: Hobby ~4.5MB por request). 5MB de foto ya viene comprimido por el
@@ -10,21 +10,26 @@ import { rangoMes } from '@/lib/finanzas';
 // de llegar aquí — el error se vería como 413 en el navegador.
 const MAX_BYTES = 5 * 1024 * 1024;
 
-// GET /api/finanzas/egresos?mes=YYYY-MM — listar egresos del mes (solo pastor)
+// GET /api/finanzas/egresos?mes=YYYY-MM|general — listar egresos (solo pastor)
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || session.role !== 'pastor') {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const { desde, hasta } = rangoMes(req.nextUrl.searchParams.get('mes'));
+  const mesParam = req.nextUrl.searchParams.get('mes');
   const db = getSupabaseAdmin();
 
-  const { data, error } = await db
+  let query = db
     .from('finanzas_egresos')
-    .select('id, fecha, detalle, monto, comprobante_path, created_at')
-    .gte('fecha', desde)
-    .lt('fecha', hasta)
+    .select('id, fecha, detalle, monto, categoria, comprobante_path, created_at');
+
+  if (mesParam !== 'general') {
+    const { desde, hasta } = rangoMes(mesParam);
+    query = query.gte('fecha', desde).lt('fecha', hasta);
+  }
+
+  const { data, error } = await query
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
 
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
   const fecha = form.get('fecha');
   const detalle = form.get('detalle');
   const montoRaw = form.get('monto');
+  const categoriaRaw = form.get('categoria');
   const file = form.get('comprobante');
 
   if (
@@ -71,6 +77,15 @@ export async function POST(req: NextRequest) {
     !(Number(montoRaw) > 0)
   ) {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+  }
+
+  // La categoría es opcional: solo se valida si viene informada.
+  let categoria: string | null = null;
+  if (typeof categoriaRaw === 'string' && categoriaRaw.trim()) {
+    if (!esCategoriaEgreso(categoriaRaw)) {
+      return NextResponse.json({ error: 'Categoría inválida' }, { status: 400 });
+    }
+    categoria = categoriaRaw;
   }
 
   const db = getSupabaseAdmin();
@@ -96,7 +111,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db
     .from('finanzas_egresos')
-    .insert({ fecha, detalle: detalle.trim(), monto: Number(montoRaw), comprobante_path })
+    .insert({ fecha, detalle: detalle.trim(), monto: Number(montoRaw), categoria, comprobante_path })
     .select()
     .single();
 

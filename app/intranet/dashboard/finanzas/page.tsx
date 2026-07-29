@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,25 +15,34 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import {
   Wallet, TrendingUp, TrendingDown, Receipt, Loader2, Trash2, Plus, ExternalLink,
+  ArrowLeftRight, Download, X,
 } from 'lucide-react';
 import {
-  type Ingreso, type Egreso, type TipoIngreso,
-  TIPOS_INGRESO, LABEL_TIPO_INGRESO, formatCLP, formatFechaCL,
+  type Ingreso, type Egreso, type Movimiento, type TipoIngreso, type CategoriaEgreso,
+  TIPOS_INGRESO, LABEL_TIPO_INGRESO, CATEGORIAS_EGRESO, LABEL_CATEGORIA_EGRESO,
+  opcionesMes, formatCLP, formatFechaCL,
 } from '@/lib/finanzas';
 
-const mesActual = () => new Date().toISOString().slice(0, 7);
-const hoy = () => new Date().toISOString().slice(0, 10);
+// Usa hora LOCAL (Chile) en vez de .toISOString(), que convierte a UTC y podía
+// adelantar la fecha/mes hasta 4 horas durante la noche (bug corregido).
+const mesActual = () => format(new Date(), 'yyyy-MM');
+const hoy = () => format(new Date(), 'yyyy-MM-dd');
 
 const BADGE_TIPO: Record<TipoIngreso, string> = {
   diezmo: 'bg-primary/10 text-primary border-primary/25',
   ofrenda: 'bg-accent/10 text-accent border-accent/25',
   ofrenda_especial: 'bg-amber-100 text-amber-700 border-amber-200',
 };
+
+const SIN_CATEGORIA = '__sin_categoria__';
 
 export default function FinanzasPage() {
   const { user } = useAuth();
@@ -44,8 +54,10 @@ export default function FinanzasPage() {
   }, [user, router]);
 
   const [mes, setMes] = useState(mesActual());
+  const [rangoDesde, setRangoDesde] = useState<string | null>(null);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [egresos, setEgresos] = useState<Egreso[]>([]);
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [formIngreso, setFormIngreso] = useState({
@@ -56,24 +68,58 @@ export default function FinanzasPage() {
   });
   const [guardandoIngreso, setGuardandoIngreso] = useState(false);
 
-  const [formEgreso, setFormEgreso] = useState({ fecha: hoy(), detalle: '', monto: '' });
+  const [formEgreso, setFormEgreso] = useState({
+    fecha: hoy(),
+    detalle: '',
+    monto: '',
+    categoria: SIN_CATEGORIA as CategoriaEgreso | typeof SIN_CATEGORIA,
+  });
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [comprobantePreview, setComprobantePreview] = useState<string | null>(null);
   const [guardandoEgreso, setGuardandoEgreso] = useState(false);
 
   const [eliminarIngreso, setEliminarIngreso] = useState<Ingreso | null>(null);
   const [eliminarEgreso, setEliminarEgreso] = useState<Egreso | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
+  // Rango histórico (primer registro) — una sola vez, para armar el selector de meses
+  useEffect(() => {
+    fetch('/api/finanzas/rango')
+      .then((r) => r.json())
+      .then((d) => setRangoDesde(d.desde ?? null))
+      .catch(() => setRangoDesde(null));
+  }, []);
+
+  const opciones = useMemo(() => opcionesMes(rangoDesde), [rangoDesde]);
+
+  // Vista previa de la foto antes de guardar — libera el objeto anterior para
+  // no acumular memoria si el usuario cambia de archivo varias veces.
+  useEffect(() => {
+    if (!comprobante) {
+      setComprobantePreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(comprobante);
+    setComprobantePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [comprobante]);
+
   async function cargar(mesConsulta: string) {
     setLoading(true);
     try {
-      const [rIngresos, rEgresos] = await Promise.all([
+      const [rIngresos, rEgresos, rMovimientos] = await Promise.all([
         fetch(`/api/finanzas/ingresos?mes=${mesConsulta}`),
         fetch(`/api/finanzas/egresos?mes=${mesConsulta}`),
+        fetch(`/api/finanzas/movimientos?mes=${mesConsulta}`),
       ]);
-      const [dIngresos, dEgresos] = await Promise.all([rIngresos.json(), rEgresos.json()]);
+      const [dIngresos, dEgresos, dMovimientos] = await Promise.all([
+        rIngresos.json(),
+        rEgresos.json(),
+        rMovimientos.json(),
+      ]);
       setIngresos(dIngresos.ingresos ?? []);
       setEgresos(dEgresos.egresos ?? []);
+      setMovimientos(dMovimientos.movimientos ?? []);
     } catch {
       toast.error('No pudimos cargar los datos de Finanzas.');
     } finally {
@@ -103,6 +149,8 @@ export default function FinanzasPage() {
       saldo: totalIngresos - totalEgresos,
     };
   }, [ingresos, egresos]);
+
+  const esGeneral = mes === 'general';
 
   async function registrarIngreso(e: React.FormEvent) {
     e.preventDefault();
@@ -147,12 +195,18 @@ export default function FinanzasPage() {
       body.set('fecha', formEgreso.fecha);
       body.set('detalle', formEgreso.detalle.trim());
       body.set('monto', formEgreso.monto);
+      if (formEgreso.categoria !== SIN_CATEGORIA) body.set('categoria', formEgreso.categoria);
       if (comprobante) body.set('comprobante', comprobante);
 
       const res = await fetch('/api/finanzas/egresos', { method: 'POST', body });
       if (res.ok) {
-        toast.success('Egreso registrado.');
-        setFormEgreso({ fecha: hoy(), detalle: '', monto: '' });
+        if (comprobante) {
+          toast.success('Egreso registrado.');
+        } else {
+          // Aviso suave, no bloqueante: buena práctica contable, sin frenar al usuario.
+          toast.warning('Egreso registrado sin foto de comprobante. Puedes agregarla más tarde si la consigues.');
+        }
+        setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA });
         setComprobante(null);
         cargar(mes);
       } else {
@@ -170,9 +224,9 @@ export default function FinanzasPage() {
     try {
       const res = await fetch(`/api/finanzas/ingresos/${eliminarIngreso.id}`, { method: 'DELETE' });
       if (res.ok) {
-        setIngresos((prev) => prev.filter((i) => i.id !== eliminarIngreso.id));
         toast.success('Ingreso eliminado.');
         setEliminarIngreso(null);
+        cargar(mes);
       } else {
         toast.error('No se pudo eliminar.');
       }
@@ -187,15 +241,19 @@ export default function FinanzasPage() {
     try {
       const res = await fetch(`/api/finanzas/egresos/${eliminarEgreso.id}`, { method: 'DELETE' });
       if (res.ok) {
-        setEgresos((prev) => prev.filter((e) => e.id !== eliminarEgreso.id));
         toast.success('Egreso eliminado.');
         setEliminarEgreso(null);
+        cargar(mes);
       } else {
         toast.error('No se pudo eliminar.');
       }
     } finally {
       setEliminando(false);
     }
+  }
+
+  function exportarCSV() {
+    window.open(`/api/finanzas/exportar?mes=${mes}`, '_blank');
   }
 
   if (!user || user.role !== 'pastor') return null;
@@ -212,12 +270,23 @@ export default function FinanzasPage() {
             Diezmos, ofrendas y gastos · panorama mensual
           </p>
         </div>
-        <Input
-          type="month"
-          value={mes}
-          onChange={(e) => setMes(e.target.value)}
-          className="w-auto"
-        />
+        <div className="flex items-center gap-2">
+          <Select value={mes} onValueChange={setMes}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {opciones.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" onClick={exportarCSV} title="Exportar a Excel/CSV">
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -226,7 +295,7 @@ export default function FinanzasPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Resumen del mes */}
+          {/* Resumen del período */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             <Card>
               <CardContent className="p-4">
@@ -282,7 +351,9 @@ export default function FinanzasPage() {
               }
             >
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Saldo del mes</p>
+                <p className="text-xs text-muted-foreground">
+                  {esGeneral ? 'Saldo del período' : 'Saldo del mes'}
+                </p>
                 <p
                   className={`text-lg font-bold tabular-nums ${
                     resumen.saldo >= 0 ? 'text-green-700' : 'text-destructive'
@@ -407,13 +478,59 @@ export default function FinanzasPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Foto del comprobante</Label>
+                    <Label>
+                      Categoría <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </Label>
+                    <Select
+                      value={formEgreso.categoria}
+                      onValueChange={(v) =>
+                        setFormEgreso((f) => ({ ...f, categoria: v as CategoriaEgreso }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
+                        {CATEGORIAS_EGRESO.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>
+                      Foto del comprobante{' '}
+                      <span className="text-muted-foreground font-normal">(recomendado)</span>
+                    </Label>
                     <Input
                       type="file"
                       accept="image/*"
                       capture="environment"
                       onChange={(e) => setComprobante(e.target.files?.[0] ?? null)}
                     />
+                    {comprobantePreview && (
+                      <div className="relative mt-2 inline-block">
+                        <Image
+                          src={comprobantePreview}
+                          alt="Vista previa del comprobante"
+                          width={96}
+                          height={96}
+                          unoptimized
+                          className="rounded-md border border-border object-cover h-24 w-24"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setComprobante(null)}
+                          className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
+                          aria-label="Quitar foto"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <Button
                     type="submit"
@@ -436,23 +553,89 @@ export default function FinanzasPage() {
           {/* Historial */}
           <Card>
             <CardContent className="p-0">
-              <Tabs defaultValue="ingresos">
+              <Tabs defaultValue="movimientos">
                 <div className="p-4 md:p-6 pb-0">
-                  <TabsList className="grid w-full max-w-sm grid-cols-2">
-                    <TabsTrigger value="ingresos" className="gap-2">
+                  <TabsList className="grid w-full max-w-lg grid-cols-3">
+                    <TabsTrigger value="movimientos" className="gap-1.5">
+                      <ArrowLeftRight className="h-3.5 w-3.5" />
+                      Movimientos <Badge variant="secondary">{movimientos.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="ingresos" className="gap-1.5">
                       Ingresos <Badge variant="secondary">{ingresos.length}</Badge>
                     </TabsTrigger>
-                    <TabsTrigger value="egresos" className="gap-2">
+                    <TabsTrigger value="egresos" className="gap-1.5">
                       Egresos <Badge variant="secondary">{egresos.length}</Badge>
                     </TabsTrigger>
                   </TabsList>
                 </div>
 
+                <TabsContent value="movimientos" className="mt-0">
+                  {movimientos.length === 0 ? (
+                    <p className="py-10 text-center text-muted-foreground text-sm">
+                      Sin movimientos en este período.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Fecha</TableHead>
+                            <TableHead>Detalle</TableHead>
+                            <TableHead className="text-right">Monto</TableHead>
+                            <TableHead className="text-right">Saldo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {movimientos.map((m) => (
+                            <TableRow key={m.id}>
+                              <TableCell className="whitespace-nowrap">
+                                {formatFechaCL(m.fecha)}
+                              </TableCell>
+                              <TableCell className="max-w-xs">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate">{m.detalle}</span>
+                                  {m.categoria && (
+                                    <Badge variant="outline" className="text-[10px] shrink-0">
+                                      {LABEL_CATEGORIA_EGRESO[m.categoria]}
+                                    </Badge>
+                                  )}
+                                  {m.comprobante_url && (
+                                    <a
+                                      href={m.comprobante_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-muted-foreground hover:text-foreground shrink-0"
+                                      aria-label="Ver comprobante"
+                                    >
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className={`text-right font-medium tabular-nums whitespace-nowrap ${
+                                  m.tipo === 'ingreso' ? 'text-green-700' : 'text-destructive'
+                                }`}
+                              >
+                                {m.tipo === 'ingreso' ? '+' : '-'}
+                                {formatCLP(m.monto)}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums whitespace-nowrap">
+                                {formatCLP(m.saldo)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </TabsContent>
+
                 <TabsContent value="ingresos" className="mt-0">
                   <div className="divide-y divide-border">
                     {ingresos.length === 0 ? (
                       <p className="py-10 text-center text-muted-foreground text-sm">
-                        Sin ingresos registrados este mes.
+                        Sin ingresos registrados en este período.
                       </p>
                     ) : (
                       ingresos.map((i) => (
@@ -499,7 +682,7 @@ export default function FinanzasPage() {
                   <div className="divide-y divide-border">
                     {egresos.length === 0 ? (
                       <p className="py-10 text-center text-muted-foreground text-sm">
-                        Sin egresos registrados este mes.
+                        Sin egresos registrados en este período.
                       </p>
                     ) : (
                       egresos.map((e) => (
@@ -529,9 +712,16 @@ export default function FinanzasPage() {
                               </div>
                             )}
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {e.detalle}
-                              </p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {e.detalle}
+                                </p>
+                                {e.categoria && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {LABEL_CATEGORIA_EGRESO[e.categoria]}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 {formatFechaCL(e.fecha)}
                               </p>

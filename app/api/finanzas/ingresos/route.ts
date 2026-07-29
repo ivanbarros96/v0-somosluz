@@ -3,20 +3,24 @@ import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { esTipoIngreso, rangoMes } from '@/lib/finanzas';
 
-// GET /api/finanzas/ingresos?mes=YYYY-MM — listar ingresos del mes (solo pastor)
+// GET /api/finanzas/ingresos?mes=YYYY-MM|general — listar ingresos (solo pastor)
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || session.role !== 'pastor') {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const { desde, hasta } = rangoMes(req.nextUrl.searchParams.get('mes'));
-
-  const { data, error } = await getSupabaseAdmin()
+  const mesParam = req.nextUrl.searchParams.get('mes');
+  let query = getSupabaseAdmin()
     .from('finanzas_ingresos')
-    .select('id, fecha, tipo, monto, notas, created_at')
-    .gte('fecha', desde)
-    .lt('fecha', hasta)
+    .select('id, fecha, tipo, monto, notas, created_at');
+
+  if (mesParam !== 'general') {
+    const { desde, hasta } = rangoMes(mesParam);
+    query = query.gte('fecha', desde).lt('fecha', hasta);
+  }
+
+  const { data, error } = await query
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
 

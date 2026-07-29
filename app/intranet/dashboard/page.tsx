@@ -13,9 +13,10 @@ import { SexoChart, type SexoData } from '@/components/intranet/pastor/sexo-char
 import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-chart';
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
+import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
 import { CULTO_TIPOS, MINISTERIO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight } from 'lucide-react';
+import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight, Wallet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -41,6 +42,7 @@ function PastorDashboard() {
   const [fidelidadData, setFidelidadData] = useState<FidelidadData[]>([]);
   const [fidelidadEval, setFidelidadEval] = useState(0);
   const [ministerios, setMinisterios] = useState<MinisterioStat[]>([]);
+  const [finanzasTendencia, setFinanzasTendencia] = useState<FinanzasTendenciaMes[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -262,6 +264,17 @@ function PastorDashboard() {
         // sin bloqueo: el banner simplemente no se muestra
       }
 
+      // Tendencia de Finanzas (endpoint solo-pastor: RLS bloquea el acceso directo del cliente)
+      try {
+        const res = await fetch('/api/finanzas/tendencia?meses=6');
+        if (res.ok) {
+          const { meses } = await res.json();
+          setFinanzasTendencia(meses ?? []);
+        }
+      } catch {
+        // sin bloqueo: el gráfico simplemente no se muestra
+      }
+
       setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
       setAsistenciaMensual(mensual);
@@ -347,14 +360,17 @@ function PastorDashboard() {
 
       <MinisteriosPanel data={ministerios} />
 
+      <FinanzasTendenciaChart data={finanzasTendencia} />
+
       <Card>
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-base">Accesos Rápidos</CardTitle>
           <CardDescription>Funciones principales del sistema</CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
+              { href: '/intranet/dashboard/finanzas', icon: Wallet, label: 'Finanzas', desc: 'Ingresos, egresos y saldo' },
               { href: '/intranet/dashboard/seguimiento', icon: Activity, label: 'Seguimiento', desc: 'Ausencias consecutivas' },
               { href: '/intranet/dashboard/retiros', icon: UserX, label: 'Retiros', desc: '+30 días sin asistir' },
               { href: '/intranet/dashboard/settings', icon: Settings, label: 'Configuración', desc: 'Ajustes del sistema' },
