@@ -35,7 +35,7 @@ export const CULTO_TIPOS: Record<
     label: 'Hombría al Máximo',
     publico: 'Varones adultos',
     elegibilidad: (p) => {
-      if (p.source_tipo === 'nuevo') return 'si'; // visitantes siempre bienvenidos
+      if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
       if (p.source_tipo !== 'adulto') return 'no';
       const s = norm(p.sexo);
       if (s === 'masculino') return 'si';
@@ -47,7 +47,7 @@ export const CULTO_TIPOS: Record<
     label: 'Amadas',
     publico: 'Mujeres adultas',
     elegibilidad: (p) => {
-      if (p.source_tipo === 'nuevo') return 'si';
+      if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
       if (p.source_tipo !== 'adulto') return 'no';
       const s = norm(p.sexo);
       if (s === 'femenino') return 'si';
@@ -59,7 +59,7 @@ export const CULTO_TIPOS: Record<
     label: 'Viernes de Discipulado',
     publico: 'Adultos',
     elegibilidad: (p) => {
-      if (p.source_tipo === 'nuevo') return 'si';
+      if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
       if (p.source_tipo === 'adulto') return 'si';
       // Jóvenes mayores de edad también son adultos (rango adultos: 18+)
       if (p.source_tipo === 'joven') return p.edad != null && p.edad >= 18 ? 'si' : 'no';
@@ -70,7 +70,7 @@ export const CULTO_TIPOS: Record<
     label: 'Generación Youth',
     publico: 'Jóvenes 15–20',
     elegibilidad: (p) => {
-      if (p.source_tipo === 'nuevo') return 'si';
+      if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
       if (p.source_tipo === 'joven') return 'si'; // la categoría manda sobre la edad
       if (p.edad == null) return 'incompleto';
       return p.edad >= 15 && p.edad <= 20 ? 'si' : 'no';
