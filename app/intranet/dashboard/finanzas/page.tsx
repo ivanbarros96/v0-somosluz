@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import {
-  Wallet, TrendingUp, TrendingDown, Receipt, Loader2, Trash2, Plus, ExternalLink,
+  Wallet, TrendingUp, TrendingDown, Receipt, Loader2, Trash2, Pencil, Plus, ExternalLink,
   ArrowLeftRight, Download, X,
 } from 'lucide-react';
 import {
@@ -43,6 +44,92 @@ const BADGE_TIPO: Record<TipoIngreso, string> = {
 };
 
 const SIN_CATEGORIA = '__sin_categoria__';
+
+// Campo de persona: busca entre miembros ya registrados (autocompletar) o
+// permite dejar cualquier nombre libre (visitantes, proveedores). Si el
+// usuario edita el texto después de elegir una sugerencia, se trata como
+// nombre libre de nuevo (personaId vuelve a null).
+function PersonaField({
+  nombre,
+  onChange,
+  placeholder = 'Nombre (opcional) — busca un miembro o escribe uno nuevo',
+}: {
+  nombre: string;
+  onChange: (nombre: string, personaId: string | null) => void;
+  placeholder?: string;
+}) {
+  const [resultados, setResultados] = useState<{ id: string; nombre: string }[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setDropdownOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (nombre.trim().length < 2) {
+      setResultados([]);
+      setDropdownOpen(false);
+      return;
+    }
+    setBuscando(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('personas')
+        .select('id, nombre')
+        .ilike('nombre', `%${nombre.trim()}%`)
+        .order('nombre')
+        .limit(8);
+      setResultados(data ?? []);
+      setDropdownOpen(true);
+      setBuscando(false);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nombre]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <Input
+        value={nombre}
+        onChange={(e) => onChange(e.target.value, null)}
+        onFocus={() => {
+          if (resultados.length > 0) setDropdownOpen(true);
+        }}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      {buscando && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {dropdownOpen && resultados.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+          {resultados.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(p.nombre, p.id);
+                setDropdownOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-secondary transition-colors text-sm"
+            >
+              {p.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FinanzasPage() {
   const { user } = useAuth();
@@ -65,6 +152,8 @@ export default function FinanzasPage() {
     tipo: 'diezmo' as TipoIngreso,
     monto: '',
     notas: '',
+    personaNombre: '',
+    personaId: null as string | null,
   });
   const [guardandoIngreso, setGuardandoIngreso] = useState(false);
 
@@ -73,6 +162,8 @@ export default function FinanzasPage() {
     detalle: '',
     monto: '',
     categoria: SIN_CATEGORIA as CategoriaEgreso | typeof SIN_CATEGORIA,
+    personaNombre: '',
+    personaId: null as string | null,
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobantePreview, setComprobantePreview] = useState<string | null>(null);
@@ -81,6 +172,29 @@ export default function FinanzasPage() {
   const [eliminarIngreso, setEliminarIngreso] = useState<Ingreso | null>(null);
   const [eliminarEgreso, setEliminarEgreso] = useState<Egreso | null>(null);
   const [eliminando, setEliminando] = useState(false);
+
+  // Edición
+  const [editandoIngreso, setEditandoIngreso] = useState<Ingreso | null>(null);
+  const [formEditIngreso, setFormEditIngreso] = useState({
+    fecha: '',
+    tipo: 'diezmo' as TipoIngreso,
+    monto: '',
+    notas: '',
+    personaNombre: '',
+    personaId: null as string | null,
+  });
+  const [guardandoEditIngreso, setGuardandoEditIngreso] = useState(false);
+
+  const [editandoEgreso, setEditandoEgreso] = useState<Egreso | null>(null);
+  const [formEditEgreso, setFormEditEgreso] = useState({
+    fecha: '',
+    detalle: '',
+    monto: '',
+    categoria: SIN_CATEGORIA as CategoriaEgreso | typeof SIN_CATEGORIA,
+    personaNombre: '',
+    personaId: null as string | null,
+  });
+  const [guardandoEditEgreso, setGuardandoEditEgreso] = useState(false);
 
   // Rango histórico (primer registro) — una sola vez, para armar el selector de meses
   useEffect(() => {
@@ -168,11 +282,13 @@ export default function FinanzasPage() {
           tipo: formIngreso.tipo,
           monto: Number(formIngreso.monto),
           notas: formIngreso.notas,
+          personaId: formIngreso.personaId,
+          personaNombre: formIngreso.personaNombre,
         }),
       });
       if (res.ok) {
         toast.success('Ingreso registrado.');
-        setFormIngreso({ fecha: hoy(), tipo: 'diezmo', monto: '', notas: '' });
+        setFormIngreso({ fecha: hoy(), tipo: 'diezmo', monto: '', notas: '', personaNombre: '', personaId: null });
         cargar(mes);
       } else {
         const { error } = await res.json().catch(() => ({ error: 'Error al guardar.' }));
@@ -196,6 +312,10 @@ export default function FinanzasPage() {
       body.set('detalle', formEgreso.detalle.trim());
       body.set('monto', formEgreso.monto);
       if (formEgreso.categoria !== SIN_CATEGORIA) body.set('categoria', formEgreso.categoria);
+      if (formEgreso.personaNombre.trim()) {
+        body.set('personaNombre', formEgreso.personaNombre.trim());
+        if (formEgreso.personaId) body.set('personaId', formEgreso.personaId);
+      }
       if (comprobante) body.set('comprobante', comprobante);
 
       const res = await fetch('/api/finanzas/egresos', { method: 'POST', body });
@@ -206,7 +326,7 @@ export default function FinanzasPage() {
           // Aviso suave, no bloqueante: buena práctica contable, sin frenar al usuario.
           toast.warning('Egreso registrado sin foto de comprobante. Puedes agregarla más tarde si la consigues.');
         }
-        setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA });
+        setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA, personaNombre: '', personaId: null });
         setComprobante(null);
         cargar(mes);
       } else {
@@ -215,6 +335,98 @@ export default function FinanzasPage() {
       }
     } finally {
       setGuardandoEgreso(false);
+    }
+  }
+
+  function abrirEditarIngreso(i: Ingreso) {
+    setFormEditIngreso({
+      fecha: i.fecha,
+      tipo: i.tipo,
+      monto: String(i.monto),
+      notas: i.notas ?? '',
+      personaNombre: i.persona_nombre ?? '',
+      personaId: i.persona_id ? String(i.persona_id) : null,
+    });
+    setEditandoIngreso(i);
+  }
+
+  async function guardarEditIngreso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editandoIngreso) return;
+    if (!formEditIngreso.fecha || !(Number(formEditIngreso.monto) > 0)) {
+      toast.error('Completa fecha y un monto válido.');
+      return;
+    }
+    setGuardandoEditIngreso(true);
+    try {
+      const res = await fetch(`/api/finanzas/ingresos/${editandoIngreso.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha: formEditIngreso.fecha,
+          tipo: formEditIngreso.tipo,
+          monto: Number(formEditIngreso.monto),
+          notas: formEditIngreso.notas,
+          personaId: formEditIngreso.personaId,
+          personaNombre: formEditIngreso.personaNombre,
+        }),
+      });
+      if (res.ok) {
+        toast.success('Ingreso actualizado.');
+        setEditandoIngreso(null);
+        cargar(mes);
+      } else {
+        const { error } = await res.json().catch(() => ({ error: 'Error al actualizar.' }));
+        toast.error(error ?? 'Error al actualizar.');
+      }
+    } finally {
+      setGuardandoEditIngreso(false);
+    }
+  }
+
+  function abrirEditarEgreso(e: Egreso) {
+    setFormEditEgreso({
+      fecha: e.fecha,
+      detalle: e.detalle,
+      monto: String(e.monto),
+      categoria: e.categoria ?? SIN_CATEGORIA,
+      personaNombre: e.persona_nombre ?? '',
+      personaId: e.persona_id ? String(e.persona_id) : null,
+    });
+    setEditandoEgreso(e);
+  }
+
+  async function guardarEditEgreso(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editandoEgreso) return;
+    if (!formEditEgreso.fecha || !formEditEgreso.detalle.trim() || !(Number(formEditEgreso.monto) > 0)) {
+      toast.error('Completa fecha, detalle y un monto válido.');
+      return;
+    }
+    setGuardandoEditEgreso(true);
+    try {
+      const res = await fetch(`/api/finanzas/egresos/${editandoEgreso.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha: formEditEgreso.fecha,
+          detalle: formEditEgreso.detalle.trim(),
+          monto: Number(formEditEgreso.monto),
+          categoria: formEditEgreso.categoria === SIN_CATEGORIA ? null : formEditEgreso.categoria,
+          personaId: formEditEgreso.personaId,
+          personaNombre: formEditEgreso.personaNombre,
+        }),
+      });
+      if (res.ok) {
+        toast.success('Egreso actualizado.');
+        setEditandoEgreso(null);
+        cargar(mes);
+      } else {
+        const { error } = await res.json().catch(() => ({ error: 'Error al actualizar.' }));
+        toast.error(error ?? 'Error al actualizar.');
+      }
+    } finally {
+      setGuardandoEditEgreso(false);
     }
   }
 
@@ -419,6 +631,17 @@ export default function FinanzasPage() {
                   </div>
                   <div className="space-y-1">
                     <Label>
+                      Persona <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </Label>
+                    <PersonaField
+                      nombre={formIngreso.personaNombre}
+                      onChange={(nombre, personaId) =>
+                        setFormIngreso((f) => ({ ...f, personaNombre: nombre, personaId }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>
                       Notas <span className="text-muted-foreground font-normal">(opcional)</span>
                     </Label>
                     <Input
@@ -475,6 +698,18 @@ export default function FinanzasPage() {
                       placeholder="Ej: Cosas de aseo"
                       value={formEgreso.detalle}
                       onChange={(e) => setFormEgreso((f) => ({ ...f, detalle: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>
+                      Persona <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </Label>
+                    <PersonaField
+                      nombre={formEgreso.personaNombre}
+                      onChange={(nombre, personaId) =>
+                        setFormEgreso((f) => ({ ...f, personaNombre: nombre, personaId }))
+                      }
+                      placeholder="Quién gastó (opcional) — miembro o proveedor"
                     />
                   </div>
                   <div className="space-y-1">
@@ -570,6 +805,9 @@ export default function FinanzasPage() {
                 </div>
 
                 <TabsContent value="movimientos" className="mt-0">
+                  <p className="px-4 md:px-6 pb-2 text-xs text-muted-foreground">
+                    Solo lectura — para editar o eliminar, usa las pestañas de Ingresos o Egresos.
+                  </p>
                   {movimientos.length === 0 ? (
                     <p className="py-10 text-center text-muted-foreground text-sm">
                       Sin movimientos en este período.
@@ -598,6 +836,11 @@ export default function FinanzasPage() {
                                     <Badge variant="outline" className="text-[10px] shrink-0">
                                       {LABEL_CATEGORIA_EGRESO[m.categoria]}
                                     </Badge>
+                                  )}
+                                  {m.personaNombre && (
+                                    <span className="text-xs text-muted-foreground shrink-0">
+                                      · {m.personaNombre}
+                                    </span>
                                   )}
                                   {m.comprobante_url && (
                                     <a
@@ -651,6 +894,11 @@ export default function FinanzasPage() {
                               <Badge variant="outline" className={BADGE_TIPO[i.tipo]}>
                                 {LABEL_TIPO_INGRESO[i.tipo]}
                               </Badge>
+                              {i.persona_nombre && (
+                                <span className="text-xs text-muted-foreground">
+                                  · {i.persona_nombre}
+                                </span>
+                              )}
                             </div>
                             {i.notas && (
                               <p className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -658,10 +906,18 @@ export default function FinanzasPage() {
                               </p>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-semibold text-foreground tabular-nums">
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="font-semibold text-foreground tabular-nums mr-2">
                               {formatCLP(i.monto)}
                             </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => abrirEditarIngreso(i)}
+                              aria-label="Editar ingreso"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -724,11 +980,12 @@ export default function FinanzasPage() {
                               </div>
                               <p className="text-xs text-muted-foreground">
                                 {formatFechaCL(e.fecha)}
+                                {e.persona_nombre && <> · {e.persona_nombre}</>}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-semibold text-destructive tabular-nums">
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="font-semibold text-destructive tabular-nums mr-1">
                               -{formatCLP(e.monto)}
                             </span>
                             {e.comprobante_url && (
@@ -736,12 +993,20 @@ export default function FinanzasPage() {
                                 href={e.comprobante_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground p-2"
                                 aria-label="Ver comprobante"
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </a>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => abrirEditarEgreso(e)}
+                              aria-label="Editar egreso"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -762,6 +1027,152 @@ export default function FinanzasPage() {
           </Card>
         </div>
       )}
+
+      {/* Editar ingreso */}
+      <Dialog open={!!editandoIngreso} onOpenChange={(o) => { if (!o) setEditandoIngreso(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar ingreso
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={guardarEditIngreso} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Fecha</Label>
+                <Input
+                  type="date"
+                  value={formEditIngreso.fecha}
+                  onChange={(e) => setFormEditIngreso((f) => ({ ...f, fecha: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <Select
+                  value={formEditIngreso.tipo}
+                  onValueChange={(v) => setFormEditIngreso((f) => ({ ...f, tipo: v as TipoIngreso }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_INGRESO.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Monto (CLP)</Label>
+              <Input
+                type="number"
+                min="1"
+                inputMode="numeric"
+                value={formEditIngreso.monto}
+                onChange={(e) => setFormEditIngreso((f) => ({ ...f, monto: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Persona <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <PersonaField
+                nombre={formEditIngreso.personaNombre}
+                onChange={(nombre, personaId) =>
+                  setFormEditIngreso((f) => ({ ...f, personaNombre: nombre, personaId }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Notas <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Input
+                value={formEditIngreso.notas}
+                onChange={(e) => setFormEditIngreso((f) => ({ ...f, notas: e.target.value }))}
+              />
+            </div>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditandoIngreso(null)} disabled={guardandoEditIngreso}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={guardandoEditIngreso}>
+                {guardandoEditIngreso ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : 'Guardar cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Editar egreso */}
+      <Dialog open={!!editandoEgreso} onOpenChange={(o) => { if (!o) setEditandoEgreso(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar egreso
+            </DialogTitle>
+            <DialogDescription>La foto del comprobante no se puede reemplazar aquí — elimina y vuelve a registrar si necesitas cambiarla.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={guardarEditEgreso} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Fecha</Label>
+                <Input
+                  type="date"
+                  value={formEditEgreso.fecha}
+                  onChange={(e) => setFormEditEgreso((f) => ({ ...f, fecha: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Monto (CLP)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={formEditEgreso.monto}
+                  onChange={(e) => setFormEditEgreso((f) => ({ ...f, monto: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Detalle</Label>
+              <Input
+                value={formEditEgreso.detalle}
+                onChange={(e) => setFormEditEgreso((f) => ({ ...f, detalle: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Persona <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <PersonaField
+                nombre={formEditEgreso.personaNombre}
+                onChange={(nombre, personaId) =>
+                  setFormEditEgreso((f) => ({ ...f, personaNombre: nombre, personaId }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Categoría <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Select
+                value={formEditEgreso.categoria}
+                onValueChange={(v) => setFormEditEgreso((f) => ({ ...f, categoria: v as CategoriaEgreso }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
+                  {CATEGORIAS_EGRESO.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditandoEgreso(null)} disabled={guardandoEditEgreso}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={guardandoEditEgreso}>
+                {guardandoEditEgreso ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : 'Guardar cambios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmar eliminación de ingreso */}
       <Dialog

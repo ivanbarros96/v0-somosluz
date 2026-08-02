@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   let query = db
     .from('finanzas_egresos')
-    .select('id, fecha, detalle, monto, categoria, comprobante_path, created_at');
+    .select('id, fecha, detalle, monto, categoria, persona_id, persona_nombre, comprobante_path, created_at');
 
   if (mesParam !== 'general') {
     const { desde, hasta } = rangoMes(mesParam);
@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
   const detalle = form.get('detalle');
   const montoRaw = form.get('monto');
   const categoriaRaw = form.get('categoria');
+  const personaIdRaw = form.get('personaId');
+  const personaNombreRaw = form.get('personaNombre');
   const file = form.get('comprobante');
 
   if (
@@ -87,6 +89,10 @@ export async function POST(req: NextRequest) {
     }
     categoria = categoriaRaw;
   }
+
+  const personaNombre =
+    typeof personaNombreRaw === 'string' && personaNombreRaw.trim() ? personaNombreRaw.trim() : null;
+  const personaId = personaNombre && personaIdRaw ? Number(personaIdRaw) : null;
 
   const db = getSupabaseAdmin();
   let comprobante_path: string | null = null;
@@ -111,7 +117,15 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db
     .from('finanzas_egresos')
-    .insert({ fecha, detalle: detalle.trim(), monto: Number(montoRaw), categoria, comprobante_path })
+    .insert({
+      fecha,
+      detalle: detalle.trim(),
+      monto: Number(montoRaw),
+      categoria,
+      persona_id: personaId,
+      persona_nombre: personaNombre,
+      comprobante_path,
+    })
     .select()
     .single();
 

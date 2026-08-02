@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         tipo: m.tipo,
         detalle: m.detalle,
         categoria: m.categoria ?? null,
+        personaNombre: m.personaNombre ?? null,
         monto: m.monto,
         saldo: m.saldo,
         comprobante_url,

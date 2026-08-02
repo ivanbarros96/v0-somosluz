@@ -30,13 +30,14 @@ export async function GET(req: NextRequest) {
 
   const filas = movimientos.slice().reverse(); // más reciente primero, igual que la vista
 
-  const encabezado = ['Fecha', 'Tipo', 'Categoría', 'Detalle', 'Monto', 'Saldo'].join(';');
+  const encabezado = ['Fecha', 'Tipo', 'Categoría', 'Persona', 'Detalle', 'Monto', 'Saldo'].join(';');
   const cuerpo = filas
     .map((m) =>
       [
         csvCell(formatFechaCL(m.fecha)),
         csvCell(m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'),
         csvCell(m.categoria ? LABEL_CATEGORIA_EGRESO[m.categoria as CategoriaEgreso] : ''),
+        csvCell(m.personaNombre ?? ''),
         csvCell(m.detalle),
         csvCell(m.tipo === 'ingreso' ? m.monto : -m.monto),
         csvCell(m.saldo),

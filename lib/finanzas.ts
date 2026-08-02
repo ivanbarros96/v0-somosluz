@@ -50,6 +50,8 @@ export interface Ingreso {
   tipo: TipoIngreso;
   monto: number;
   notas: string | null;
+  persona_id: number | null;
+  persona_nombre: string | null;
   created_at: string;
 }
 
@@ -59,6 +61,8 @@ export interface Egreso {
   detalle: string;
   monto: number;
   categoria: CategoriaEgreso | null;
+  persona_id: number | null;
+  persona_nombre: string | null;
   comprobante_path: string | null;
   comprobante_url?: string | null; // URL firmada, agregada solo en el GET
   created_at: string;
@@ -73,6 +77,7 @@ export interface Movimiento {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  personaNombre?: string | null;
   monto: number; // siempre positivo; el signo lo da `tipo`
   saldo: number; // saldo acumulado histórico hasta esta fila, inclusive
   comprobante_url?: string | null;

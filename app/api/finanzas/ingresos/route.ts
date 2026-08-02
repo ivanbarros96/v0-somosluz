@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const mesParam = req.nextUrl.searchParams.get('mes');
   let query = getSupabaseAdmin()
     .from('finanzas_ingresos')
-    .select('id, fecha, tipo, monto, notas, created_at');
+    .select('id, fecha, tipo, monto, notas, persona_id, persona_nombre, created_at');
 
   if (mesParam !== 'general') {
     const { desde, hasta } = rangoMes(mesParam);
@@ -38,11 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const { fecha, tipo, monto, notas } = await req.json().catch(() => ({}));
+  const { fecha, tipo, monto, notas, personaId, personaNombre } = await req.json().catch(() => ({}));
 
   if (!fecha || !esTipoIngreso(tipo) || !(Number(monto) > 0)) {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
   }
+
+  const nombre = typeof personaNombre === 'string' && personaNombre.trim() ? personaNombre.trim() : null;
 
   const { data, error } = await getSupabaseAdmin()
     .from('finanzas_ingresos')
@@ -51,6 +53,9 @@ export async function POST(req: NextRequest) {
       tipo,
       monto: Number(monto),
       notas: typeof notas === 'string' && notas.trim() ? notas.trim() : null,
+      // persona_id solo si viene un nombre asociado; sin nombre, no tiene sentido guardar el id
+      persona_id: nombre && personaId ? Number(personaId) : null,
+      persona_nombre: nombre,
     })
     .select()
     .single();

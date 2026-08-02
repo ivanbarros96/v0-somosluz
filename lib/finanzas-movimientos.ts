@@ -12,6 +12,7 @@ export interface MovimientoCalculado {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  personaNombre?: string | null;
   monto: number;
   saldo: number;
   comprobante_path?: string | null;
@@ -24,6 +25,7 @@ interface MovBase {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  personaNombre?: string | null;
   monto: number;
   comprobante_path?: string | null;
 }
@@ -38,12 +40,12 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
   const [{ data: ingresos, error: errIng }, { data: egresos, error: errEgr }] = await Promise.all([
     db
       .from('finanzas_ingresos')
-      .select('id, fecha, tipo, monto, notas, created_at')
+      .select('id, fecha, tipo, monto, notas, persona_nombre, created_at')
       .order('fecha', { ascending: true })
       .order('created_at', { ascending: true }),
     db
       .from('finanzas_egresos')
-      .select('id, fecha, detalle, monto, categoria, comprobante_path, created_at')
+      .select('id, fecha, detalle, monto, categoria, persona_nombre, comprobante_path, created_at')
       .order('fecha', { ascending: true })
       .order('created_at', { ascending: true }),
   ]);
@@ -60,6 +62,7 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
       detalle: i.notas
         ? `${LABEL_TIPO_INGRESO[i.tipo as TipoIngreso]} — ${i.notas}`
         : LABEL_TIPO_INGRESO[i.tipo as TipoIngreso],
+      personaNombre: i.persona_nombre ?? null,
       monto: Number(i.monto),
     })),
     ...(egresos ?? []).map((e) => ({
@@ -69,6 +72,7 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
       tipo: 'egreso' as const,
       detalle: e.detalle,
       categoria: (e.categoria ?? null) as CategoriaEgreso | null,
+      personaNombre: e.persona_nombre ?? null,
       monto: Number(e.monto),
       comprobante_path: e.comprobante_path,
     })),
@@ -83,6 +87,7 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
       tipo: m.tipo,
       detalle: m.detalle,
       categoria: m.categoria ?? null,
+      personaNombre: m.personaNombre ?? null,
       monto: m.monto,
       saldo,
       comprobante_path: m.comprobante_path ?? null,
