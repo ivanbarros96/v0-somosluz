@@ -28,14 +28,16 @@ const EDAD_YOUTH_MAX = 20;
 // Qué pestañas de registro puede usar cada rol. El Pastor no llega a
 // renderizar este formulario (bloqueado antes, en registro/page.tsx).
 //   - Somos Luz: registra la asistencia dominical completa → las 4 pestañas.
-//   - Amadas / Hombría / Discipulado: solo su gente adulta y los niños que
-//     traen (los niños no tienen reunión propia, van al general).
+//   - Amadas / Hombría / Discipulado: su gente adulta y los niños que traen
+//     (los niños no tienen reunión propia, van al general).
 //   - Youth: solo su propia audiencia.
+//   - "Nuevo" lo puede usar cualquiera menos Pastor: puede llegar una visita
+//     a cualquier reunión, no solo al culto general.
 function modosPermitidosParaRol(role: string | undefined): Modo[] {
   const ministerio = ministerioDeRol(role ?? '');
-  if (ministerio === 'youth') return ['joven'];
+  if (ministerio === 'youth') return ['joven', 'nuevo'];
   if (ministerio === 'mujeres' || ministerio === 'hombres' || ministerio === 'discipulado') {
-    return ['adulto', 'nino'];
+    return ['adulto', 'nino', 'nuevo'];
   }
   return ['adulto', 'joven', 'nino', 'nuevo'];
 }
@@ -45,6 +47,22 @@ interface MemberFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
+
+const TAB_LABELS: Record<Modo, string> = {
+  adulto: '👤 Adulto',
+  joven: '🧑 Youth',
+  nino: '🧒 Niño',
+  nuevo: '✨ Nuevo',
+};
+
+// Recordatorio sutil de a quién corresponde cada pestaña, para quien no se
+// sabe las reglas de memoria.
+const TAB_HINT: Record<Modo, string> = {
+  adulto: '+18 años, en general',
+  joven: '15–20 años',
+  nino: '14 años o menos — requiere un apoderado',
+  nuevo: 'Visita, primera vez, invitado o no miembro',
+};
 
 const PAISES = [
   { flag: '🇨🇱', code: '+56' },
@@ -426,13 +444,6 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const mostrarAvisoEdadYouth = modo === 'joven' && edadPreview !== null
     && (edadPreview < EDAD_YOUTH_MIN || edadPreview > EDAD_YOUTH_MAX);
 
-  const TAB_LABELS: Record<Modo, string> = {
-    adulto: '👤 Adulto',
-    joven: '🧑 Youth',
-    nino: '🧒 Niño',
-    nuevo: '✨ Nuevo',
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -464,6 +475,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   ? 'Datos del Visitante'
                   : 'Datos Personales'}
           </CardTitle>
+          <p className="text-xs text-muted-foreground/70">{TAB_HINT[modo]}</p>
         </CardHeader>
         <CardContent className="space-y-4">
 

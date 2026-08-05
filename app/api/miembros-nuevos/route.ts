@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { ministerioDeRol } from '@/lib/roles';
 
 // GET /api/miembros-nuevos — lectura de visitantes. Requiere sesión.
 // Sustituye la lectura directa con anon key (ver GET /api/personas).
@@ -40,17 +39,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ miembrosNuevos: data ?? [] });
 }
 
-// POST /api/miembros-nuevos — registro de visitante/miembro nuevo. Reservado
-// a Somos Luz: es quien toma la asistencia dominical general, único culto
-// donde entran visitantes. Pastor no registra; los ministerios (Amadas,
-// Hombría, Discipulado, Youth) solo registran su propia audiencia ya
-// existente, sin pestaña "Nuevo" — ver components/intranet/member-form.tsx.
+// POST /api/miembros-nuevos — registro de visitante/miembro nuevo. Puede
+// llegar una visita a cualquier reunión (no solo al culto general), así que
+// cualquier rol operativo puede registrar — salvo Pastor, que no hace
+// registro (ver components/intranet/member-form.tsx).
 export async function POST(req: NextRequest) {
   const session = getSession(req);
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
-  if (session.role === 'pastor' || ministerioDeRol(session.role) !== null) {
+  if (session.role === 'pastor') {
     return NextResponse.json({ error: 'Tu perfil no puede registrar visitantes.' }, { status: 403 });
   }
 
