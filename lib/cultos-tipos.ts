@@ -8,6 +8,12 @@ export interface PersonaAudiencia {
   source_tipo: 'adulto' | 'nino' | 'joven' | 'nuevo';
   sexo: string | null;
   edad: number | null;
+  // Solo relevante para 'youth': si la persona NO se registró en la pestaña
+  // Youth (source_tipo !== 'joven') pero su edad cae en el rango 15–20, no
+  // se la cuenta como Youth por edad sola — hace falta que ya haya asistido
+  // al menos una vez a un culto de Youth. Quien se registra directo como
+  // Youth siempre es elegible, sin importar la edad.
+  asistioAYouthAlgunaVez?: boolean;
 }
 
 // Resultado de elegibilidad:
@@ -73,7 +79,11 @@ export const CULTO_TIPOS: Record<
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
       if (p.source_tipo === 'joven') return 'si'; // la categoría manda sobre la edad
       if (p.edad == null) return 'incompleto';
-      return p.edad >= 15 && p.edad <= 20 ? 'si' : 'no';
+      if (p.edad < 15 || p.edad > 20) return 'no';
+      // Adulto (o Niño) en el rango de edad de Youth: no cuenta como Youth
+      // solo por edad — necesita al menos una asistencia previa registrada
+      // en un culto de Youth.
+      return p.asistioAYouthAlgunaVez ? 'si' : 'no';
     },
   },
 };
@@ -85,6 +95,22 @@ export const MINISTERIO_KEYS = CULTO_TIPO_KEYS.filter((t) => t !== 'general');
 
 export function esCultoTipo(v: unknown): v is CultoTipo {
   return typeof v === 'string' && v in CULTO_TIPOS;
+}
+
+// IDs de persona con al menos una asistencia registrada en un culto del tipo
+// dado. Usado para decidir elegibilidad de Youth por asistencia real, no por
+// edad — ver PersonaAudiencia.asistioAYouthAlgunaVez.
+export function idsQueAsistieron(
+  cultos: { id: number; tipo: string }[],
+  asistencias: { culto_id: number; persona_id: number | null }[],
+  tipo: CultoTipo,
+): Set<number> {
+  const cultoIds = new Set(cultos.filter((c) => c.tipo === tipo).map((c) => Number(c.id)));
+  const out = new Set<number>();
+  for (const a of asistencias) {
+    if (a.persona_id != null && cultoIds.has(Number(a.culto_id))) out.add(Number(a.persona_id));
+  }
+  return out;
 }
 
 export function descripcionCulto(tipo: CultoTipo, fechaISO: string): string {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,8 @@ import { useMembers } from '@/lib/members-store';
 import { useAuth } from '@/lib/auth-context';
 import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember, isJovenMember } from '@/lib/types';
 import { ministerioDeRol } from '@/lib/roles';
-import { CULTO_TIPOS } from '@/lib/cultos-tipos';
+import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
+import { getCultos, getAsistencias } from '@/lib/datos';
 import { MemberForm } from '@/components/intranet/member-form';
 
 function fmt(v: string | number | null | undefined) {
@@ -146,12 +147,24 @@ export function MembersTable() {
   const ministerio = ministerioDeRol(user?.role ?? '');
   const [verTodosMiembros, setVerTodosMiembros] = useState(false);
 
+  // Solo para el rol Youth: un Adulto de 15-20 años no cuenta como público de
+  // Youth por edad sola, necesita al menos una asistencia previa a un culto
+  // de Youth (ver PersonaAudiencia.asistioAYouthAlgunaVez en cultos-tipos.ts).
+  const [asistioYouthIds, setAsistioYouthIds] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    if (ministerio !== 'youth') return;
+    Promise.all([getCultos({ tipo: 'youth' }), getAsistencias()])
+      .then(([cultos, asistencias]) => setAsistioYouthIds(idsQueAsistieron(cultos, asistencias, 'youth')))
+      .catch(() => {});
+  }, [ministerio]);
+
   const enAudiencia = (m: Member) => {
     if (!ministerio || verTodosMiembros) return true;
     return CULTO_TIPOS[ministerio].elegibilidad({
       source_tipo: m.tipo,
       sexo: m.sexo,
       edad: 'edad' in m ? (m.edad ?? null) : null,
+      asistioAYouthAlgunaVez: asistioYouthIds.has(Number(m.id)),
     }) !== 'no';
   };
 

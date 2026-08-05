@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { getCultos, getMiembrosNuevos, getPersonas, getAsistenciasDeCulto } from '@/lib/datos';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { getCultos, getMiembrosNuevos, getPersonas, getAsistenciasDeCulto, getAsistencias } from '@/lib/datos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, 
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import {
-  CULTO_TIPOS, CULTO_TIPO_KEYS, descripcionCulto,
+  CULTO_TIPOS, CULTO_TIPO_KEYS, descripcionCulto, idsQueAsistieron,
   type CultoTipo, type Elegibilidad,
 } from '@/lib/cultos-tipos';
 import { ministerioDeRol } from '@/lib/roles';
@@ -81,6 +81,11 @@ export function AsistenciaPanel() {
   // Excepciones (ej. jóvenes fuera de rango): mostrar también a los no elegibles
   const [verTodos, setVerTodos] = useState(false);
 
+  // Historial completo de asistencias (no solo del culto seleccionado): hace
+  // falta para saber quién ya asistió alguna vez a un culto de Youth, que es
+  // lo que decide si un Adulto de 15-20 años cuenta como público de Youth.
+  const [todasAsistencias, setTodasAsistencias] = useState<{ culto_id: number; persona_id: number | null }[]>([]);
+
   // Estado para eliminar culto
   const [showEliminar, setShowEliminar] = useState(false);
   const [pwdEliminar, setPwdEliminar] = useState('');
@@ -127,6 +132,10 @@ export function AsistenciaPanel() {
       setLoadingCultos(false);
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    getAsistencias().then(setTodasAsistencias).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -314,8 +323,17 @@ export function AsistenciaPanel() {
   // Audiencia del culto seleccionado: pre-filtra la lista según el público.
   // 'incompleto' (falta sexo/edad en la ficha) se muestra con aviso, al final.
   const tipoCulto: CultoTipo = cultoActual?.tipo ?? 'general';
+  const asistioYouthIds = useMemo(
+    () => idsQueAsistieron(cultos, todasAsistencias, 'youth'),
+    [cultos, todasAsistencias],
+  );
   const elegibilidadDe = (p: Persona): Elegibilidad =>
-    CULTO_TIPOS[tipoCulto].elegibilidad({ source_tipo: p.tipo, sexo: p.sexo, edad: p.edad });
+    CULTO_TIPOS[tipoCulto].elegibilidad({
+      source_tipo: p.tipo,
+      sexo: p.sexo,
+      edad: p.edad,
+      asistioAYouthAlgunaVez: asistioYouthIds.has(p.id),
+    });
 
   const filtradas = personas
     .filter((p) => filtro === 'todos' || p.tipo === filtro)

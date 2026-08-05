@@ -14,7 +14,7 @@ import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-cha
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
-import { CULTO_TIPOS, MINISTERIO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
+import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight, Wallet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
@@ -213,6 +213,10 @@ function PastorDashboard() {
         const cId = Number(a.culto_id);
         conteoTodosCultos[cId] = (conteoTodosCultos[cId] ?? 0) + 1;
       }
+      // Adulto (o Niño) de 15-20 años no cuenta como público de Youth solo por
+      // edad — necesita al menos una asistencia previa a un culto de Youth.
+      const asistioYouthIds = idsQueAsistieron(cultosMinisterio ?? [], rawAsist ?? [], 'youth');
+
       const statsMinisterios: MinisterioStat[] = MINISTERIO_KEYS.map((tipo) => {
         const def = CULTO_TIPOS[tipo as CultoTipo];
         const reuniones = (cultosMinisterio ?? []).filter(
@@ -226,6 +230,7 @@ function PastorDashboard() {
               source_tipo: p.source_tipo as 'adulto' | 'nino',
               sexo: p.sexo ?? null,
               edad: typeof p.edad === 'number' ? p.edad : null,
+              asistioAYouthAlgunaVez: asistioYouthIds.has(Number(p.id)),
             }) === 'si',
         ).length;
         return {
