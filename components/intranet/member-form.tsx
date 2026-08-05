@@ -100,6 +100,66 @@ function parseTiempoConversion(val: string | null) {
   return { num: parts[0] ?? '', unidad: parts[1] ?? '' };
 }
 
+// Calcula el estado inicial del formulario a partir del miembro a editar.
+// Se usa como inicializador perezoso de useState (no en un useEffect posterior)
+// porque los Select de shadcn/Radix, una vez montados con value="", no
+// reflejan un cambio de value hecho DESPUÉS del primer render salvo que el
+// usuario interactúe — el trigger se queda mostrando el placeholder aunque el
+// estado interno ya tenga el valor correcto. Al calcular esto antes del
+// primer render, el Select nace ya con el valor correcto y el problema no
+// llega a producirse. (MemberForm siempre se remonta por miembro vía
+// key={editing.id} en members-table.tsx, así que un inicializador perezoso
+// basta — no hace falta reaccionar a cambios de `member` en un mismo montaje.)
+function computeForm(member: Member | null | undefined) {
+  if (!member) return emptyForm();
+
+  const tel = parseTelefono(member.telefono);
+  const base = {
+    nombre: member.nombre ?? '',
+    sexo: member.sexo ?? '',
+    codTel: tel.code, telefono: tel.num,
+    codWa: '+56', whatsapp: '',
+    email: member.email ?? '',
+    region: member.region ?? '',
+    comuna: member.comuna ?? '',
+    direccion: member.direccion ?? '',
+    bautizado: false,
+    convNum: '', convUnidad: '',
+    dia: '', mes: '', anio: '',
+  };
+
+  // Adulto y Youth comparten exactamente los mismos campos (Youth asiste por
+  // sí mismo, sin apoderado en este formulario).
+  if (member.tipo === 'adulto' || member.tipo === 'joven') {
+    const a = member as AdultoMember | JovenMember;
+    const wa = parseTelefono(a.whatsapp);
+    base.codWa = wa.code;
+    base.whatsapp = wa.num;
+    base.bautizado = a.bautizado === 'si';
+    const conv = parseTiempoConversion(a.tiempo_conversion);
+    base.convNum = conv.num;
+    base.convUnidad = conv.unidad;
+    if (a.fecha_nacimiento) {
+      const parts = a.fecha_nacimiento.split('/');
+      base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
+      base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
+      base.anio = parts[2] ?? '';
+    }
+  }
+
+  if (member.tipo === 'nino') {
+    const n = member as NinoMember;
+    if (n.fecha_nacimiento) {
+      const parts = n.fecha_nacimiento.split('/');
+      base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
+      base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
+      base.anio = parts[2] ?? '';
+    }
+  }
+
+  return base;
+}
+
 export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const { addMember, updateMember } = useMembers();
   const { user } = useAuth();
@@ -121,77 +181,27 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     if (soloYouth && !isEditing) setModo('joven');
   }, [soloYouth, isEditing]);
 
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => computeForm(member));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
 
-  // Autocomplete apoderado
-  const [apoderadoQuery, setApoderadoQuery] = useState('');
+  // Autocomplete apoderado. Precargado también de forma perezosa (mismo
+  // motivo que `form`): Niño es el único modo con apoderado en este
+  // formulario. Youth ya no lo gestiona aquí; si un registro antiguo tenía
+  // uno, se preserva intacto al guardar sin mostrarse (ver handleSubmit).
+  const [apoderadoQuery, setApoderadoQuery] = useState(() =>
+    member?.tipo === 'nino' ? (member as NinoMember).nombre_apoderado ?? '' : '',
+  );
   const [apoderadoResultados, setApoderadoResultados] = useState<{ id: string; nombre: string; telefono: string | null }[]>([]);
   const [apoderadoBuscando, setApoderadoBuscando] = useState(false);
-  const [apoderadoSeleccionado, setApoderadoSeleccionado] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null);
+  const [apoderadoSeleccionado, setApoderadoSeleccionado] = useState<{ id: string; nombre: string; telefono: string | null } | null>(() => {
+    if (member?.tipo !== 'nino') return null;
+    const n = member as NinoMember;
+    return n.nombre_apoderado ? { id: '', nombre: n.nombre_apoderado, telefono: n.telefono_apoderado ?? null } : null;
+  });
   const [apoderadoDropdownOpen, setApoderadoDropdownOpen] = useState(false);
   const apoderadoRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!member) { setForm(emptyForm()); return; }
-    const tel = parseTelefono(member.telefono);
-    const base = {
-      nombre: member.nombre ?? '',
-      sexo: member.sexo ?? '',
-      codTel: tel.code, telefono: tel.num,
-      codWa: '+56', whatsapp: '',
-      email: member.email ?? '',
-      email_apoderado: '',
-      region: member.region ?? '',
-      comuna: member.comuna ?? '',
-      direccion: member.direccion ?? '',
-      bautizado: false,
-      convNum: '', convUnidad: '',
-      dia: '', mes: '', anio: '',
-    };
-
-    // Adulto y Youth comparten exactamente los mismos campos (Youth asiste por
-    // sí mismo, sin apoderado en este formulario).
-    if (member.tipo === 'adulto' || member.tipo === 'joven') {
-      const a = member as AdultoMember | JovenMember;
-      const wa = parseTelefono(a.whatsapp);
-      base.codWa = wa.code;
-      base.whatsapp = wa.num;
-      base.bautizado = a.bautizado === 'si';
-      const conv = parseTiempoConversion(a.tiempo_conversion);
-      base.convNum = conv.num;
-      base.convUnidad = conv.unidad;
-      if (a.fecha_nacimiento) {
-        const parts = a.fecha_nacimiento.split('/');
-        base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
-        base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
-        base.anio = parts[2] ?? '';
-      }
-    }
-
-    if (member.tipo === 'nino') {
-      const n = member as NinoMember;
-      if (n.fecha_nacimiento) {
-        const parts = n.fecha_nacimiento.split('/');
-        base.dia = String(parseInt(parts[0] ?? '0', 10)) || '';
-        base.mes = String(parseInt(parts[1] ?? '0', 10)) || '';
-        base.anio = parts[2] ?? '';
-      }
-      // Precargar apoderado si existe
-      if (n.nombre_apoderado) {
-        setApoderadoQuery(n.nombre_apoderado);
-        setApoderadoSeleccionado({ id: '', nombre: n.nombre_apoderado, telefono: n.telefono_apoderado ?? null });
-      }
-    }
-
-    // Nota: Youth ya no gestiona apoderado desde este formulario. Si el
-    // registro tenía uno de una migración/edición anterior, se preserva
-    // intacto al guardar (ver handleSubmit) aunque no se muestre aquí.
-
-    setForm(base);
-  }, [member]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -445,19 +455,19 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
               <Label>Fecha de Nacimiento</Label>
               <div className="grid grid-cols-3 gap-2">
                 <Select value={form.dia} onValueChange={(v) => set('dia', v)}>
-                  <SelectTrigger><SelectValue placeholder="Día">{form.dia || undefined}</SelectValue></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Día" /></SelectTrigger>
                   <SelectContent>
                     {DIAS.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.mes} onValueChange={(v) => set('mes', v)}>
-                  <SelectTrigger><SelectValue placeholder="Mes">{form.mes ? MESES[+form.mes - 1] : undefined}</SelectValue></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
                   <SelectContent>
                     {MESES.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.anio} onValueChange={(v) => set('anio', v)}>
-                  <SelectTrigger><SelectValue placeholder="Año">{form.anio || undefined}</SelectValue></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
                   <SelectContent>
                     {ANIOS.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
                   </SelectContent>
@@ -503,7 +513,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   <Label>Tiempo de Conversión</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
-                      <SelectTrigger><SelectValue placeholder="N°">{form.convNum || undefined}</SelectValue></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="N°" /></SelectTrigger>
                       <SelectContent>
                         {NUMS_CONVERSION.map((n) => (
                           <SelectItem key={n} value={String(n)}>{n}</SelectItem>
@@ -511,7 +521,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                       </SelectContent>
                     </Select>
                     <Select value={form.convUnidad} onValueChange={(v) => set('convUnidad', v)}>
-                      <SelectTrigger><SelectValue placeholder="Unidad">{form.convUnidad || undefined}</SelectValue></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Meses">Meses</SelectItem>
                         <SelectItem value="Años">Años</SelectItem>
@@ -677,7 +687,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                     <div className="space-y-1">
                       <Label>Región</Label>
                       <Select value={form.region} onValueChange={handleRegionChange}>
-                        <SelectTrigger><SelectValue placeholder="Seleccione región...">{form.region || undefined}</SelectValue></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
                         <SelectContent>
                           {Object.keys(REGIONES).map((r) => (
                             <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -693,9 +703,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                         disabled={!form.region}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'}>
-                            {form.comuna || undefined}
-                          </SelectValue>
+                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
                         </SelectTrigger>
                         <SelectContent>
                           {comunas.map((c) => (
