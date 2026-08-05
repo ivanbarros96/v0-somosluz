@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { ministerioDeRol } from '@/lib/roles';
 
 // GET /api/personas — lectura de personas. Requiere sesión.
 //
@@ -58,15 +59,35 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ personas: data ?? [] });
 }
 
-// POST /api/personas — crear persona (adulto/niño)
+// POST /api/personas — crear persona (adulto/niño/joven)
 export async function POST(req: NextRequest) {
-  if (!getSession(req)) {
+  const session = getSession(req);
+  if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  // El Pastor no registra miembros — solo ve/edita desde Miembros.
+  if (session.role === 'pastor') {
+    return NextResponse.json({ error: 'El perfil Pastor no registra miembros.' }, { status: 403 });
   }
 
   const row = await req.json().catch(() => null);
   if (!row || typeof row !== 'object') {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+  }
+
+  // Espejo de las pestañas permitidas en components/intranet/member-form.tsx:
+  // Youth solo registra Youth; Amadas/Hombría/Discipulado solo adulto/niño.
+  const ministerio = ministerioDeRol(session.role);
+  const sourceTipo = (row as { source_tipo?: unknown }).source_tipo;
+  if (ministerio === 'youth' && sourceTipo !== 'joven') {
+    return NextResponse.json({ error: 'Tu perfil solo puede registrar Youth' }, { status: 403 });
+  }
+  if (
+    (ministerio === 'mujeres' || ministerio === 'hombres' || ministerio === 'discipulado') &&
+    sourceTipo !== 'adulto' && sourceTipo !== 'nino'
+  ) {
+    return NextResponse.json({ error: 'Tu perfil solo puede registrar Adulto o Niño' }, { status: 403 });
   }
 
   const { error } = await getSupabaseAdmin().from('personas').insert(row);

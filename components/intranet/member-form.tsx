@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { buscarPersonas, existePersona, existeMiembroNuevo } from '@/lib/datos';
+import { ministerioDeRol } from '@/lib/roles';
 
 // La categoría real la elige quien registra (la pestaña), no un cálculo por
 // edad — evita el caso de un joven de 18 que participa en Discipulado y no en
@@ -20,6 +21,24 @@ type Modo = 'adulto' | 'joven' | 'nino' | 'nuevo';
 
 // Umbral solo para el AVISO visual del tab Niño (no bloquea, no clasifica).
 const EDAD_AVISO_NINO = 15;
+// Rango "esperado" de Youth — el aviso es solo informativo, no bloquea.
+const EDAD_YOUTH_MIN = 15;
+const EDAD_YOUTH_MAX = 20;
+
+// Qué pestañas de registro puede usar cada rol. El Pastor no llega a
+// renderizar este formulario (bloqueado antes, en registro/page.tsx).
+//   - Somos Luz: registra la asistencia dominical completa → las 4 pestañas.
+//   - Amadas / Hombría / Discipulado: solo su gente adulta y los niños que
+//     traen (los niños no tienen reunión propia, van al general).
+//   - Youth: solo su propia audiencia.
+function modosPermitidosParaRol(role: string | undefined): Modo[] {
+  const ministerio = ministerioDeRol(role ?? '');
+  if (ministerio === 'youth') return ['joven'];
+  if (ministerio === 'mujeres' || ministerio === 'hombres' || ministerio === 'discipulado') {
+    return ['adulto', 'nino'];
+  }
+  return ['adulto', 'joven', 'nino', 'nuevo'];
+}
 
 interface MemberFormProps {
   member?: Member | null;
@@ -165,21 +184,18 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const { user } = useAuth();
   const isEditing = !!member;
 
-  // Rol Youth: solo registra su propia audiencia, sin acceso a Niño/Adulto/Nuevo.
-  const soloYouth = user?.role === 'youth';
+  // Pestañas que este rol puede usar al CREAR (en edición, el modo ya viene
+  // fijado por el tipo del miembro que se está editando, no por el rol).
+  const modosPermitidos = modosPermitidosParaRol(user?.role);
 
   const [modo, setModo] = useState<Modo>(() => {
-    if (!member) return 'adulto';
-    if (member.tipo === 'nino') return 'nino';
-    if (member.tipo === 'joven') return 'joven';
-    return 'adulto';
+    if (member) {
+      if (member.tipo === 'nino') return 'nino';
+      if (member.tipo === 'joven') return 'joven';
+      return 'adulto';
+    }
+    return modosPermitidos[0] ?? 'adulto';
   });
-
-  // Si el usuario logueado es del perfil Youth, se fuerza el modo al crear
-  // (en edición, el modo ya viene fijado por el tipo del miembro que se edita).
-  useEffect(() => {
-    if (soloYouth && !isEditing) setModo('joven');
-  }, [soloYouth, isEditing]);
 
   const [form, setForm] = useState(() => computeForm(member));
   const [loading, setLoading] = useState(false);
@@ -405,11 +421,22 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     ? calcEdad(+form.dia, +form.mes, +form.anio)
     : null;
   const mostrarAvisoEdadNino = modo === 'nino' && edadPreview !== null && edadPreview >= EDAD_AVISO_NINO;
+  // Solo avisa — Youth es una decisión de a quién ministerio pertenece, no
+  // un cálculo por edad, así que un Youth fuera de 15-20 igual se deja pasar.
+  const mostrarAvisoEdadYouth = modo === 'joven' && edadPreview !== null
+    && (edadPreview < EDAD_YOUTH_MIN || edadPreview > EDAD_YOUTH_MAX);
+
+  const TAB_LABELS: Record<Modo, string> = {
+    adulto: '👤 Adulto',
+    joven: '🧑 Youth',
+    nino: '🧒 Niño',
+    nuevo: '✨ Nuevo',
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
-      {!isEditing && !soloYouth && (
+      {!isEditing && modosPermitidos.length > 1 && (
         <Tabs value={modo} onValueChange={(v) => {
           setModo(v as Modo);
           setError(''); setOk(false);
@@ -419,10 +446,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           setApoderadoDropdownOpen(false);
         }}>
           <TabsList className="w-full">
-            <TabsTrigger value="adulto" className="flex-1">👤 Adulto</TabsTrigger>
-            <TabsTrigger value="joven" className="flex-1">🧑 Youth</TabsTrigger>
-            <TabsTrigger value="nino" className="flex-1">🧒 Niño</TabsTrigger>
-            <TabsTrigger value="nuevo" className="flex-1">✨ Nuevo</TabsTrigger>
+            {modosPermitidos.map((m) => (
+              <TabsTrigger key={m} value={m} className="flex-1">{TAB_LABELS[m]}</TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
       )}
@@ -479,6 +505,15 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   <span>
                     Esta persona tendría {edadPreview} años según la fecha ingresada.
                     ¿Seguro que corresponde al grupo Niño y no a Youth?
+                  </span>
+                </div>
+              )}
+              {mostrarAvisoEdadYouth && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Esta persona tendría {edadPreview} años según la fecha ingresada — fuera del
+                    rango habitual de Youth (15–20). Puedes registrarla igual si corresponde.
                   </span>
                 </div>
               )}
