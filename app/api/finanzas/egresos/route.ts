@@ -1,37 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { rangoMes, esCategoriaEgreso } from '@/lib/finanzas';
-
-// Margen bajo el límite de payload de Vercel Serverless Functions (ver advertencia
-// al usuario: Hobby ~4.5MB por request). 5MB de foto ya viene comprimido por el
-// celular en la mayoría de los casos, pero fotos muy grandes pueden fallar antes
-// de llegar aquí — el error se vería como 413 en el navegador.
-const MAX_BYTES = 5 * 1024 * 1024;
-
-// El formulario solo ofrece imágenes (accept="image/*"). Se valida también aquí
-// para no depender únicamente del allowlist del bucket, y para devolver un error
-// entendible en vez del genérico de Storage.
-const MIME_PERMITIDOS = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-  'image/gif',
-];
-
-// Extensión derivada del tipo real declarado, no del nombre del archivo: así un
-// "factura.pdf.jpg" no decide por sí solo cómo se guarda el objeto.
-const EXT_POR_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/heic': 'heic',
-  'image/heif': 'heif',
-  'image/gif': 'gif',
-};
+import { subirComprobante, MAX_COMPROBANTES_POR_EGRESO } from '@/lib/finanzas-comprobantes';
 
 // GET /api/finanzas/egresos?mes=YYYY-MM|general — listar egresos (solo pastor)
 export async function GET(req: NextRequest) {
@@ -45,7 +16,9 @@ export async function GET(req: NextRequest) {
 
   let query = db
     .from('finanzas_egresos')
-    .select('id, fecha, detalle, monto, categoria, persona_id, persona_nombre, comprobante_path, created_at');
+    .select(
+      'id, fecha, detalle, monto, categoria, categoria_personalizada, persona_id, persona_nombre, created_at',
+    );
 
   if (mesParam !== 'general') {
     const { desde, hasta } = rangoMes(mesParam);
@@ -60,22 +33,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const ids = (data ?? []).map((e) => e.id);
+  const { data: comprobantesRows, error: errComp } = ids.length
+    ? await db.from('finanzas_egresos_comprobantes').select('id, egreso_id, storage_path').in('egreso_id', ids)
+    : { data: [], error: null };
+  if (errComp) {
+    return NextResponse.json({ error: errComp.message }, { status: 500 });
+  }
+
   // El bucket es privado: generamos una URL firmada de corta duración por cada
   // comprobante en vez de exponer el bucket como público.
+  const porEgreso = new Map<number, { id: number; storage_path: string }[]>();
+  for (const c of comprobantesRows ?? []) {
+    const arr = porEgreso.get(c.egreso_id) ?? [];
+    arr.push(c);
+    porEgreso.set(c.egreso_id, arr);
+  }
+
   const egresos = await Promise.all(
     (data ?? []).map(async (e) => {
-      if (!e.comprobante_path) return { ...e, comprobante_url: null };
-      const { data: signed } = await db.storage
-        .from('comprobantes')
-        .createSignedUrl(e.comprobante_path, 3600);
-      return { ...e, comprobante_url: signed?.signedUrl ?? null };
+      const propios = porEgreso.get(e.id) ?? [];
+      const comprobantes = await Promise.all(
+        propios.map(async (c) => {
+          const { data: signed } = await db.storage
+            .from('comprobantes')
+            .createSignedUrl(c.storage_path, 3600);
+          return { id: c.id, url: signed?.signedUrl ?? null };
+        }),
+      );
+      return { ...e, comprobantes };
     }),
   );
 
   return NextResponse.json({ egresos });
 }
 
-// POST /api/finanzas/egresos — registrar un egreso con foto de comprobante (solo pastor)
+// POST /api/finanzas/egresos — registrar un egreso con foto(s) de comprobante (solo pastor)
 export async function POST(req: NextRequest) {
   const session = getSession(req);
   if (!session || session.role !== 'pastor') {
@@ -91,9 +84,10 @@ export async function POST(req: NextRequest) {
   const detalle = form.get('detalle');
   const montoRaw = form.get('monto');
   const categoriaRaw = form.get('categoria');
+  const categoriaPersonalizadaRaw = form.get('categoriaPersonalizada');
   const personaIdRaw = form.get('personaId');
   const personaNombreRaw = form.get('personaNombre');
-  const file = form.get('comprobante');
+  const files = form.getAll('comprobantes');
 
   if (
     typeof fecha !== 'string' ||
@@ -104,13 +98,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
   }
 
+  if (files.length > MAX_COMPROBANTES_POR_EGRESO) {
+    return NextResponse.json({ error: `Máximo ${MAX_COMPROBANTES_POR_EGRESO} fotos por egreso` }, { status: 400 });
+  }
+
   // La categoría es opcional: solo se valida si viene informada.
   let categoria: string | null = null;
+  let categoriaPersonalizada: string | null = null;
   if (typeof categoriaRaw === 'string' && categoriaRaw.trim()) {
     if (!esCategoriaEgreso(categoriaRaw)) {
       return NextResponse.json({ error: 'Categoría inválida' }, { status: 400 });
     }
     categoria = categoriaRaw;
+    if (categoria === 'otros') {
+      const texto = typeof categoriaPersonalizadaRaw === 'string' ? categoriaPersonalizadaRaw.trim() : '';
+      if (!texto) {
+        return NextResponse.json({ error: 'Escribe el nombre de la categoría' }, { status: 400 });
+      }
+      categoriaPersonalizada = texto;
+    }
   }
 
   const personaNombre =
@@ -118,34 +124,14 @@ export async function POST(req: NextRequest) {
   const personaId = personaNombre && personaIdRaw ? Number(personaIdRaw) : null;
 
   const db = getSupabaseAdmin();
-  let comprobante_path: string | null = null;
 
-  if (file instanceof File && file.size > 0) {
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: 'La foto no puede superar 5 MB' }, { status: 400 });
-    }
-
-    const contentType = (file.type || '').toLowerCase();
-    if (!MIME_PERMITIDOS.includes(contentType)) {
-      return NextResponse.json(
-        { error: 'El comprobante debe ser una imagen (JPG, PNG, WEBP, HEIC o GIF).' },
-        { status: 400 },
-      );
-    }
-
-    const ext = EXT_POR_MIME[contentType];
-    const path = `${fecha}/${randomUUID()}.${ext}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    const { error: uploadError } = await db.storage
-      .from('comprobantes')
-      .upload(path, buffer, { contentType });
-
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
-    comprobante_path = path;
+  let paths: (string | null)[];
+  try {
+    paths = await Promise.all(files.map((f) => subirComprobante(db, f, fecha)));
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
+  const pathsValidos = paths.filter((p): p is string => !!p);
 
   const { data, error } = await db
     .from('finanzas_egresos')
@@ -154,15 +140,26 @@ export async function POST(req: NextRequest) {
       detalle: detalle.trim(),
       monto: Number(montoRaw),
       categoria,
+      categoria_personalizada: categoriaPersonalizada,
       persona_id: personaId,
       persona_nombre: personaNombre,
-      comprobante_path,
     })
     .select()
     .single();
 
   if (error) {
+    // Si la fila no se pudo crear, no dejamos huérfanas las fotos ya subidas.
+    if (pathsValidos.length) await db.storage.from('comprobantes').remove(pathsValidos);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (pathsValidos.length) {
+    const { error: errComp } = await db
+      .from('finanzas_egresos_comprobantes')
+      .insert(pathsValidos.map((storage_path) => ({ egreso_id: data.id, storage_path })));
+    if (errComp) {
+      return NextResponse.json({ error: errComp.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ egreso: data });

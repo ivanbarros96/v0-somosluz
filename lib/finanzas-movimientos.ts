@@ -12,10 +12,11 @@ export interface MovimientoCalculado {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  categoriaPersonalizada?: string | null;
   personaNombre?: string | null;
   monto: number;
   saldo: number;
-  comprobante_path?: string | null;
+  comprobantesPaths?: string[];
 }
 
 interface MovBase {
@@ -25,9 +26,10 @@ interface MovBase {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  categoriaPersonalizada?: string | null;
   personaNombre?: string | null;
   monto: number;
-  comprobante_path?: string | null;
+  comprobantesPaths?: string[];
 }
 
 // Calcula el historial combinado (ingresos + egresos) con saldo corrido
@@ -37,21 +39,31 @@ interface MovBase {
 export async function calcularMovimientos(mesParam: string | null): Promise<MovimientoCalculado[]> {
   const db = getSupabaseAdmin();
 
-  const [{ data: ingresos, error: errIng }, { data: egresos, error: errEgr }] = await Promise.all([
-    db
-      .from('finanzas_ingresos')
-      .select('id, fecha, tipo, monto, notas, persona_nombre, created_at')
-      .order('fecha', { ascending: true })
-      .order('created_at', { ascending: true }),
-    db
-      .from('finanzas_egresos')
-      .select('id, fecha, detalle, monto, categoria, persona_nombre, comprobante_path, created_at')
-      .order('fecha', { ascending: true })
-      .order('created_at', { ascending: true }),
-  ]);
+  const [{ data: ingresos, error: errIng }, { data: egresos, error: errEgr }, { data: comprobantes, error: errComp }] =
+    await Promise.all([
+      db
+        .from('finanzas_ingresos')
+        .select('id, fecha, tipo, monto, notas, persona_nombre, created_at')
+        .order('fecha', { ascending: true })
+        .order('created_at', { ascending: true }),
+      db
+        .from('finanzas_egresos')
+        .select('id, fecha, detalle, monto, categoria, categoria_personalizada, persona_nombre, created_at')
+        .order('fecha', { ascending: true })
+        .order('created_at', { ascending: true }),
+      db.from('finanzas_egresos_comprobantes').select('egreso_id, storage_path'),
+    ]);
 
   if (errIng) throw new Error(errIng.message);
   if (errEgr) throw new Error(errEgr.message);
+  if (errComp) throw new Error(errComp.message);
+
+  const pathsPorEgreso = new Map<number, string[]>();
+  for (const c of comprobantes ?? []) {
+    const arr = pathsPorEgreso.get(c.egreso_id) ?? [];
+    arr.push(c.storage_path);
+    pathsPorEgreso.set(c.egreso_id, arr);
+  }
 
   const combinado: MovBase[] = [
     ...(ingresos ?? []).map((i) => ({
@@ -72,9 +84,10 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
       tipo: 'egreso' as const,
       detalle: e.detalle,
       categoria: (e.categoria ?? null) as CategoriaEgreso | null,
+      categoriaPersonalizada: e.categoria_personalizada ?? null,
       personaNombre: e.persona_nombre ?? null,
       monto: Number(e.monto),
-      comprobante_path: e.comprobante_path,
+      comprobantesPaths: pathsPorEgreso.get(e.id) ?? [],
     })),
   ].sort((a, b) => a.fecha.localeCompare(b.fecha) || a.created_at.localeCompare(b.created_at));
 
@@ -87,10 +100,11 @@ export async function calcularMovimientos(mesParam: string | null): Promise<Movi
       tipo: m.tipo,
       detalle: m.detalle,
       categoria: m.categoria ?? null,
+      categoriaPersonalizada: m.categoriaPersonalizada ?? null,
       personaNombre: m.personaNombre ?? null,
       monto: m.monto,
       saldo,
-      comprobante_path: m.comprobante_path ?? null,
+      comprobantesPaths: m.comprobantesPaths ?? [],
     };
   });
 

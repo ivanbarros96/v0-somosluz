@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import {
   type Ingreso, type Egreso, type Movimiento, type TipoIngreso, type CategoriaEgreso,
-  TIPOS_INGRESO, LABEL_TIPO_INGRESO, CATEGORIAS_EGRESO, LABEL_CATEGORIA_EGRESO,
+  TIPOS_INGRESO, LABEL_TIPO_INGRESO, CATEGORIAS_EGRESO, labelCategoriaEgreso,
   opcionesMes, formatCLP, formatFechaCL,
 } from '@/lib/finanzas';
 
@@ -127,6 +127,69 @@ function PersonaField({
   );
 }
 
+// Selector de categoría de egreso. Al elegir "Otros" pide escribir el nombre
+// de la categoría; si alguna ya se repitió 3+ veces en el historial, aparece
+// como atajo (clic y listo, sin volver a tipearla).
+function CategoriaEgresoField({
+  categoria,
+  categoriaPersonalizada,
+  categoriasFrecuentes,
+  onChange,
+}: {
+  categoria: CategoriaEgreso | typeof SIN_CATEGORIA;
+  categoriaPersonalizada: string;
+  categoriasFrecuentes: string[];
+  onChange: (categoria: CategoriaEgreso | typeof SIN_CATEGORIA, categoriaPersonalizada: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Select
+        value={categoria}
+        onValueChange={(v) => onChange(v as CategoriaEgreso, v === 'otros' ? categoriaPersonalizada : '')}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
+          {CATEGORIAS_EGRESO.map((c) => (
+            <SelectItem key={c.value} value={c.value}>
+              {c.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {categoria === 'otros' && (
+        <>
+          <Input
+            placeholder="Nombre de la categoría (ej: Flete, Regalo)"
+            value={categoriaPersonalizada}
+            onChange={(e) => onChange('otros', e.target.value)}
+          />
+          {categoriasFrecuentes.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {categoriasFrecuentes.map((texto) => (
+                <button
+                  key={texto}
+                  type="button"
+                  onClick={() => onChange('otros', texto)}
+                  className={`px-2 py-1 rounded-full text-xs border transition-colors ${
+                    categoriaPersonalizada === texto
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                  }`}
+                >
+                  {texto}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function FinanzasPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -158,12 +221,16 @@ export default function FinanzasPage() {
     detalle: '',
     monto: '',
     categoria: SIN_CATEGORIA as CategoriaEgreso | typeof SIN_CATEGORIA,
+    categoriaPersonalizada: '',
     personaNombre: '',
     personaId: null as string | null,
   });
-  const [comprobante, setComprobante] = useState<File | null>(null);
-  const [comprobantePreview, setComprobantePreview] = useState<string | null>(null);
+  const [comprobantes, setComprobantes] = useState<File[]>([]);
   const [guardandoEgreso, setGuardandoEgreso] = useState(false);
+
+  // Categorías "Otros: X" que ya se repitieron 3+ veces en todo el historial —
+  // aparecen como atajo seleccionable en vez de tener que volver a escribirlas.
+  const [categoriasFrecuentes, setCategoriasFrecuentes] = useState<string[]>([]);
 
   const [eliminarIngreso, setEliminarIngreso] = useState<Ingreso | null>(null);
   const [eliminarEgreso, setEliminarEgreso] = useState<Egreso | null>(null);
@@ -187,10 +254,21 @@ export default function FinanzasPage() {
     detalle: '',
     monto: '',
     categoria: SIN_CATEGORIA as CategoriaEgreso | typeof SIN_CATEGORIA,
+    categoriaPersonalizada: '',
     personaNombre: '',
     personaId: null as string | null,
   });
   const [guardandoEditEgreso, setGuardandoEditEgreso] = useState(false);
+  // Comprobantes existentes marcados para borrar (por id) + fotos nuevas a agregar.
+  const [comprobantesABorrar, setComprobantesABorrar] = useState<Set<number>>(new Set());
+  const [comprobantesNuevos, setComprobantesNuevos] = useState<File[]>([]);
+  const [comprobantesNuevosPreview, setComprobantesNuevosPreview] = useState<string[]>([]);
+
+  useEffect(() => {
+    const urls = comprobantesNuevos.map((f) => URL.createObjectURL(f));
+    setComprobantesNuevosPreview(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [comprobantesNuevos]);
 
   // Rango histórico (primer registro) — una sola vez, para armar el selector de meses
   useEffect(() => {
@@ -202,17 +280,21 @@ export default function FinanzasPage() {
 
   const opciones = useMemo(() => opcionesMes(rangoDesde), [rangoDesde]);
 
-  // Vista previa de la foto antes de guardar — libera el objeto anterior para
-  // no acumular memoria si el usuario cambia de archivo varias veces.
+  // Vista previa de las fotos antes de guardar — libera los objetos anteriores
+  // para no acumular memoria si el usuario cambia de archivos varias veces.
+  const [comprobantesPreview, setComprobantesPreview] = useState<string[]>([]);
   useEffect(() => {
-    if (!comprobante) {
-      setComprobantePreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(comprobante);
-    setComprobantePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [comprobante]);
+    const urls = comprobantes.map((f) => URL.createObjectURL(f));
+    setComprobantesPreview(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [comprobantes]);
+
+  useEffect(() => {
+    fetch('/api/finanzas/categorias-frecuentes')
+      .then((r) => r.json())
+      .then((d) => setCategoriasFrecuentes(d.categorias ?? []))
+      .catch(() => {});
+  }, []);
 
   async function cargar(mesConsulta: string) {
     setLoading(true);
@@ -301,30 +383,40 @@ export default function FinanzasPage() {
       toast.error('Completa fecha, detalle y un monto válido.');
       return;
     }
+    if (formEgreso.categoria === 'otros' && !formEgreso.categoriaPersonalizada.trim()) {
+      toast.error('Escribe el nombre de la categoría.');
+      return;
+    }
     setGuardandoEgreso(true);
     try {
       const body = new FormData();
       body.set('fecha', formEgreso.fecha);
       body.set('detalle', formEgreso.detalle.trim());
       body.set('monto', formEgreso.monto);
-      if (formEgreso.categoria !== SIN_CATEGORIA) body.set('categoria', formEgreso.categoria);
+      if (formEgreso.categoria !== SIN_CATEGORIA) {
+        body.set('categoria', formEgreso.categoria);
+        if (formEgreso.categoria === 'otros') {
+          body.set('categoriaPersonalizada', formEgreso.categoriaPersonalizada.trim());
+        }
+      }
       if (formEgreso.personaNombre.trim()) {
         body.set('personaNombre', formEgreso.personaNombre.trim());
         if (formEgreso.personaId) body.set('personaId', formEgreso.personaId);
       }
-      if (comprobante) body.set('comprobante', comprobante);
+      comprobantes.forEach((f) => body.append('comprobantes', f));
 
       const res = await fetch('/api/finanzas/egresos', { method: 'POST', body });
       if (res.ok) {
-        if (comprobante) {
+        if (comprobantes.length) {
           toast.success('Egreso registrado.');
         } else {
           // Aviso suave, no bloqueante: buena práctica contable, sin frenar al usuario.
           toast.warning('Egreso registrado sin foto de comprobante. Puedes agregarla más tarde si la consigues.');
         }
-        setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA, personaNombre: '', personaId: null });
-        setComprobante(null);
+        setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA, categoriaPersonalizada: '', personaNombre: '', personaId: null });
+        setComprobantes([]);
         cargar(mes);
+        fetch('/api/finanzas/categorias-frecuentes').then((r) => r.json()).then((d) => setCategoriasFrecuentes(d.categorias ?? [])).catch(() => {});
       } else {
         const { error } = await res.json().catch(() => ({ error: 'Error al guardar.' }));
         toast.error(error ?? 'Error al guardar.');
@@ -386,9 +478,12 @@ export default function FinanzasPage() {
       detalle: e.detalle,
       monto: String(e.monto),
       categoria: e.categoria ?? SIN_CATEGORIA,
+      categoriaPersonalizada: e.categoria_personalizada ?? '',
       personaNombre: e.persona_nombre ?? '',
       personaId: e.persona_id ? String(e.persona_id) : null,
     });
+    setComprobantesABorrar(new Set());
+    setComprobantesNuevos([]);
     setEditandoEgreso(e);
   }
 
@@ -399,24 +494,34 @@ export default function FinanzasPage() {
       toast.error('Completa fecha, detalle y un monto válido.');
       return;
     }
+    if (formEditEgreso.categoria === 'otros' && !formEditEgreso.categoriaPersonalizada.trim()) {
+      toast.error('Escribe el nombre de la categoría.');
+      return;
+    }
     setGuardandoEditEgreso(true);
     try {
+      const body = new FormData();
+      body.set('fecha', formEditEgreso.fecha);
+      body.set('detalle', formEditEgreso.detalle.trim());
+      body.set('monto', formEditEgreso.monto);
+      body.set('categoria', formEditEgreso.categoria === SIN_CATEGORIA ? '' : formEditEgreso.categoria);
+      if (formEditEgreso.categoria === 'otros') {
+        body.set('categoriaPersonalizada', formEditEgreso.categoriaPersonalizada.trim());
+      }
+      body.set('personaNombre', formEditEgreso.personaNombre);
+      if (formEditEgreso.personaId) body.set('personaId', formEditEgreso.personaId);
+      comprobantesABorrar.forEach((id) => body.append('eliminarComprobantes', String(id)));
+      comprobantesNuevos.forEach((f) => body.append('comprobantesNuevos', f));
+
       const res = await fetch(`/api/finanzas/egresos/${editandoEgreso.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fecha: formEditEgreso.fecha,
-          detalle: formEditEgreso.detalle.trim(),
-          monto: Number(formEditEgreso.monto),
-          categoria: formEditEgreso.categoria === SIN_CATEGORIA ? null : formEditEgreso.categoria,
-          personaId: formEditEgreso.personaId,
-          personaNombre: formEditEgreso.personaNombre,
-        }),
+        body,
       });
       if (res.ok) {
         toast.success('Egreso actualizado.');
         setEditandoEgreso(null);
         cargar(mes);
+        fetch('/api/finanzas/categorias-frecuentes').then((r) => r.json()).then((d) => setCategoriasFrecuentes(d.categorias ?? [])).catch(() => {});
       } else {
         const { error } = await res.json().catch(() => ({ error: 'Error al actualizar.' }));
         toast.error(error ?? 'Error al actualizar.');
@@ -712,54 +817,49 @@ export default function FinanzasPage() {
                     <Label>
                       Categoría <span className="text-muted-foreground font-normal">(opcional)</span>
                     </Label>
-                    <Select
-                      value={formEgreso.categoria}
-                      onValueChange={(v) =>
-                        setFormEgreso((f) => ({ ...f, categoria: v as CategoriaEgreso }))
+                    <CategoriaEgresoField
+                      categoria={formEgreso.categoria}
+                      categoriaPersonalizada={formEgreso.categoriaPersonalizada}
+                      categoriasFrecuentes={categoriasFrecuentes}
+                      onChange={(categoria, categoriaPersonalizada) =>
+                        setFormEgreso((f) => ({ ...f, categoria, categoriaPersonalizada }))
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
-                        {CATEGORIAS_EGRESO.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>
-                            {c.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label>
-                      Foto del comprobante{' '}
-                      <span className="text-muted-foreground font-normal">(recomendado)</span>
+                      Fotos del comprobante{' '}
+                      <span className="text-muted-foreground font-normal">(recomendado, hasta 5)</span>
                     </Label>
                     <Input
                       type="file"
                       accept="image/*"
                       capture="environment"
-                      onChange={(e) => setComprobante(e.target.files?.[0] ?? null)}
+                      multiple
+                      onChange={(e) => setComprobantes(Array.from(e.target.files ?? []).slice(0, 5))}
                     />
-                    {comprobantePreview && (
-                      <div className="relative mt-2 inline-block">
-                        <Image
-                          src={comprobantePreview}
-                          alt="Vista previa del comprobante"
-                          width={96}
-                          height={96}
-                          unoptimized
-                          className="rounded-md border border-border object-cover h-24 w-24"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setComprobante(null)}
-                          className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
-                          aria-label="Quitar foto"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                    {comprobantesPreview.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {comprobantesPreview.map((url, i) => (
+                          <div key={url} className="relative inline-block">
+                            <Image
+                              src={url}
+                              alt={`Vista previa del comprobante ${i + 1}`}
+                              width={96}
+                              height={96}
+                              unoptimized
+                              className="rounded-md border border-border object-cover h-24 w-24"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setComprobantes((prev) => prev.filter((_, j) => j !== i))}
+                              className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
+                              aria-label="Quitar foto"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -830,7 +930,7 @@ export default function FinanzasPage() {
                                   <span className="truncate">{m.detalle}</span>
                                   {m.categoria && (
                                     <Badge variant="outline" className="text-[10px] shrink-0">
-                                      {LABEL_CATEGORIA_EGRESO[m.categoria]}
+                                      {labelCategoriaEgreso(m.categoria, m.categoriaPersonalizada)}
                                     </Badge>
                                   )}
                                   {m.personaNombre && (
@@ -838,15 +938,19 @@ export default function FinanzasPage() {
                                       · {m.personaNombre}
                                     </span>
                                   )}
-                                  {m.comprobante_url && (
+                                  {!!m.comprobantesUrls?.length && (
                                     <a
-                                      href={m.comprobante_url}
+                                      href={m.comprobantesUrls[0]}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-muted-foreground hover:text-foreground shrink-0"
                                       aria-label="Ver comprobante"
+                                      title={m.comprobantesUrls.length > 1 ? `${m.comprobantesUrls.length} fotos` : undefined}
                                     >
                                       <ExternalLink className="h-3.5 w-3.5" />
+                                      {m.comprobantesUrls.length > 1 && (
+                                        <sup className="ml-0.5">{m.comprobantesUrls.length}</sup>
+                                      )}
                                     </a>
                                   )}
                                 </div>
@@ -943,20 +1047,25 @@ export default function FinanzasPage() {
                           className="flex items-center justify-between gap-3 px-4 md:px-6 py-3"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            {e.comprobante_url ? (
+                            {e.comprobantes.length > 0 ? (
                               <a
-                                href={e.comprobante_url}
+                                href={e.comprobantes[0].url ?? undefined}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="shrink-0"
+                                className="relative shrink-0"
                               >
                                 <Image
-                                  src={e.comprobante_url}
+                                  src={e.comprobantes[0].url ?? ''}
                                   alt={`Comprobante: ${e.detalle}`}
                                   width={44}
                                   height={44}
                                   className="rounded-md border border-border object-cover h-11 w-11"
                                 />
+                                {e.comprobantes.length > 1 && (
+                                  <span className="absolute -top-1.5 -right-1.5 bg-foreground text-background text-[10px] leading-none rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                                    {e.comprobantes.length}
+                                  </span>
+                                )}
                               </a>
                             ) : (
                               <div className="h-11 w-11 rounded-md border border-dashed border-border shrink-0 flex items-center justify-center">
@@ -970,7 +1079,7 @@ export default function FinanzasPage() {
                                 </p>
                                 {e.categoria && (
                                   <Badge variant="outline" className="text-[10px]">
-                                    {LABEL_CATEGORIA_EGRESO[e.categoria]}
+                                    {labelCategoriaEgreso(e.categoria, e.categoria_personalizada)}
                                   </Badge>
                                 )}
                               </div>
@@ -984,17 +1093,6 @@ export default function FinanzasPage() {
                             <span className="font-semibold text-destructive tabular-nums mr-1">
                               -{formatCLP(e.monto)}
                             </span>
-                            {e.comprobante_url && (
-                              <a
-                                href={e.comprobante_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-foreground p-2"
-                                aria-label="Ver comprobante"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1104,7 +1202,6 @@ export default function FinanzasPage() {
               <Pencil className="h-5 w-5 text-primary" />
               Editar egreso
             </DialogTitle>
-            <DialogDescription>La foto del comprobante no se puede reemplazar aquí — elimina y vuelve a registrar si necesitas cambiarla.</DialogDescription>
           </DialogHeader>
           <form onSubmit={guardarEditEgreso} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -1145,18 +1242,87 @@ export default function FinanzasPage() {
             </div>
             <div className="space-y-1">
               <Label>Categoría <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-              <Select
-                value={formEditEgreso.categoria}
-                onValueChange={(v) => setFormEditEgreso((f) => ({ ...f, categoria: v as CategoriaEgreso }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SIN_CATEGORIA}>Sin categoría</SelectItem>
-                  {CATEGORIAS_EGRESO.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              <CategoriaEgresoField
+                categoria={formEditEgreso.categoria}
+                categoriaPersonalizada={formEditEgreso.categoriaPersonalizada}
+                categoriasFrecuentes={categoriasFrecuentes}
+                onChange={(categoria, categoriaPersonalizada) =>
+                  setFormEditEgreso((f) => ({ ...f, categoria, categoriaPersonalizada }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fotos del comprobante</Label>
+              {editandoEgreso && editandoEgreso.comprobantes.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editandoEgreso.comprobantes.map((c) => {
+                    const marcada = comprobantesABorrar.has(c.id);
+                    return (
+                      <div key={c.id} className="relative inline-block">
+                        <Image
+                          src={c.url ?? ''}
+                          alt="Comprobante"
+                          width={72}
+                          height={72}
+                          unoptimized
+                          className={`rounded-md border object-cover h-18 w-18 ${marcada ? 'opacity-30 border-destructive' : 'border-border'}`}
+                          style={{ height: 72, width: 72 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setComprobantesABorrar((prev) => {
+                              const next = new Set(prev);
+                              if (marcada) next.delete(c.id); else next.add(c.id);
+                              return next;
+                            })
+                          }
+                          className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
+                          aria-label={marcada ? 'Deshacer eliminación' : 'Quitar esta foto'}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <Label className="text-muted-foreground font-normal text-xs">
+                Agregar {editandoEgreso && editandoEgreso.comprobantes.length > 0 ? 'más fotos' : 'una foto'}{' '}
+                (o reemplaza: marca la actual para quitarla y sube la nueva aquí)
+              </Label>
+              <Input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                onChange={(e) => setComprobantesNuevos(Array.from(e.target.files ?? []).slice(0, 5))}
+              />
+              {comprobantesNuevosPreview.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {comprobantesNuevosPreview.map((url, i) => (
+                    <div key={url} className="relative inline-block">
+                      <Image
+                        src={url}
+                        alt={`Foto nueva ${i + 1}`}
+                        width={72}
+                        height={72}
+                        unoptimized
+                        className="rounded-md border border-primary object-cover"
+                        style={{ height: 72, width: 72 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setComprobantesNuevos((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
+                        aria-label="Quitar foto"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
             <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={() => setEditandoEgreso(null)} disabled={guardandoEditEgreso}>

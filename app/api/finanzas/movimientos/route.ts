@@ -24,12 +24,14 @@ export async function GET(req: NextRequest) {
   // Firmamos URL solo de los comprobantes que realmente se van a mostrar.
   const movimientos = await Promise.all(
     visibles.map(async (m) => {
-      let comprobante_url: string | null = null;
-      if (m.tipo === 'egreso' && m.comprobante_path) {
-        const { data: signed } = await db.storage
-          .from('comprobantes')
-          .createSignedUrl(m.comprobante_path, 3600);
-        comprobante_url = signed?.signedUrl ?? null;
+      let comprobantesUrls: string[] = [];
+      if (m.tipo === 'egreso' && m.comprobantesPaths?.length) {
+        const signed = await Promise.all(
+          m.comprobantesPaths.map((path) =>
+            db.storage.from('comprobantes').createSignedUrl(path, 3600),
+          ),
+        );
+        comprobantesUrls = signed.map((s) => s.data?.signedUrl).filter((u): u is string => !!u);
       }
       return {
         id: m.id,
@@ -37,10 +39,11 @@ export async function GET(req: NextRequest) {
         tipo: m.tipo,
         detalle: m.detalle,
         categoria: m.categoria ?? null,
+        categoriaPersonalizada: m.categoriaPersonalizada ?? null,
         personaNombre: m.personaNombre ?? null,
         monto: m.monto,
         saldo: m.saldo,
-        comprobante_url,
+        comprobantesUrls,
       };
     }),
   );

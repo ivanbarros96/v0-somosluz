@@ -44,6 +44,17 @@ export function esCategoriaEgreso(v: unknown): v is CategoriaEgreso {
   return typeof v === 'string' && CATEGORIAS_EGRESO.some((c) => c.value === v);
 }
 
+// Etiqueta a mostrar: si es 'otros' con texto propio, se muestra ese texto
+// en vez del genérico "Otros" — así "Otros: flete" se ve como "Flete".
+export function labelCategoriaEgreso(
+  categoria: CategoriaEgreso | null | undefined,
+  categoriaPersonalizada?: string | null,
+): string | null {
+  if (!categoria) return null;
+  if (categoria === 'otros' && categoriaPersonalizada?.trim()) return categoriaPersonalizada.trim();
+  return LABEL_CATEGORIA_EGRESO[categoria];
+}
+
 export interface Ingreso {
   id: number;
   fecha: string; // YYYY-MM-DD
@@ -55,16 +66,21 @@ export interface Ingreso {
   created_at: string;
 }
 
+export interface Comprobante {
+  id: number;
+  url: string | null; // URL firmada, agregada solo en el GET
+}
+
 export interface Egreso {
   id: number;
   fecha: string; // YYYY-MM-DD
   detalle: string;
   monto: number;
   categoria: CategoriaEgreso | null;
+  categoria_personalizada: string | null; // solo si categoria === 'otros'
   persona_id: number | null;
   persona_nombre: string | null;
-  comprobante_path: string | null;
-  comprobante_url?: string | null; // URL firmada, agregada solo en el GET
+  comprobantes: Comprobante[]; // 0 o más fotos por egreso
   created_at: string;
 }
 
@@ -77,10 +93,11 @@ export interface Movimiento {
   tipo: 'ingreso' | 'egreso';
   detalle: string;
   categoria?: CategoriaEgreso | null;
+  categoriaPersonalizada?: string | null;
   personaNombre?: string | null;
   monto: number; // siempre positivo; el signo lo da `tipo`
   saldo: number; // saldo acumulado histórico hasta esta fila, inclusive
-  comprobante_url?: string | null;
+  comprobantesUrls?: string[];
 }
 
 // Rango [desde, hasta) para filtrar por mes calendario 'YYYY-MM'. Si el mes

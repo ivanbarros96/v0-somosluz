@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { calcularMovimientos } from '@/lib/finanzas-movimientos';
-import { formatFechaCL, LABEL_CATEGORIA_EGRESO, type CategoriaEgreso } from '@/lib/finanzas';
+import { formatFechaCL, labelCategoriaEgreso, type CategoriaEgreso } from '@/lib/finanzas';
 
 // Escapa un valor para CSV: si contiene ; " o salto de línea, lo entrecomilla
 // y duplica las comillas internas (regla estándar de CSV/Excel).
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       [
         csvCell(formatFechaCL(m.fecha)),
         csvCell(m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'),
-        csvCell(m.categoria ? LABEL_CATEGORIA_EGRESO[m.categoria as CategoriaEgreso] : ''),
+        csvCell(labelCategoriaEgreso(m.categoria as CategoriaEgreso | null, m.categoriaPersonalizada) ?? ''),
         csvCell(m.personaNombre ?? ''),
         csvCell(m.detalle),
         csvCell(m.tipo === 'ingreso' ? m.monto : -m.monto),
