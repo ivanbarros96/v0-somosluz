@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { buscarPersonas } from '@/lib/datos';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,13 +79,9 @@ function PersonaField({
     }
     setBuscando(true);
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('personas')
-        .select('id, nombre')
-        .ilike('nombre', `%${nombre.trim()}%`)
-        .order('nombre')
-        .limit(8);
-      setResultados(data ?? []);
+      const data = await buscarPersonas(nombre).catch(() => []);
+      // El id llega como número desde la API; el resto del formulario lo maneja como texto.
+      setResultados(data.map((p) => ({ id: String(p.id), nombre: p.nombre })));
       setDropdownOpen(true);
       setBuscando(false);
     }, 300);

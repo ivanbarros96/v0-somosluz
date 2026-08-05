@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getPersonas, getAsistenciasConFechaCulto, getIdsRetirados } from '@/lib/datos';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -52,32 +52,27 @@ export default function RetirosPage() {
   async function loadAusentes() {
     setLoading(true);
 
-    // IDs ya retirados
-    const { data: retirosExist } = await supabase
-      .from('retiros')
-      .select('persona_id')
-      .not('persona_id', 'is', null);
-    const retiradosIds = new Set((retirosExist ?? []).map((r: any) => Number(r.persona_id)));
-
-    // Todas las personas
-    const { data: personas } = await supabase
-      .from('personas')
-      .select('id, nombre, source_tipo, telefono');
-
-    if (!personas) { setLoading(false); return; }
-
-    // Todas las asistencias con la fecha del culto
-    const { data: asistencias } = await supabase
-      .from('asistencias')
-      .select('persona_id, cultos(fecha)')
-      .not('persona_id', 'is', null);
+    // IDs ya retirados, personas y asistencias con la fecha de su culto
+    let retiradosIds: Set<number>;
+    let personas: Awaited<ReturnType<typeof getPersonas>>;
+    let asistencias: Awaited<ReturnType<typeof getAsistenciasConFechaCulto>>;
+    try {
+      [retiradosIds, personas, asistencias] = await Promise.all([
+        getIdsRetirados(),
+        getPersonas(),
+        getAsistenciasConFechaCulto(),
+      ]);
+    } catch {
+      setLoading(false);
+      return;
+    }
 
     // Última fecha de asistencia por persona
     const ultimaFechaPorPersona: Record<number, string> = {};
-    for (const a of asistencias ?? []) {
+    for (const a of asistencias) {
       if (!a.persona_id) continue;
       const pId = Number(a.persona_id);
-      const fecha: string | undefined = (a.cultos as any)?.fecha;
+      const fecha = a.fecha;
       if (fecha && (!ultimaFechaPorPersona[pId] || fecha > ultimaFechaPorPersona[pId])) {
         ultimaFechaPorPersona[pId] = fecha;
       }

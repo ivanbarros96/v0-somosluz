@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { getPersonas, getCultos, getAsistencias, getIdsRetirados } from '@/lib/datos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -59,25 +59,29 @@ function FidelizacionContent() {
     setLoading(true);
     const ahora = Date.now();
 
-    // Excluir retirados
-    const { data: retirosData } = await supabase
-      .from('retiros').select('persona_id').not('persona_id', 'is', null);
-    const retirados = new Set((retirosData ?? []).map((r: any) => Number(r.persona_id)));
+    // Excluir retirados. Solo cultos generales: la fidelidad se mide sobre el
+    // culto dominical.
+    let retirados: Set<number>;
+    let personas: Awaited<ReturnType<typeof getPersonas>>;
+    let cultos: Awaited<ReturnType<typeof getCultos>>;
+    let asist: Awaited<ReturnType<typeof getAsistencias>>;
+    try {
+      [retirados, personas, cultos, asist] = await Promise.all([
+        getIdsRetirados(),
+        getPersonas(),
+        getCultos({ tipo: 'general', orden: 'desc' }),
+        getAsistencias(),
+      ]);
+    } catch {
+      setLoading(false);
+      return;
+    }
 
-    const { data: personas } = await supabase
-      .from('personas').select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
-    // Solo cultos generales: la fidelidad se mide sobre el culto dominical
-    const { data: cultos } = await supabase
-      .from('cultos').select('id, fecha').eq('tipo', 'general').order('fecha', { ascending: false });
-    const { data: asist } = await supabase
-      .from('asistencias').select('persona_id, culto_id').not('persona_id', 'is', null);
-
-    if (!personas) { setLoading(false); return; }
-
-    const cultosPasados = (cultos ?? []).filter((c) => new Date(c.fecha).getTime() <= ahora);
+    const cultosPasados = cultos.filter((c) => new Date(c.fecha).getTime() <= ahora);
 
     const asistMap = new Map<number, Set<number>>();
-    for (const a of asist ?? []) {
+    for (const a of asist) {
+      if (a.persona_id == null) continue;
       const pid = Number(a.persona_id);
       if (!asistMap.has(pid)) asistMap.set(pid, new Set());
       asistMap.get(pid)!.add(Number(a.culto_id));

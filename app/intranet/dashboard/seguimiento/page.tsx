@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getPersonas, getCultos, getAsistencias, getIdsRetirados } from '@/lib/datos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
@@ -49,29 +49,31 @@ export default function SeguimientoPage() {
     setLoading(true);
     const ahora = Date.now();
 
-    // Excluir retirados
-    const { data: retirosExist } = await supabase
-      .from('retiros').select('persona_id').not('persona_id', 'is', null);
-    const retirados = new Set((retirosExist ?? []).map((r: any) => Number(r.persona_id)));
-
-    // Personas activas
-    const { data: personas } = await supabase
-      .from('personas')
-      .select('id, nombre, source_tipo, telefono, nombre_apoderado, telefono_apoderado, fecha_registro, created_at');
-    if (!personas) { setLoading(false); return; }
-
     // Cultos GENERALES ya realizados (fecha <= ahora), más reciente primero.
     // Las ausencias consecutivas se miden sobre el culto dominical, no sobre
     // reuniones de ministerio (público parcial).
-    const { data: cultos } = await supabase
-      .from('cultos').select('id, fecha').eq('tipo', 'general').order('fecha', { ascending: false });
-    const cultosPasados = (cultos ?? []).filter((c) => new Date(c.fecha).getTime() <= ahora);
+    let retirados: Set<number>;
+    let personas: Awaited<ReturnType<typeof getPersonas>>;
+    let cultos: Awaited<ReturnType<typeof getCultos>>;
+    let asist: Awaited<ReturnType<typeof getAsistencias>>;
+    try {
+      [retirados, personas, cultos, asist] = await Promise.all([
+        getIdsRetirados(),
+        getPersonas(),
+        getCultos({ tipo: 'general', orden: 'desc' }),
+        getAsistencias(),
+      ]);
+    } catch {
+      setLoading(false);
+      return;
+    }
+
+    const cultosPasados = cultos.filter((c) => new Date(c.fecha).getTime() <= ahora);
 
     // Asistencias → Map persona -> Set(culto_id)
-    const { data: asist } = await supabase
-      .from('asistencias').select('persona_id, culto_id').not('persona_id', 'is', null);
     const asistMap = new Map<number, Set<number>>();
-    for (const a of asist ?? []) {
+    for (const a of asist) {
+      if (a.persona_id == null) continue;
       const pId = Number(a.persona_id);
       if (!asistMap.has(pId)) asistMap.set(pId, new Set());
       asistMap.get(pId)!.add(Number(a.culto_id));

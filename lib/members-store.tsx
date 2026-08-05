@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getPersonas, getIdsRetirados } from '@/lib/datos';
+import { useAuth } from '@/lib/auth-context';
 import type { Member, AdultoMember, NinoMember, JovenMember } from '@/lib/types';
 
 type MembersContextType = {
@@ -66,6 +67,10 @@ function mapToMember(row: any): Member {
 }
 
 export function MembersProvider({ children }: { children: ReactNode }) {
+  // Este provider envuelve toda /intranet, incluida la pantalla de login, donde
+  // todavía no hay sesión. Los datos ahora vienen de /api (que exige sesión), así
+  // que se espera a estar autenticado antes de pedirlos y se recarga al entrar.
+  const { isAuthenticated } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,23 +79,14 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(null);
 
-    // Excluir personas retiradas
-    const { data: retirosData } = await supabase
-      .from('retiros')
-      .select('persona_id')
-      .not('persona_id', 'is', null);
-    const retiradosIds = (retirosData ?? []).map((r: any) => Number(r.persona_id));
-
-    let query = supabase.from('personas').select('*').order('created_at', { ascending: false });
-    if (retiradosIds.length > 0) {
-      query = query.not('id', 'in', `(${retiradosIds.join(',')})`);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      setError(error.message);
-    } else {
-      setMembers((data ?? []).map(mapToMember));
+    try {
+      // Excluir personas retiradas
+      const [personas, retirados] = await Promise.all([getPersonas(), getIdsRetirados()]);
+      setMembers(
+        personas.filter((p) => !retirados.has(Number(p.id))).map(mapToMember),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los miembros.');
     }
     setIsLoading(false);
   }, []);
@@ -189,8 +185,16 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   }, [refreshMembers]);
 
   useEffect(() => {
+    // Al cerrar sesión se descarta la lista para no dejar datos personales
+    // en memoria del cliente.
+    if (!isAuthenticated) {
+      setMembers([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
     refreshMembers();
-  }, [refreshMembers]);
+  }, [isAuthenticated, refreshMembers]);
 
   return (
     <MembersContext.Provider value={{ members, isLoading, error, refreshMembers, addMember, updateMember, deleteMember }}>

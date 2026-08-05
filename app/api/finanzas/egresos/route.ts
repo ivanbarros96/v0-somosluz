@@ -10,6 +10,29 @@ import { rangoMes, esCategoriaEgreso } from '@/lib/finanzas';
 // de llegar aquí — el error se vería como 413 en el navegador.
 const MAX_BYTES = 5 * 1024 * 1024;
 
+// El formulario solo ofrece imágenes (accept="image/*"). Se valida también aquí
+// para no depender únicamente del allowlist del bucket, y para devolver un error
+// entendible en vez del genérico de Storage.
+const MIME_PERMITIDOS = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/gif',
+];
+
+// Extensión derivada del tipo real declarado, no del nombre del archivo: así un
+// "factura.pdf.jpg" no decide por sí solo cómo se guarda el objeto.
+const EXT_POR_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/gif': 'gif',
+};
+
 // GET /api/finanzas/egresos?mes=YYYY-MM|general — listar egresos (solo pastor)
 export async function GET(req: NextRequest) {
   const session = getSession(req);
@@ -101,13 +124,22 @@ export async function POST(req: NextRequest) {
     if (file.size > MAX_BYTES) {
       return NextResponse.json({ error: 'La foto no puede superar 5 MB' }, { status: 400 });
     }
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+
+    const contentType = (file.type || '').toLowerCase();
+    if (!MIME_PERMITIDOS.includes(contentType)) {
+      return NextResponse.json(
+        { error: 'El comprobante debe ser una imagen (JPG, PNG, WEBP, HEIC o GIF).' },
+        { status: 400 },
+      );
+    }
+
+    const ext = EXT_POR_MIME[contentType];
     const path = `${fecha}/${randomUUID()}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await db.storage
       .from('comprobantes')
-      .upload(path, buffer, { contentType: file.type || 'image/jpeg' });
+      .upload(path, buffer, { contentType });
 
     if (uploadError) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });

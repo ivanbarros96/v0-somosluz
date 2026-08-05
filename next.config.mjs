@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Sin `typescript.ignoreBuildErrors`: como los push a main van directo a
+  // producción (no hay Preview Deployments), un error de tipos debe romper el
+  // build aquí y no aparecer como fallo en runtime frente al usuario.
   images: {
     unoptimized: true,
   },

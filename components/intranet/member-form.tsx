@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { buscarPersonas, existePersona, existeMiembroNuevo } from '@/lib/datos';
 
 type Modo = 'adulto' | 'nino' | 'nuevo';
 
@@ -192,14 +192,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
     setApoderadoBuscando(true);
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('personas')
-        .select('id, nombre, telefono')
-        .eq('source_tipo', 'adulto')
-        .ilike('nombre', `%${apoderadoQuery}%`)
-        .order('nombre')
-        .limit(8);
-      setApoderadoResultados(data ?? []);
+      const data = await buscarPersonas(apoderadoQuery, 'adulto').catch(() => []);
+      // El id llega como número desde la API; el resto del formulario lo maneja como texto.
+      setApoderadoResultados(data.map((p) => ({ ...p, id: String(p.id) })));
       setApoderadoDropdownOpen(true);
       setApoderadoBuscando(false);
     }, 300);
@@ -233,11 +228,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     try {
       // ✅ MODO NUEVO → verificar duplicado por nombre en personas Y en miembros_nuevos
       if (modo === 'nuevo') {
-        const { data: existeEnPersonas } = await supabase
-          .from('personas')
-          .select('id, nombre')
-          .ilike('nombre', form.nombre.trim())
-          .maybeSingle();
+        const existeEnPersonas = await existePersona(form.nombre.trim());
 
         if (existeEnPersonas) {
           setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
@@ -245,11 +236,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           return;
         }
 
-        const { data: existeNuevo } = await supabase
-          .from('miembros_nuevos')
-          .select('id, nombre')
-          .ilike('nombre', form.nombre.trim())
-          .maybeSingle();
+        const existeNuevo = await existeMiembroNuevo(form.nombre.trim());
 
         if (existeNuevo) {
           setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
@@ -286,14 +273,10 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
       // ✅ Verificar duplicado por nombre en personas (sin filtrar por source_tipo)
       {
-        const queryNombre = supabase
-          .from('personas')
-          .select('id, nombre')
-          .ilike('nombre', form.nombre.trim());
-
-        if (isEditing && member?.id) queryNombre.neq('id', member.id);
-
-        const { data: existeNombre } = await queryNombre.maybeSingle();
+        const existeNombre = await existePersona(
+          form.nombre.trim(),
+          isEditing && member?.id ? member.id : undefined,
+        );
         if (existeNombre) {
           setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
           setLoading(false);
@@ -312,7 +295,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
           tipo: (edad != null && edad >= 15 ? 'joven' : 'nino') as 'nino',
-          source_id: member?.source_id ?? undefined,
+          source_id: member?.source_id ?? null,
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),
           sexo: form.sexo || null,
@@ -339,7 +322,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
       const data: Omit<AdultoMember, 'id' | 'created_at'> = {
         tipo: 'adulto',
-        source_id: member?.source_id ?? undefined,
+        source_id: member?.source_id ?? null,
         fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
         nombre: form.nombre.trim(),
         sexo: form.sexo || null,

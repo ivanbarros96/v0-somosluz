@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { KpiCards, type KpiData } from '@/components/intranet/pastor/kpi-cards';
 import { AsistenciaChart, type CultoAsistencia } from '@/components/intranet/pastor/asistencia-chart';
 import { AsistenciaMensualChart, type AsistenciaMes } from '@/components/intranet/pastor/asistencia-mensual-chart';
@@ -48,9 +48,7 @@ function PastorDashboard() {
   useEffect(() => {
     async function fetchAll() {
       // Personas
-      const { data: personas } = await supabase
-        .from('personas')
-        .select('id, source_tipo, bautizado, sexo, edad, fecha_registro, created_at');
+      const personas = await getPersonas().catch(() => [] as Awaited<ReturnType<typeof getPersonas>>);
 
       const total = personas?.length ?? 0;
       const adultos = personas?.filter((p) => p.source_tipo === 'adulto').length ?? 0;
@@ -80,7 +78,9 @@ function PastorDashboard() {
         { rango: '31-50', min: 31, max: 50 },
         { rango: '51+', min: 51, max: 200 },
       ];
-      const conEdad = (personas ?? []).filter((p) => typeof p.edad === 'number' && p.edad >= 0);
+      const conEdad = (personas ?? []).filter(
+        (p): p is typeof p & { edad: number } => typeof p.edad === 'number' && p.edad >= 0,
+      );
       const edadRangos: EdadRango[] = RANGOS.map((r) => ({
         rango: r.rango,
         total: conEdad.filter((p) => p.edad >= r.min && p.edad <= r.max).length,
@@ -111,22 +111,12 @@ function PastorDashboard() {
 
       // Cultos GENERALES (dominicales) — las métricas congregacionales se anclan
       // a ellos para no distorsionarse con reuniones de público parcial (ministerios).
-      const { data: cultos } = await supabase
-        .from('cultos')
-        .select('id, fecha, descripcion')
-        .eq('tipo', 'general')
-        .order('fecha', { ascending: true });
-
-      const { data: rawAsist } = await supabase
-        .from('asistencias')
-        .select('culto_id, persona_id, miembro_nuevo_id');
-
-      // Reuniones de ministerio (todo lo que no es culto general)
-      const { data: cultosMinisterio } = await supabase
-        .from('cultos')
-        .select('id, tipo, fecha')
-        .neq('tipo', 'general')
-        .order('fecha', { ascending: true });
+      const [cultos, rawAsist, cultosMinisterio] = await Promise.all([
+        getCultos({ tipo: 'general', orden: 'asc' }).catch(() => []),
+        getAsistencias().catch(() => []),
+        // Reuniones de ministerio (todo lo que no es culto general)
+        getCultos({ tipoDistinto: 'general', orden: 'asc' }).catch(() => []),
+      ]);
 
       // Conteo por culto
       const conteoPorCulto: Record<number, number> = {};
@@ -400,13 +390,15 @@ function SomosluzDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('personas').select('id, created_at').then(({ data }) => {
-      const total = data?.length ?? 0;
-      const hace3m = subMonths(new Date(), 3).toISOString();
-      const recientes = data?.filter((p) => p.created_at && p.created_at >= hace3m).length ?? 0;
-      setStats({ total, recientes });
-      setLoading(false);
-    });
+    getPersonas()
+      .then((data) => {
+        const total = data.length;
+        const hace3m = subMonths(new Date(), 3).toISOString();
+        const recientes = data.filter((p) => p.created_at && p.created_at >= hace3m).length;
+        setStats({ total, recientes });
+      })
+      .catch(() => setStats({ total: 0, recientes: 0 }))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {

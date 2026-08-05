@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getCultos, getMiembrosNuevos, getPersonas, getAsistenciasDeCulto } from '@/lib/datos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,12 +117,13 @@ export function AsistenciaPanel() {
   useEffect(() => {
     const load = async () => {
       setLoadingCultos(true);
-      const { data } = await supabase
-        .from('cultos')
-        .select('id, fecha, descripcion, activo, tipo')
-        .order('fecha', { ascending: false });
-      setCultos(data ?? []);
-      if (data && data.length > 0) setCultoId(data[0].id);
+      try {
+        const data = await getCultos({ orden: 'desc' });
+        setCultos(data as Culto[]);
+        if (data.length > 0) setCultoId(data[0].id);
+      } catch {
+        toast.error('No se pudieron cargar los cultos.');
+      }
       setLoadingCultos(false);
     };
     load();
@@ -131,45 +132,42 @@ export function AsistenciaPanel() {
   useEffect(() => {
     const load = async () => {
       setLoadingPersonas(true);
-      const [{ data: pdata }, { data: ndata }] = await Promise.all([
-        supabase.from('personas').select('id, nombre, source_tipo, telefono, sexo, edad').order('nombre'),
-        supabase.from('miembros_nuevos').select('id, nombre, telefono').order('nombre'),
-      ]);
+      try {
+        const [pdata, ndata] = await Promise.all([getPersonas(), getMiembrosNuevos()]);
 
-      const lista: Persona[] = [
-        ...(pdata ?? []).map((p: any) => ({
-          id: p.id,
-          nombre: p.nombre,
-          tipo: p.source_tipo as 'adulto' | 'nino' | 'joven',
-          telefono: p.telefono,
-          sexo: p.sexo ?? null,
-          edad: typeof p.edad === 'number' ? p.edad : null,
-        })),
-        ...(ndata ?? []).map((p: any) => ({
-          id: p.id,
-          nombre: p.nombre,
-          tipo: 'nuevo' as const,
-          telefono: p.telefono,
-          sexo: null,
-          edad: null,
-        })),
-      ].sort((a, b) => a.nombre.localeCompare(b.nombre));
+        const lista: Persona[] = [
+          ...pdata.map((p) => ({
+            id: Number(p.id),
+            nombre: p.nombre,
+            tipo: p.source_tipo as 'adulto' | 'nino' | 'joven',
+            telefono: p.telefono,
+            sexo: p.sexo ?? null,
+            edad: typeof p.edad === 'number' ? p.edad : null,
+          })),
+          ...ndata.map((p) => ({
+            id: Number(p.id),
+            nombre: p.nombre,
+            tipo: 'nuevo' as const,
+            telefono: p.telefono,
+            sexo: null,
+            edad: null,
+          })),
+        ].sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-      setPersonas(lista);
+        setPersonas(lista);
+      } catch {
+        toast.error('No se pudieron cargar las personas.');
+      }
       setLoadingPersonas(false);
     };
     load();
   }, []);
 
-  // ✅ CÓDIGO CORRECTO
   const cargarAsistencias = useCallback(async (id: number) => {
-    const { data } = await supabase
-      .from('asistencias')
-      .select('persona_id, miembro_nuevo_id')
-      .eq('culto_id', id);
+    const data = await getAsistenciasDeCulto(id).catch(() => []);
 
     const keys = new Set<string>();
-    for (const a of data ?? []) {
+    for (const a of data) {
       if (a.persona_id) {
         // Buscar el tipo real de la persona en el estado `personas`
         const persona = personas.find(p => p.id === a.persona_id && p.tipo !== 'nuevo');
