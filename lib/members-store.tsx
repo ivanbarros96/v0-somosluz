@@ -20,7 +20,6 @@ const MembersContext = createContext<MembersContextType | undefined>(undefined);
 function mapToMember(row: any): Member {
   const base = {
     id: String(row.id),
-    source_id: row.source_id ?? null,
     fecha_registro: row.fecha_registro ?? null,
     nombre: row.nombre ?? '',
     sexo: row.sexo ?? null,
@@ -49,6 +48,7 @@ function mapToMember(row: any): Member {
       ...base,
       tipo: 'joven',
       bautizado: row.bautizado ?? null,
+      tiempo_conversion: row.tiempo_conversion ?? null,
       fecha_nacimiento: row.fecha_nacimiento ?? null,
       edad: row.edad ?? null,
       nombre_apoderado: row.nombre_apoderado ?? null,
@@ -96,7 +96,6 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   ) => {
     const row: any = {
       source_tipo: data.tipo,
-      source_id: data.source_id,
       fecha_registro: data.fecha_registro,
       nombre: data.nombre,
       sexo: data.sexo,
@@ -117,6 +116,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     } else if (data.tipo === 'joven') {
       const j = data as Omit<JovenMember, 'id' | 'created_at'>;
       row.bautizado = j.bautizado;
+      row.tiempo_conversion = j.tiempo_conversion;
       row.fecha_nacimiento = j.fecha_nacimiento ?? null;
       row.edad = j.edad ?? null;
       row.nombre_apoderado = j.nombre_apoderado ?? null;

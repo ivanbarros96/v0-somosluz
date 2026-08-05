@@ -2,17 +2,24 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useMembers } from '@/lib/members-store';
-import type { Member, AdultoMember, NinoMember } from '@/lib/types';
+import { useAuth } from '@/lib/auth-context';
+import type { Member, AdultoMember, NinoMember, JovenMember } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { buscarPersonas, existePersona, existeMiembroNuevo } from '@/lib/datos';
 
-type Modo = 'adulto' | 'nino' | 'nuevo';
+// La categoría real la elige quien registra (la pestaña), no un cálculo por
+// edad — evita el caso de un joven de 18 que participa en Discipulado y no en
+// Youth, o un niño de 14 a punto de cumplir 15.
+type Modo = 'adulto' | 'joven' | 'nino' | 'nuevo';
+
+// Umbral solo para el AVISO visual del tab Niño (no bloquea, no clasifica).
+const EDAD_AVISO_NINO = 15;
 
 interface MemberFormProps {
   member?: Member | null;
@@ -95,13 +102,24 @@ function parseTiempoConversion(val: string | null) {
 
 export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
   const { addMember, updateMember } = useMembers();
+  const { user } = useAuth();
   const isEditing = !!member;
+
+  // Rol Youth: solo registra su propia audiencia, sin acceso a Niño/Adulto/Nuevo.
+  const soloYouth = user?.role === 'youth';
 
   const [modo, setModo] = useState<Modo>(() => {
     if (!member) return 'adulto';
-    // Los jóvenes se editan en la pestaña Niño/Joven (mismos campos + apoderado)
-    return member.tipo === 'nino' || member.tipo === 'joven' ? 'nino' : 'adulto';
+    if (member.tipo === 'nino') return 'nino';
+    if (member.tipo === 'joven') return 'joven';
+    return 'adulto';
   });
+
+  // Si el usuario logueado es del perfil Youth, se fuerza el modo al crear
+  // (en edición, el modo ya viene fijado por el tipo del miembro que se edita).
+  useEffect(() => {
+    if (soloYouth && !isEditing) setModo('joven');
+  }, [soloYouth, isEditing]);
 
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -134,8 +152,10 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       dia: '', mes: '', anio: '',
     };
 
-    if (member.tipo === 'adulto') {
-      const a = member as AdultoMember;
+    // Adulto y Youth comparten exactamente los mismos campos (Youth asiste por
+    // sí mismo, sin apoderado en este formulario).
+    if (member.tipo === 'adulto' || member.tipo === 'joven') {
+      const a = member as AdultoMember | JovenMember;
       const wa = parseTelefono(a.whatsapp);
       base.codWa = wa.code;
       base.whatsapp = wa.num;
@@ -151,7 +171,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       }
     }
 
-    if (member.tipo === 'nino' || member.tipo === 'joven') {
+    if (member.tipo === 'nino') {
       const n = member as NinoMember;
       if (n.fecha_nacimiento) {
         const parts = n.fecha_nacimiento.split('/');
@@ -165,6 +185,10 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         setApoderadoSeleccionado({ id: '', nombre: n.nombre_apoderado, telefono: n.telefono_apoderado ?? null });
       }
     }
+
+    // Nota: Youth ya no gestiona apoderado desde este formulario. Si el
+    // registro tenía uno de una migración/edición anterior, se preserva
+    // intacto al guardar (ver handleSubmit) aunque no se muestre aquí.
 
     setForm(base);
   }, [member]);
@@ -226,24 +250,27 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
     setLoading(true);
     try {
-      // ✅ MODO NUEVO → verificar duplicado por nombre en personas Y en miembros_nuevos
+      // Duplicado: SIEMPRE se revisan ambas tablas (personas y miembros_nuevos),
+      // sea cual sea el modo. Antes solo "Nuevo" cruzaba las dos tablas — un
+      // visitante ya anotado en miembros_nuevos podía volver a registrarse como
+      // Adulto/Niño/Youth sin que nada lo detectara, porque ese camino solo
+      // miraba personas. Eso dejó duplicados reales en producción.
+      const excluirId = isEditing && member?.id ? member.id : undefined;
+      const [existeEnPersonas, existeEnNuevos] = await Promise.all([
+        existePersona(form.nombre.trim(), excluirId),
+        // Al editar, el propio registro puede venir de una migración de un
+        // "Nuevo" ya convertido — no hay id de miembros_nuevos que excluir
+        // porque esa fila ya no existe, así que solo se filtra en modo alta.
+        isEditing ? Promise.resolve(false) : existeMiembroNuevo(form.nombre.trim()),
+      ]);
+
+      if (existeEnPersonas || existeEnNuevos) {
+        setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
+        setLoading(false);
+        return;
+      }
+
       if (modo === 'nuevo') {
-        const existeEnPersonas = await existePersona(form.nombre.trim());
-
-        if (existeEnPersonas) {
-          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
-          setLoading(false);
-          return;
-        }
-
-        const existeNuevo = await existeMiembroNuevo(form.nombre.trim());
-
-        if (existeNuevo) {
-          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
-          setLoading(false);
-          return;
-        }
-
         const telFull = form.telefono ? `${form.codTel} ${form.telefono}` : null;
         const res = await fetch('/api/miembros-nuevos', {
           method: 'POST',
@@ -271,31 +298,16 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       const convFull = (form.convNum && form.convUnidad)
         ? `${form.convNum} ${form.convUnidad}` : null;
 
-      // ✅ Verificar duplicado por nombre en personas (sin filtrar por source_tipo)
-      {
-        const existeNombre = await existePersona(
-          form.nombre.trim(),
-          isEditing && member?.id ? member.id : undefined,
-        );
-        if (existeNombre) {
-          setError('Ya existe un registro con este nombre. Verifica si la persona ya fue ingresada.');
-          setLoading(false);
-          return;
-        }
-      }
+      const fecha = (form.dia && form.mes && form.anio)
+        ? `${form.dia}/${form.mes}/${form.anio}` : null;
+      const edad = (form.dia && form.mes && form.anio)
+        ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
 
-
-      // Niño/Joven: usar apoderado seleccionado del autocomplete.
-      // La categoría se deriva de la edad: 3-14 niño, 15+ joven (rangos de la iglesia).
+      // Niño: tipo fijo 'nino', con apoderado obligatorio del autocomplete.
+      // La categoría la decide el tab elegido, ya no un cálculo de edad.
       if (modo === 'nino') {
-        const fecha = (form.dia && form.mes && form.anio)
-          ? `${form.dia}/${form.mes}/${form.anio}` : null;
-        const edad = (form.dia && form.mes && form.anio)
-          ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
-
         const data: Omit<NinoMember, 'id' | 'created_at'> = {
-          tipo: (edad != null && edad >= 15 ? 'joven' : 'nino') as 'nino',
-          source_id: member?.source_id ?? null,
+          tipo: 'nino',
           fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
           nombre: form.nombre.trim(),
           sexo: form.sexo || null,
@@ -315,14 +327,41 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         return;
       }
 
-      const fecha = (form.dia && form.mes && form.anio)
-        ? `${form.dia}/${form.mes}/${form.anio}` : null;
-      const edad = (form.dia && form.mes && form.anio)
-        ? calcEdad(+form.dia, +form.mes, +form.anio) : null;
+      // Youth: tipo fijo 'joven', mismos campos que Adulto (asiste por sí
+      // mismo). Solo se conserva el apoderado si el registro editado ya
+      // tenía uno de una migración/edición anterior — este formulario no lo
+      // gestiona para Youth.
+      if (modo === 'joven') {
+        const previo = isEditing && member?.tipo === 'joven' ? (member as JovenMember) : null;
 
+        const data: Omit<JovenMember, 'id' | 'created_at'> = {
+          tipo: 'joven',
+          fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
+          nombre: form.nombre.trim(),
+          sexo: form.sexo || null,
+          telefono: telFull,
+          whatsapp: waFull,
+          email: form.email.trim().toLowerCase() || null,
+          region: form.region || null,
+          comuna: form.comuna || null,
+          direccion: form.direccion.trim() || null,
+          bautizado: form.bautizado ? 'si' : 'no',
+          tiempo_conversion: convFull,
+          fecha_nacimiento: fecha,
+          edad,
+          nombre_apoderado: previo?.nombre_apoderado ?? null,
+          telefono_apoderado: previo?.telefono_apoderado ?? null,
+        };
+        isEditing ? await updateMember(member!.id, data) : await addMember(data);
+        setOk(true);
+        if (!isEditing) setForm(emptyForm());
+        onSuccess?.();
+        return;
+      }
+
+      // Adulto: tipo fijo 'adulto'.
       const data: Omit<AdultoMember, 'id' | 'created_at'> = {
         tipo: 'adulto',
-        source_id: member?.source_id ?? null,
         fecha_registro: member?.fecha_registro ?? new Date().toISOString(),
         nombre: form.nombre.trim(),
         sexo: form.sexo || null,
@@ -351,10 +390,16 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
 
   const comunas = form.region ? (REGIONES[form.region] ?? []) : [];
 
+  // Edad calculada solo para mostrar el aviso suave en el tab Niño — NO decide el tipo.
+  const edadPreview = (form.dia && form.mes && form.anio)
+    ? calcEdad(+form.dia, +form.mes, +form.anio)
+    : null;
+  const mostrarAvisoEdadNino = modo === 'nino' && edadPreview !== null && edadPreview >= EDAD_AVISO_NINO;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
-      {!isEditing && (
+      {!isEditing && !soloYouth && (
         <Tabs value={modo} onValueChange={(v) => {
           setModo(v as Modo);
           setError(''); setOk(false);
@@ -365,7 +410,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         }}>
           <TabsList className="w-full">
             <TabsTrigger value="adulto" className="flex-1">👤 Adulto</TabsTrigger>
-            <TabsTrigger value="nino" className="flex-1">🧒 Niño / Joven</TabsTrigger>
+            <TabsTrigger value="joven" className="flex-1">🧑 Youth</TabsTrigger>
+            <TabsTrigger value="nino" className="flex-1">🧒 Niño</TabsTrigger>
             <TabsTrigger value="nuevo" className="flex-1">✨ Nuevo</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -374,7 +420,13 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
-            {modo === 'nino' ? 'Datos del Niño / Joven' : modo === 'nuevo' ? 'Datos del Visitante' : 'Datos Personales'}
+            {modo === 'nino'
+              ? 'Datos del Niño'
+              : modo === 'joven'
+                ? 'Datos de Youth'
+                : modo === 'nuevo'
+                  ? 'Datos del Visitante'
+                  : 'Datos Personales'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -393,24 +445,33 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
               <Label>Fecha de Nacimiento</Label>
               <div className="grid grid-cols-3 gap-2">
                 <Select value={form.dia} onValueChange={(v) => set('dia', v)}>
-                  <SelectTrigger><SelectValue placeholder="Día" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Día">{form.dia || undefined}</SelectValue></SelectTrigger>
                   <SelectContent>
                     {DIAS.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.mes} onValueChange={(v) => set('mes', v)}>
-                  <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Mes">{form.mes ? MESES[+form.mes - 1] : undefined}</SelectValue></SelectTrigger>
                   <SelectContent>
                     {MESES.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.anio} onValueChange={(v) => set('anio', v)}>
-                  <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Año">{form.anio || undefined}</SelectValue></SelectTrigger>
                   <SelectContent>
                     {ANIOS.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              {mostrarAvisoEdadNino && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Esta persona tendría {edadPreview} años según la fecha ingresada.
+                    ¿Seguro que corresponde al grupo Niño y no a Youth?
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -434,7 +495,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
             </div>
           )}
 
-          {modo === 'adulto' && (
+          {(modo === 'adulto' || modo === 'joven') && (
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Fe y Comunidad</p>
               <div className="grid grid-cols-2 gap-4">
@@ -442,7 +503,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                   <Label>Tiempo de Conversión</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
-                      <SelectTrigger><SelectValue placeholder="N°" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="N°">{form.convNum || undefined}</SelectValue></SelectTrigger>
                       <SelectContent>
                         {NUMS_CONVERSION.map((n) => (
                           <SelectItem key={n} value={String(n)}>{n}</SelectItem>
@@ -450,7 +511,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                       </SelectContent>
                     </Select>
                     <Select value={form.convUnidad} onValueChange={(v) => set('convUnidad', v)}>
-                      <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Unidad">{form.convUnidad || undefined}</SelectValue></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Meses">Meses</SelectItem>
                         <SelectItem value="Años">Años</SelectItem>
@@ -544,8 +605,8 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         </CardContent>
       </Card>
 
-      {/* ✅ Contacto solo para adulto y nuevo, NO para niño */}
-      {(modo === 'adulto' || modo === 'nuevo') && (
+      {/* Contacto: Adulto, Youth y Nuevo. Niño NO — su contacto es el apoderado. */}
+      {(modo === 'adulto' || modo === 'joven' || modo === 'nuevo') && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
@@ -556,7 +617,11 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
               <Label>Teléfono</Label>
               <div className="flex gap-2">
                 <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
-                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-28">
+                    <SelectValue>
+                      {(() => { const p = PAISES.find((p) => p.code === form.codTel); return p ? `${p.flag} ${p.code}` : undefined; })()}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
                   </SelectContent>
@@ -581,13 +646,17 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
               />
             </div>
 
-            {modo === 'adulto' && (
+            {(modo === 'adulto' || modo === 'joven') && (
               <>
                 <div className="space-y-1">
                   <Label>WhatsApp</Label>
                   <div className="flex gap-2">
                     <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
-                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-28">
+                        <SelectValue>
+                          {(() => { const p = PAISES.find((p) => p.code === form.codWa); return p ? `${p.flag} ${p.code}` : undefined; })()}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>
                         {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
                       </SelectContent>
@@ -608,7 +677,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                     <div className="space-y-1">
                       <Label>Región</Label>
                       <Select value={form.region} onValueChange={handleRegionChange}>
-                        <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Seleccione región...">{form.region || undefined}</SelectValue></SelectTrigger>
                         <SelectContent>
                           {Object.keys(REGIONES).map((r) => (
                             <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -624,7 +693,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
                         disabled={!form.region}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
+                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'}>
+                            {form.comuna || undefined}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {comunas.map((c) => (
@@ -672,10 +743,12 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           {isEditing
             ? 'Guardar Cambios ✓'
             : modo === 'nino'
-              ? 'Registrar Niño/Joven ✓'
-              : modo === 'nuevo'
-                ? 'Registrar Visitante ✓'
-                : 'Registrar Miembro ✓'}
+              ? 'Registrar Niño ✓'
+              : modo === 'joven'
+                ? 'Registrar Youth ✓'
+                : modo === 'nuevo'
+                  ? 'Registrar Visitante ✓'
+                  : 'Registrar Miembro ✓'}
         </Button>
       </div>
 

@@ -24,7 +24,6 @@ export type BautizadoStatus = 'si' | 'no' | 'en_proceso' | null;
 
 export interface PersonaBase {
   id: string;
-  source_id: string | null;
   fecha_registro: string | null;
   nombre: string;
   sexo: string | null;
@@ -53,11 +52,13 @@ export interface NinoMember extends PersonaBase {
   telefono_apoderado: string | null;
 }
 
-// Jóvenes (15-20): mismos campos que niño (pueden tener apoderado si son menores)
-// más el estado de bautismo de adulto.
+// Jóvenes (15-20): mismos campos que adulto — asisten por sí mismos, sin
+// apoderado en el formulario. nombre_apoderado/telefono_apoderado se
+// mantienen solo por compatibilidad con registros antiguos.
 export interface JovenMember extends PersonaBase {
   tipo: 'joven';
   bautizado: BautizadoStatus;
+  tiempo_conversion: string | null;
   fecha_nacimiento: string | null;
   edad: number | null;
   nombre_apoderado: string | null;

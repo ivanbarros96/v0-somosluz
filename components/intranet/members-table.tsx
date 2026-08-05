@@ -162,6 +162,10 @@ export function MembersTable() {
       .some((v) => (v ?? '').toLowerCase().includes(q));
   };
 
+  const todos = useMemo(
+    () => members.filter(coincide).filter(enAudiencia),
+    [members, query, ministerio, verTodosMiembros],
+  );
   const adultos = useMemo(
     () => members.filter(isAdultoMember).filter(coincide).filter(enAudiencia),
     [members, query, ministerio, verTodosMiembros],
@@ -253,9 +257,12 @@ export function MembersTable() {
           </div>
         </CardHeader>
         <CardContent className="px-0 pt-0">
-          <Tabs defaultValue="adultos">
+          <Tabs defaultValue="todos">
             <div className="px-6 pb-4">
-              <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsList className="grid w-full max-w-xl grid-cols-4">
+                <TabsTrigger value="todos" className="gap-2">
+                  Todos <Badge variant="secondary">{todos.length}</Badge>
+                </TabsTrigger>
                 <TabsTrigger value="adultos" className="gap-2">
                   Adultos <Badge variant="secondary">{adultos.length}</Badge>
                 </TabsTrigger>
@@ -268,11 +275,46 @@ export function MembersTable() {
               </TabsList>
             </div>
 
+            <TabsContent value="todos" className="mt-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Edad</TableHead>
+                    <TableHead>Sexo</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todos.length === 0
+                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin miembros registrados.</TableCell></TableRow>
+                    : todos.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MemberAvatar member={m} />
+                            <span className="font-medium">{m.nombre}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell><TypeBadge tipo={m.tipo} /></TableCell>
+                        <TableCell>{fmt('edad' in m ? m.edad : null)}</TableCell>
+                        <TableCell>{fmt(m.sexo)}</TableCell>
+                        <TableCell>{fmt(m.telefono)}</TableCell>
+                        <TableCell><Actions m={m} /></TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TabsContent>
+
             <TabsContent value="adultos" className="mt-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
+                    <TableHead>Edad</TableHead>
                     <TableHead>Sexo</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Email</TableHead>
@@ -283,7 +325,7 @@ export function MembersTable() {
                 </TableHeader>
                 <TableBody>
                   {adultos.length === 0
-                    ? <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">Sin adultos registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Sin adultos registrados.</TableCell></TableRow>
                     : adultos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -292,6 +334,7 @@ export function MembersTable() {
                             <span className="font-medium">{m.nombre}</span>
                           </div>
                         </TableCell>
+                        <TableCell>{fmt(m.edad)}</TableCell>
                         <TableCell>{fmt(m.sexo)}</TableCell>
                         <TableCell>{fmt(m.telefono)}</TableCell>
                         <TableCell>{fmt(m.email)}</TableCell>
