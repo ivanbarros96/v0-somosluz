@@ -12,9 +12,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const MAX_BYTES_COMPROBANTE = 5 * 1024 * 1024;
 export const MAX_COMPROBANTES_POR_EGRESO = 5;
 
-// El formulario solo ofrece imágenes (accept="image/*"). Se valida también
-// aquí para no depender únicamente del allowlist del bucket, y para devolver
-// un error entendible en vez del genérico de Storage.
+// El formulario ofrece imágenes y PDF (accept="image/*,application/pdf"). Se
+// valida también aquí para no depender únicamente del allowlist del bucket, y
+// para devolver un error entendible en vez del genérico de Storage.
+// ⚠️ Esta lista debe coincidir con `allowed_mime_types` del bucket
+// 'comprobantes' en Supabase; si agregas un tipo acá, agrégalo también allá.
 const MIME_PERMITIDOS = [
   'image/jpeg',
   'image/png',
@@ -22,6 +24,7 @@ const MIME_PERMITIDOS = [
   'image/heic',
   'image/heif',
   'image/gif',
+  'application/pdf',
 ];
 
 // Extensión derivada del tipo real declarado, no del nombre del archivo: así
@@ -33,6 +36,7 @@ const EXT_POR_MIME: Record<string, string> = {
   'image/heic': 'heic',
   'image/heif': 'heif',
   'image/gif': 'gif',
+  'application/pdf': 'pdf',
 };
 
 // Sube un archivo de comprobante y devuelve su storage_path, o null si el
@@ -45,11 +49,11 @@ export async function subirComprobante(
 ): Promise<string | null> {
   if (!(file instanceof File) || file.size === 0) return null;
 
-  if (file.size > MAX_BYTES_COMPROBANTE) throw new Error('Cada foto no puede superar 5 MB');
+  if (file.size > MAX_BYTES_COMPROBANTE) throw new Error('Cada archivo no puede superar 5 MB');
 
   const contentType = (file.type || '').toLowerCase();
   if (!MIME_PERMITIDOS.includes(contentType)) {
-    throw new Error('El comprobante debe ser una imagen (JPG, PNG, WEBP, HEIC o GIF).');
+    throw new Error('El comprobante debe ser una imagen (JPG, PNG, WEBP, HEIC o GIF) o un PDF.');
   }
 
   const ext = EXT_POR_MIME[contentType];

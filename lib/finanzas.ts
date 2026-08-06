@@ -69,6 +69,7 @@ export interface Ingreso {
 export interface Comprobante {
   id: number;
   url: string | null; // URL firmada, agregada solo en el GET
+  esPdf: boolean; // los PDF no se previsualizan como imagen; se muestran con ícono
 }
 
 export interface Egreso {

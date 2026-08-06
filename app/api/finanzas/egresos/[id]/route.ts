@@ -101,7 +101,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const sobrevivientes = actuales - eliminarIds.length;
     if (sobrevivientes + nuevosArchivos.length > MAX_COMPROBANTES_POR_EGRESO) {
       return NextResponse.json(
-        { error: `Máximo ${MAX_COMPROBANTES_POR_EGRESO} fotos por egreso` },
+        { error: `Máximo ${MAX_COMPROBANTES_POR_EGRESO} archivos por egreso` },
         { status: 400 },
       );
     }

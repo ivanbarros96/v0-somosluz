@@ -24,7 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   Wallet, TrendingUp, TrendingDown, Receipt, Loader2, Trash2, Pencil, Plus, ExternalLink,
-  ArrowLeftRight, Download, X,
+  ArrowLeftRight, Download, X, FileText,
 } from 'lucide-react';
 import {
   type Ingreso, type Egreso, type Movimiento, type TipoIngreso, type CategoriaEgreso,
@@ -44,6 +44,57 @@ const BADGE_TIPO: Record<TipoIngreso, string> = {
 };
 
 const SIN_CATEGORIA = '__sin_categoria__';
+
+// Tipos aceptados como comprobante. Debe seguir a MIME_PERMITIDOS de
+// lib/finanzas-comprobantes.ts (que valida en el servidor) y al allowlist del
+// bucket 'comprobantes' en Supabase.
+const ACCEPT_COMPROBANTES = 'image/*,application/pdf';
+
+const esArchivoPdf = (f: File | undefined) => f?.type === 'application/pdf';
+
+// Miniatura de un comprobante. Un PDF no se puede renderizar con next/image,
+// así que se muestra como tarjeta con ícono; el resto sí es imagen.
+function MiniaturaComprobante({
+  src,
+  esPdf,
+  alt,
+  size,
+  className = 'border-border',
+}: {
+  src: string;
+  esPdf: boolean;
+  alt: string;
+  size: number;
+  className?: string;
+}) {
+  const dimensiones = { height: size, width: size };
+
+  if (esPdf) {
+    return (
+      <div
+        className={`rounded-md border bg-muted text-muted-foreground flex flex-col items-center justify-center gap-0.5 shrink-0 ${className}`}
+        style={dimensiones}
+        title={alt}
+      >
+        <FileText style={{ height: size * 0.3, width: size * 0.3 }} aria-hidden />
+        <span className="text-[9px] font-semibold leading-none tracking-wide">PDF</span>
+        <span className="sr-only">{alt}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      unoptimized
+      className={`rounded-md border object-cover shrink-0 ${className}`}
+      style={dimensiones}
+    />
+  );
+}
 
 // Campo de persona: busca entre miembros ya registrados (autocompletar) o
 // permite dejar cualquier nombre libre (visitantes, proveedores). Si el
@@ -411,7 +462,7 @@ export default function FinanzasPage() {
           toast.success('Egreso registrado.');
         } else {
           // Aviso suave, no bloqueante: buena práctica contable, sin frenar al usuario.
-          toast.warning('Egreso registrado sin foto de comprobante. Puedes agregarla más tarde si la consigues.');
+          toast.warning('Egreso registrado sin comprobante. Puedes agregarlo más tarde si la consigues.');
         }
         setFormEgreso({ fecha: hoy(), detalle: '', monto: '', categoria: SIN_CATEGORIA, categoriaPersonalizada: '', personaNombre: '', personaId: null });
         setComprobantes([]);
@@ -828,7 +879,7 @@ export default function FinanzasPage() {
                   </div>
                   <div className="space-y-1">
                     <Label>
-                      Fotos del comprobante{' '}
+                      Comprobante — fotos o PDF{' '}
                       <span className="text-muted-foreground font-normal">(recomendado, hasta 5)</span>
                     </Label>
                     {/* Sin capture="environment": ese atributo abre la cámara directo en
@@ -836,7 +887,7 @@ export default function FinanzasPage() {
                         "Cámara" como una opción más. */}
                     <Input
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPT_COMPROBANTES}
                       multiple
                       onChange={(e) => setComprobantes(Array.from(e.target.files ?? []).slice(0, 5))}
                     />
@@ -844,19 +895,17 @@ export default function FinanzasPage() {
                       <div className="flex flex-wrap gap-2 mt-2">
                         {comprobantesPreview.map((url, i) => (
                           <div key={url} className="relative inline-block">
-                            <Image
+                            <MiniaturaComprobante
                               src={url}
-                              alt={`Vista previa del comprobante ${i + 1}`}
-                              width={96}
-                              height={96}
-                              unoptimized
-                              className="rounded-md border border-border object-cover h-24 w-24"
+                              esPdf={esArchivoPdf(comprobantes[i])}
+                              alt={comprobantes[i]?.name ?? `Comprobante ${i + 1}`}
+                              size={96}
                             />
                             <button
                               type="button"
                               onClick={() => setComprobantes((prev) => prev.filter((_, j) => j !== i))}
                               className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
-                              aria-label="Quitar foto"
+                              aria-label="Quitar archivo"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -947,7 +996,7 @@ export default function FinanzasPage() {
                                       rel="noopener noreferrer"
                                       className="text-muted-foreground hover:text-foreground shrink-0"
                                       aria-label="Ver comprobante"
-                                      title={m.comprobantesUrls.length > 1 ? `${m.comprobantesUrls.length} fotos` : undefined}
+                                      title={m.comprobantesUrls.length > 1 ? `${m.comprobantesUrls.length} archivos` : undefined}
                                     >
                                       <ExternalLink className="h-3.5 w-3.5" />
                                       {m.comprobantesUrls.length > 1 && (
@@ -1056,12 +1105,11 @@ export default function FinanzasPage() {
                                 rel="noopener noreferrer"
                                 className="relative shrink-0"
                               >
-                                <Image
+                                <MiniaturaComprobante
                                   src={e.comprobantes[0].url ?? ''}
+                                  esPdf={e.comprobantes[0].esPdf}
                                   alt={`Comprobante: ${e.detalle}`}
-                                  width={44}
-                                  height={44}
-                                  className="rounded-md border border-border object-cover h-11 w-11"
+                                  size={44}
                                 />
                                 {e.comprobantes.length > 1 && (
                                   <span className="absolute -top-1.5 -right-1.5 bg-foreground text-background text-[10px] leading-none rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
@@ -1254,21 +1302,19 @@ export default function FinanzasPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Fotos del comprobante</Label>
+              <Label>Comprobante (fotos o PDF)</Label>
               {editandoEgreso && editandoEgreso.comprobantes.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {editandoEgreso.comprobantes.map((c) => {
                     const marcada = comprobantesABorrar.has(c.id);
                     return (
                       <div key={c.id} className="relative inline-block">
-                        <Image
+                        <MiniaturaComprobante
                           src={c.url ?? ''}
+                          esPdf={c.esPdf}
                           alt="Comprobante"
-                          width={72}
-                          height={72}
-                          unoptimized
-                          className={`rounded-md border object-cover h-18 w-18 ${marcada ? 'opacity-30 border-destructive' : 'border-border'}`}
-                          style={{ height: 72, width: 72 }}
+                          size={72}
+                          className={marcada ? 'opacity-30 border-destructive' : 'border-border'}
                         />
                         <button
                           type="button"
@@ -1280,7 +1326,7 @@ export default function FinanzasPage() {
                             })
                           }
                           className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
-                          aria-label={marcada ? 'Deshacer eliminación' : 'Quitar esta foto'}
+                          aria-label={marcada ? 'Deshacer eliminación' : 'Quitar este archivo'}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -1290,13 +1336,14 @@ export default function FinanzasPage() {
                 </div>
               )}
               <Label className="text-muted-foreground font-normal text-xs">
-                Agregar {editandoEgreso && editandoEgreso.comprobantes.length > 0 ? 'más fotos' : 'una foto'}{' '}
-                (o reemplaza: marca la actual para quitarla y sube la nueva aquí)
+                Agregar{' '}
+                {editandoEgreso && editandoEgreso.comprobantes.length > 0 ? 'más archivos' : 'un archivo'}{' '}
+                (o reemplaza: marca el actual para quitarlo y sube el nuevo aquí)
               </Label>
               {/* Sin capture: ver comentario en el formulario de egreso nuevo. */}
               <Input
                 type="file"
-                accept="image/*"
+                accept={ACCEPT_COMPROBANTES}
                 multiple
                 onChange={(e) => setComprobantesNuevos(Array.from(e.target.files ?? []).slice(0, 5))}
               />
@@ -1304,20 +1351,18 @@ export default function FinanzasPage() {
                 <div className="flex flex-wrap gap-2">
                   {comprobantesNuevosPreview.map((url, i) => (
                     <div key={url} className="relative inline-block">
-                      <Image
+                      <MiniaturaComprobante
                         src={url}
-                        alt={`Foto nueva ${i + 1}`}
-                        width={72}
-                        height={72}
-                        unoptimized
-                        className="rounded-md border border-primary object-cover"
-                        style={{ height: 72, width: 72 }}
+                        esPdf={esArchivoPdf(comprobantesNuevos[i])}
+                        alt={comprobantesNuevos[i]?.name ?? `Archivo nuevo ${i + 1}`}
+                        size={72}
+                        className="border-primary"
                       />
                       <button
                         type="button"
                         onClick={() => setComprobantesNuevos((prev) => prev.filter((_, j) => j !== i))}
                         className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5 shadow-sm"
-                        aria-label="Quitar foto"
+                        aria-label="Quitar archivo"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>

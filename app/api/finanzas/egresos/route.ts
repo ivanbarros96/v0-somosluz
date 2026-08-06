@@ -58,7 +58,13 @@ export async function GET(req: NextRequest) {
           const { data: signed } = await db.storage
             .from('comprobantes')
             .createSignedUrl(c.storage_path, 3600);
-          return { id: c.id, url: signed?.signedUrl ?? null };
+          // El path se guarda con la extensión del MIME real (ver
+          // subirComprobante), así que basta para saber si es PDF.
+          return {
+            id: c.id,
+            url: signed?.signedUrl ?? null,
+            esPdf: c.storage_path.toLowerCase().endsWith('.pdf'),
+          };
         }),
       );
       return { ...e, comprobantes };
@@ -99,7 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (files.length > MAX_COMPROBANTES_POR_EGRESO) {
-    return NextResponse.json({ error: `Máximo ${MAX_COMPROBANTES_POR_EGRESO} fotos por egreso` }, { status: 400 });
+    return NextResponse.json({ error: `Máximo ${MAX_COMPROBANTES_POR_EGRESO} archivos por egreso` }, { status: 400 });
   }
 
   // La categoría es opcional: solo se valida si viene informada.
