@@ -50,8 +50,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ personas: data ?? [] });
   }
 
+  // Se lee de la VISTA, no de la tabla: personas.edad es un entero fijado al
+  // registrar y estaba desactualizado en 24 de 71 filas (hasta 2 años). La
+  // vista calcula `edad` al vuelo desde fecha_nac. Los INSERT/UPDATE siguen
+  // yendo a la tabla `personas` (una vista no es escribible aquí).
   const { data, error } = await db
-    .from('personas')
+    .from('personas_con_edad')
     .select('*')
     .order('created_at', { ascending: false });
 

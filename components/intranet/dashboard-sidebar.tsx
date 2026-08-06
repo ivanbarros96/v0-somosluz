@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
-  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank,
+  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, esRolValido } from '@/lib/roles';
@@ -41,14 +41,18 @@ const PASTOR_NAV: NavItem[] = [
   { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart, addedAt: '2026-07-07' },
   { href: '/intranet/dashboard/finanzas', label: 'Finanzas', icon: Wallet, addedAt: '2026-07-23' },
   { href: '/intranet/dashboard/reservas', label: 'Reservas', icon: PiggyBank, addedAt: '2026-08-05' },
+  { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
   { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
   { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
 ];
 
+// Operativo y ministerios: cada uno ve los cumpleaños de su propio público
+// (la página filtra por audiencia con las reglas de lib/cultos-tipos.ts).
 const SOMOSLUZ_NAV: NavItem[] = [
   { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
   { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
   { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+  { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
 ];
 
 interface DashboardSidebarProps {

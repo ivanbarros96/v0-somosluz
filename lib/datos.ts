@@ -180,3 +180,29 @@ export async function getIdsRetirados(): Promise<Set<number>> {
     retiros.filter((r) => r.persona_id != null).map((r) => Number(r.persona_id)),
   );
 }
+
+// ─── Cumpleaños ──────────────────────────────────────────────────────────────
+
+export interface CumpleanosRow {
+  id: number;
+  nombre: string;
+  source_tipo: string;
+  sexo: string | null;
+  fecha_nac: string;
+  cumple_dia: number;
+  cumple_mes: number;
+  proximo_cumple: string;
+  dias_hasta: number;
+  es_hoy: boolean;
+  edad_actual: number;
+  edad_que_cumple: number;
+  email: string | null;
+  contacto_telefono: string | null;
+  contacto_nombre: string;
+  contacto_es_apoderado: boolean;
+}
+
+/** Próximos cumpleaños, ya calculados en Postgres (excluye retirados). */
+export function getCumpleanos(dias = 400): Promise<CumpleanosRow[]> {
+  return pedir<CumpleanosRow[]>(`/api/cumpleanos?dias=${dias}`, 'cumpleanos');
+}
