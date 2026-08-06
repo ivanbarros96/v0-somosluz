@@ -831,10 +831,12 @@ export default function FinanzasPage() {
                       Fotos del comprobante{' '}
                       <span className="text-muted-foreground font-normal">(recomendado, hasta 5)</span>
                     </Label>
+                    {/* Sin capture="environment": ese atributo abre la cámara directo en
+                        el celular y esconde galería/archivos. El selector nativo ya ofrece
+                        "Cámara" como una opción más. */}
                     <Input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       multiple
                       onChange={(e) => setComprobantes(Array.from(e.target.files ?? []).slice(0, 5))}
                     />
@@ -1291,10 +1293,10 @@ export default function FinanzasPage() {
                 Agregar {editandoEgreso && editandoEgreso.comprobantes.length > 0 ? 'más fotos' : 'una foto'}{' '}
                 (o reemplaza: marca la actual para quitarla y sube la nueva aquí)
               </Label>
+              {/* Sin capture: ver comentario en el formulario de egreso nuevo. */}
               <Input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 multiple
                 onChange={(e) => setComprobantesNuevos(Array.from(e.target.files ?? []).slice(0, 5))}
               />
