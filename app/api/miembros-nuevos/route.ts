@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { esRolKids } from '@/lib/roles';
 
 // GET /api/miembros-nuevos — lectura de visitantes. Requiere sesión.
 // Sustituye la lectura directa con anon key (ver GET /api/personas).
@@ -49,6 +50,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
   if (session.role === 'pastor') {
+    return NextResponse.json({ error: 'Tu perfil no puede registrar visitantes.' }, { status: 403 });
+  }
+  // Kids solo toma asistencia; el registro lo hace Somos Luz.
+  if (esRolKids(session.role)) {
     return NextResponse.json({ error: 'Tu perfil no puede registrar visitantes.' }, { status: 403 });
   }
 

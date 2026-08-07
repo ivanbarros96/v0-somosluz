@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, esRolKids } from '@/lib/roles';
 
 // Un rol de ministerio solo puede tocar cultos de su propio tipo
 async function cultoFueraDeAlcance(role: string, cultoId: string): Promise<boolean> {
@@ -16,6 +16,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const session = getSession(req);
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  // Cerrar el culto es de Somos Luz (o del pastor), no de Kids.
+  if (esRolKids(session.role)) {
+    return NextResponse.json({ error: 'Tu perfil no puede abrir ni cerrar cultos' }, { status: 403 });
   }
 
   const { id } = await params;
@@ -48,6 +53,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const session = getSession(req);
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  if (esRolKids(session.role)) {
+    return NextResponse.json({ error: 'Tu perfil no puede eliminar cultos' }, { status: 403 });
   }
 
   const { id } = await params;

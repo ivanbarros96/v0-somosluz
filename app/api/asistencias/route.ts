@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, esRolKids, TIPOS_MARCABLES_KIDS } from '@/lib/roles';
 
 interface Body {
   cultoId?: number | string;
@@ -15,6 +15,41 @@ async function cultoFueraDeAlcance(role: string, cultoId: number | string): Prom
   if (!ministerio) return false;
   const { data } = await getSupabaseAdmin().from('cultos').select('tipo').eq('id', cultoId).single();
   return !data || data.tipo !== ministerio;
+}
+
+// Kids: solo el culto general que esté abierto, y solo sobre niños o
+// visitantes. Se valida aquí y no solo en la UI porque ocultar un botón no
+// impide llamar al endpoint a mano. Devuelve el motivo del rechazo o null.
+async function kidsFueraDeAlcance(
+  role: string,
+  cultoId: number | string,
+  personaId?: number | string,
+): Promise<string | null> {
+  if (!esRolKids(role)) return null;
+
+  const db = getSupabaseAdmin();
+  const { data: culto } = await db.from('cultos').select('tipo, activo').eq('id', cultoId).single();
+  if (!culto || culto.tipo !== 'general') {
+    return 'Tu perfil solo toma asistencia en el culto dominical';
+  }
+  if (!culto.activo) {
+    return 'El culto ya fue cerrado por Somos Luz';
+  }
+
+  // Sin personaId es un visitante (miembros_nuevos): no trae categoría y Kids
+  // sí puede marcarlo — ver TIPOS_MARCABLES_KIDS.
+  if (personaId) {
+    const { data: persona } = await db
+      .from('personas')
+      .select('source_tipo')
+      .eq('id', personaId)
+      .single();
+    if (!persona || !TIPOS_MARCABLES_KIDS.includes(persona.source_tipo)) {
+      return 'Tu perfil solo puede marcar la asistencia de los niños';
+    }
+  }
+
+  return null;
 }
 
 // GET /api/asistencias — lectura de asistencias. Requiere sesión.
@@ -73,6 +108,10 @@ export async function POST(req: NextRequest) {
   if (await cultoFueraDeAlcance(session.role, cultoId)) {
     return NextResponse.json({ error: 'Este culto no pertenece a tu ministerio' }, { status: 403 });
   }
+  const rechazoKids = await kidsFueraDeAlcance(session.role, cultoId, personaId);
+  if (rechazoKids) {
+    return NextResponse.json({ error: rechazoKids }, { status: 403 });
+  }
 
   const row: Record<string, unknown> = { culto_id: cultoId, fecha_registro: new Date().toISOString() };
   if (miembroNuevoId) row.miembro_nuevo_id = miembroNuevoId;
@@ -99,6 +138,10 @@ export async function DELETE(req: NextRequest) {
   }
   if (await cultoFueraDeAlcance(session.role, cultoId)) {
     return NextResponse.json({ error: 'Este culto no pertenece a tu ministerio' }, { status: 403 });
+  }
+  const rechazoKids = await kidsFueraDeAlcance(session.role, cultoId, personaId);
+  if (rechazoKids) {
+    return NextResponse.json({ error: rechazoKids }, { status: 403 });
   }
 
   let query = getSupabaseAdmin().from('asistencias').delete().eq('culto_id', cultoId);

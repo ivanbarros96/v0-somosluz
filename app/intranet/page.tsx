@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
 
@@ -19,6 +19,7 @@ const EQUIPO: { role: UserRole; icon: React.ElementType; desc: string }[] = [
   { role: 'hombres', icon: Shield, desc: 'Ministerio de varones' },
   { role: 'discipulado', icon: GraduationCap, desc: 'Formación espiritual · Adultos' },
   { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
+  { role: 'kids', icon: Baby, desc: 'Niños · Culto dominical' },
 ];
 
 export default function IntranetLoginPage() {
@@ -157,7 +158,7 @@ export default function IntranetLoginPage() {
                 </div>
                 <div>
                   <p className="text-foreground font-semibold">Equipo y Ministerios</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">Operativo · Amadas · Hombría · Discipulado · Youth</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">Operativo · Amadas · Hombría · Discipulado · Youth · Kids</p>
                 </div>
               </div>
             </button>

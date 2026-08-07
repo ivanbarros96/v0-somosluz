@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
-import { ministerioDeRol } from '@/lib/roles';
+import { soloTomaAsistencia } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
 
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
@@ -19,10 +19,10 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) solo pueden
-  // tomar asistencia — el resto de la intranet queda fuera de su alcance aunque
-  // escriban la URL a mano, no solo oculto en el menú (dashboard-sidebar.tsx).
-  const esMinisterio = !!user && ministerioDeRol(user.role) !== null;
+  // Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) y Kids solo
+  // pueden tomar asistencia — el resto de la intranet queda fuera de su alcance
+  // aunque escriban la URL a mano, no solo oculto en el menú.
+  const esMinisterio = !!user && soloTomaAsistencia(user.role);
   const rutaPermitida = !esMinisterio || pathname.startsWith(RUTA_ASISTENCIA);
 
   useEffect(() => {

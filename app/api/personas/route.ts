@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, esRolKids } from '@/lib/roles';
 
 // GET /api/personas — lectura de personas. Requiere sesión.
 //
@@ -73,6 +73,10 @@ export async function POST(req: NextRequest) {
   // El Pastor no registra miembros — solo ve/edita desde Miembros.
   if (session.role === 'pastor') {
     return NextResponse.json({ error: 'El perfil Pastor no registra miembros.' }, { status: 403 });
+  }
+  // Kids solo toma asistencia; el registro lo hace Somos Luz.
+  if (esRolKids(session.role)) {
+    return NextResponse.json({ error: 'Tu perfil no registra miembros.' }, { status: 403 });
   }
 
   const row = await req.json().catch(() => null);

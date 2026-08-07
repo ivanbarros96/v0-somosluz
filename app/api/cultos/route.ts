@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { esCultoTipo } from '@/lib/cultos-tipos';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, esRolKids } from '@/lib/roles';
 
 // GET /api/cultos — lectura de cultos. Requiere sesión.
 // Sustituye la lectura directa con anon key (ver GET /api/personas).
@@ -46,6 +46,11 @@ export async function POST(req: NextRequest) {
   const session = getSession(req);
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  // Kids no abre cultos: toma asistencia dentro del que abre Somos Luz.
+  if (esRolKids(session.role)) {
+    return NextResponse.json({ error: 'Tu perfil no puede crear cultos' }, { status: 403 });
   }
 
   const { fecha, descripcion, tipo } = await req.json().catch(() => ({}));

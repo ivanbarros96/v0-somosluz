@@ -15,7 +15,7 @@ import {
   CULTO_TIPOS, CULTO_TIPO_KEYS, descripcionCulto, idsQueAsistieron,
   type CultoTipo, type Elegibilidad,
 } from '@/lib/cultos-tipos';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, esRolKids, TIPOS_MARCABLES_KIDS } from '@/lib/roles';
 
 type Persona = {
   id: number;
@@ -63,6 +63,10 @@ export function AsistenciaPanel() {
   // Rol de ministerio: limitado a su propio tipo de culto
   const ministerio = ministerioDeRol(user?.role ?? '');
   const esSomosluz = user?.role === 'somosluz';
+  // Kids: sin reunión propia. Trabaja sobre el culto general abierto por Somos
+  // Luz y solo puede marcar niños — no crea, no cierra y no elimina cultos.
+  const esKids = esRolKids(user?.role ?? '');
+  const puedeMarcar = (p: Persona) => !esKids || TIPOS_MARCABLES_KIDS.includes(p.tipo);
 
   const [cultos, setCultos] = useState<Culto[]>([]);
   const [cultoId, setCultoId] = useState<number | null>(null);
@@ -223,6 +227,13 @@ export function AsistenciaPanel() {
       );
       return;
     }
+    // Kids solo marca niños (y visitantes, que no traen edad). Adultos y
+    // jóvenes se ven con "Ver todos" pero quedan de solo lectura, para que no
+    // pueda desmarcar por error a alguien que registró Somos Luz.
+    if (!puedeMarcar(persona)) {
+      toast.warning('Tu perfil solo puede marcar la asistencia de los niños.');
+      return;
+    }
     const key = personaKey(persona);
     setSavingKey(key);
 
@@ -291,9 +302,12 @@ export function AsistenciaPanel() {
 
   // Cultos visibles según el rol:
   // - pastor: todos · ministerio: solo su tipo
+  // - kids: solo el culto general que esté ABIERTO (el del domingo en curso).
+  //   Al cerrarlo Somos Luz, desaparece de su vista: Kids no toca historial.
   // - somosluz: solo generales (ministerios ocultos hasta desbloquear con clave del pastor)
   const cultosVisibles = cultos.filter((c) => {
     if (esPastor) return true;
+    if (esKids) return c.tipo === 'general' && c.activo;
     if (ministerio) return c.tipo === ministerio;
     return ministeriosDesbloqueados || c.tipo === 'general';
   });
@@ -335,10 +349,15 @@ export function AsistenciaPanel() {
       asistioAYouthAlgunaVez: asistioYouthIds.has(p.id),
     });
 
+  // Kids ignora el público del culto (el general acepta a todos) y filtra por
+  // su propio público: los registrados como Niño. Los visitantes ("Nuevo") no
+  // traen edad ni categoría, así que aparecen solo al activar "Ver todos".
+  const enPublicoDelRol = (p: Persona) => (esKids ? p.tipo === 'nino' : elegibilidadDe(p) !== 'no');
+
   const filtradas = personas
     .filter((p) => filtro === 'todos' || p.tipo === filtro)
     .filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase()))
-    .filter((p) => verTodos || elegibilidadDe(p) !== 'no')
+    .filter((p) => verTodos || enPublicoDelRol(p))
     .sort((a, b) => {
       // Los de ficha incompleta van al final (dentro del orden alfabético existente)
       const ia = elegibilidadDe(a) === 'incompleto' ? 1 : 0;
@@ -346,7 +365,7 @@ export function AsistenciaPanel() {
       return ia - ib;
     });
 
-  const totalElegibles = personas.filter((p) => elegibilidadDe(p) !== 'no').length;
+  const totalElegibles = personas.filter(enPublicoDelRol).length;
 
   const FILTROS: { key: Filtro; label: string }[] = [
     { key: 'todos', label: 'Todos' },
@@ -385,10 +404,12 @@ export function AsistenciaPanel() {
                   Ministerios visibles
                 </span>
               )}
-              <Button size="sm" variant="outline" onClick={() => setMostrarNuevo(!mostrarNuevo)}>
-                <CalendarPlus className="w-4 h-4 mr-1" />
-                Nuevo culto
-              </Button>
+              {!esKids && (
+                <Button size="sm" variant="outline" onClick={() => setMostrarNuevo(!mostrarNuevo)}>
+                  <CalendarPlus className="w-4 h-4 mr-1" />
+                  Nuevo culto
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -446,6 +467,12 @@ export function AsistenciaPanel() {
             </div>
           ) : (
             <div className="grid gap-2 max-h-48 overflow-y-auto pr-1">
+              {esKids && cultosVisibles.length === 0 && (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No hay ningún culto abierto todavía. Cuando Somos Luz abra el culto
+                  dominical, aparecerá aquí para que tomes la asistencia de los niños.
+                </p>
+              )}
               {cultosVisibles.map((c) => (
                 <button
                   key={c.id}
@@ -501,9 +528,10 @@ export function AsistenciaPanel() {
                 </Badge>
                 <Badge variant="outline" className="gap-1">
                   <Users className="w-3 h-3" />
-                  {totalElegibles} {tipoCulto === 'general' ? 'total' : 'del público'}
+                  {totalElegibles} {esKids ? 'niños' : tipoCulto === 'general' ? 'total' : 'del público'}
                 </Badge>
-                {cultoActual?.activo && (
+                {/* Kids no abre ni cierra el culto: eso lo hace Somos Luz. */}
+                {cultoActual?.activo && !esKids && (
                   <Button size="sm" variant="destructive" onClick={cerrarCulto} disabled={cerrandoCulto}>
                     {cerrandoCulto
                       ? <Loader2 className="w-4 h-4 animate-spin mr-1" />
@@ -511,7 +539,7 @@ export function AsistenciaPanel() {
                     Cerrar culto
                   </Button>
                 )}
-                {cultoId && (
+                {cultoId && !esKids && (
                   <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { setShowEliminar(true); setPwdEliminar(''); setErrorEliminar(''); }}>
                     <Trash2 className="w-4 h-4 mr-1" />
                     Eliminar Culto
@@ -530,7 +558,8 @@ export function AsistenciaPanel() {
 
             {/* Filtros por tipo */}
             <div className="flex gap-2 mt-2 flex-wrap items-center">
-              {FILTROS.map(({ key, label }) => (
+              {/* Kids no necesita filtrar por tipo: su lista ya es solo niños. */}
+              {!esKids && FILTROS.map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => setFiltro(key)}
@@ -542,17 +571,19 @@ export function AsistenciaPanel() {
                   {label}
                 </button>
               ))}
-              {tipoCulto !== 'general' && (
+              {(tipoCulto !== 'general' || esKids) && (
                 <button
                   onClick={() => setVerTodos((v) => !v)}
                   className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors
                     ${verTodos
                       ? 'bg-accent text-accent-foreground border-accent'
                       : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
-                  title="Muestra también a quienes no calzan con el público (para excepciones)"
+                  title={esKids
+                    ? 'Muestra al resto de la congregación (incluye visitantes). Solo puedes marcar niños y visitantes.'
+                    : 'Muestra también a quienes no calzan con el público (para excepciones)'}
                 >
                   {verTodos ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  {verTodos ? 'Solo el público' : 'Ver todos'}
+                  {verTodos ? (esKids ? 'Solo niños' : 'Solo el público') : 'Ver todos'}
                 </button>
               )}
             </div>
@@ -570,16 +601,24 @@ export function AsistenciaPanel() {
                   const presente = presentes.has(key);
                   const saving = savingKey === key;
                   const eleg = elegibilidadDe(persona);
+                  const bloqueada = !puedeMarcar(persona);
 
                   return (
                     <div
                       key={key}
                       onClick={() => toggleAsistencia(persona)}
-                      className={`flex items-center gap-4 px-6 py-3 cursor-pointer transition-colors
-                        hover:bg-muted/50 ${presente ? 'bg-green-50' : ''}`}
+                      className={`flex items-center gap-4 px-6 py-3 transition-colors
+                        ${bloqueada
+                          ? 'cursor-not-allowed opacity-60'
+                          : `cursor-pointer hover:bg-muted/50 ${presente ? 'bg-green-50' : ''}`}`}
                     >
+                      {/* Una persona bloqueada que ya está presente (la marcó Somos Luz)
+                          se sigue viendo marcada, en verde atenuado — ocultarlo haría
+                          creer que falta por marcar. */}
                       <div className={`w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
-                        ${presente ? 'bg-green-500 border-green-500' : 'bg-white border-border'}`}>
+                        ${presente
+                          ? bloqueada ? 'bg-green-500/40 border-green-500/40' : 'bg-green-500 border-green-500'
+                          : 'bg-white border-border'}`}>
                         {saving
                           ? <Loader2 className="w-3 h-3 animate-spin text-white" />
                           : presente && (
@@ -601,9 +640,15 @@ export function AsistenciaPanel() {
                           Dato incompleto
                         </Badge>
                       )}
-                      {verTodos && eleg === 'no' && (
+                      {verTodos && !esKids && eleg === 'no' && (
                         <Badge variant="outline" className="text-xs text-muted-foreground">
                           Fuera del público
+                        </Badge>
+                      )}
+                      {bloqueada && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground gap-1" title="Solo puedes marcar niños y visitantes">
+                          <Lock className="w-3 h-3" />
+                          Solo lectura
                         </Badge>
                       )}
                       {tipoBadge(persona.tipo)}
