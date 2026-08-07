@@ -12,7 +12,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido } from '@/lib/roles';
+import { ROLES, esRolValido, ministerioDeRol } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -55,6 +55,13 @@ const SOMOSLUZ_NAV: NavItem[] = [
   { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
 ];
 
+// Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth): solo toman
+// asistencia de sus propias reuniones. El resto de la intranet está bloqueado
+// también a nivel de ruta en dashboard/layout.tsx, no solo oculto aquí.
+const MINISTERIO_NAV: NavItem[] = [
+  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+];
+
 interface DashboardSidebarProps {
   onClose?: () => void;
 }
@@ -65,7 +72,8 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const pathname = usePathname();
 
   const isPastor = user?.role === 'pastor';
-  const navItems = isPastor ? PASTOR_NAV : SOMOSLUZ_NAV;
+  const esMinisterio = !!user && ministerioDeRol(user.role) !== null;
+  const navItems = isPastor ? PASTOR_NAV : esMinisterio ? MINISTERIO_NAV : SOMOSLUZ_NAV;
 
   // Peticiones de oración sin revisar (solo pastor). Alimenta el badge y el título de pestaña.
   const oracionPendientes = usePeticionesPendientes(isPastor);

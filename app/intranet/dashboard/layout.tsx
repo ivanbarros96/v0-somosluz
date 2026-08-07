@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
+import { ministerioDeRol } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
+
+const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
 
 export default function DashboardLayout({
   children,
@@ -13,15 +16,26 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) solo pueden
+  // tomar asistencia — el resto de la intranet queda fuera de su alcance aunque
+  // escriban la URL a mano, no solo oculto en el menú (dashboard-sidebar.tsx).
+  const esMinisterio = !!user && ministerioDeRol(user.role) !== null;
+  const rutaPermitida = !esMinisterio || pathname.startsWith(RUTA_ASISTENCIA);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/intranet');
+      return;
     }
-  }, [isAuthenticated, router]);
+    if (!rutaPermitida) {
+      router.push(RUTA_ASISTENCIA);
+    }
+  }, [isAuthenticated, rutaPermitida, router]);
 
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated || !user || !rutaPermitida) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
