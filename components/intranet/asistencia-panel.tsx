@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getCultos, getMiembrosNuevos, getPersonas, getAsistenciasDeCulto, getAsistencias } from '@/lib/datos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,11 @@ type Culto = {
 };
 
 type Filtro = 'todos' | 'adulto' | 'joven' | 'nino' | 'nuevo';
+
+// Cada cuánto se re-consulta el estado de los cultos mientras la pantalla
+// está a la vista. 30s es suficiente para que "se abrió el culto" se sienta
+// inmediato sin cargar el servidor con una consulta por segundo.
+const REFRESCO_MS = 30_000;
 
 function personaKey(p: Persona) {
   return `${p.tipo}::${p.id}`;
@@ -142,39 +147,42 @@ export function AsistenciaPanel() {
     getAsistencias().then(setTodasAsistencias).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoadingPersonas(true);
-      try {
-        const [pdata, ndata] = await Promise.all([getPersonas(), getMiembrosNuevos()]);
+  // `silencioso` = recarga de fondo (sincronización): no muestra el estado de
+  // carga ni molesta con un toast si falla, para no interrumpir el conteo.
+  const cargarPersonas = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoadingPersonas(true);
+    try {
+      const [pdata, ndata] = await Promise.all([getPersonas(), getMiembrosNuevos()]);
 
-        const lista: Persona[] = [
-          ...pdata.map((p) => ({
-            id: Number(p.id),
-            nombre: p.nombre,
-            tipo: p.source_tipo as 'adulto' | 'nino' | 'joven',
-            telefono: p.telefono,
-            sexo: p.sexo ?? null,
-            edad: typeof p.edad === 'number' ? p.edad : null,
-          })),
-          ...ndata.map((p) => ({
-            id: Number(p.id),
-            nombre: p.nombre,
-            tipo: 'nuevo' as const,
-            telefono: p.telefono,
-            sexo: null,
-            edad: null,
-          })),
-        ].sort((a, b) => a.nombre.localeCompare(b.nombre));
+      const lista: Persona[] = [
+        ...pdata.map((p) => ({
+          id: Number(p.id),
+          nombre: p.nombre,
+          tipo: p.source_tipo as 'adulto' | 'nino' | 'joven',
+          telefono: p.telefono,
+          sexo: p.sexo ?? null,
+          edad: typeof p.edad === 'number' ? p.edad : null,
+        })),
+        ...ndata.map((p) => ({
+          id: Number(p.id),
+          nombre: p.nombre,
+          tipo: 'nuevo' as const,
+          telefono: p.telefono,
+          sexo: null,
+          edad: null,
+        })),
+      ].sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-        setPersonas(lista);
-      } catch {
-        toast.error('No se pudieron cargar las personas.');
-      }
-      setLoadingPersonas(false);
-    };
-    load();
+      setPersonas(lista);
+    } catch {
+      if (!silencioso) toast.error('No se pudieron cargar las personas.');
+    }
+    if (!silencioso) setLoadingPersonas(false);
   }, []);
+
+  useEffect(() => {
+    cargarPersonas();
+  }, [cargarPersonas]);
 
   const cargarAsistencias = useCallback(async (id: number) => {
     const data = await getAsistenciasDeCulto(id).catch(() => []);
@@ -194,6 +202,51 @@ export function AsistenciaPanel() {
   useEffect(() => {
     if (cultoId) cargarAsistencias(cultoId);
   }, [cultoId, cargarAsistencias]);
+
+  // Sincronización con lo que pasa en otros dispositivos. Sin esto la pantalla
+  // se quedaba con la foto del momento en que se abrió: si Somos Luz abría (o
+  // cerraba) el culto desde su teléfono, el resto tenía que recargar a mano.
+  // Se nota sobre todo en Kids, cuya vista depende de un culto que abre otro.
+  // Mismo patrón que hooks/use-peticiones-pendientes.ts.
+  //
+  // La referencia evita recrear el intervalo en cada render: el timer llama
+  // siempre a la última versión de la función, con el estado actual.
+  const sincronizarRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    sincronizarRef.current = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        // No re-selecciona el culto: respeta el que el usuario tenga elegido.
+        // Si el elegido dejó de estar visible (ej. lo cerraron), de eso se
+        // encarga el efecto de re-selección de más abajo.
+        setCultos((await getCultos({ orden: 'desc' })) as Culto[]);
+        // Con un marcado en vuelo no tocamos la lista de presentes, para no
+        // hacer parpadear el check que el usuario acaba de tocar.
+        if (cultoId && !savingKey) await cargarAsistencias(cultoId);
+      } catch {
+        // Silencioso: un fallo de red no debe interrumpir la toma de asistencia.
+      }
+    };
+  });
+
+  useEffect(() => {
+    const tick = () => sincronizarRef.current();
+    const timer = setInterval(tick, REFRESCO_MS);
+    // Al volver a la pestaña/app: es el caso más común en el celular y el que
+    // más rápido debe reaccionar, sin esperar al intervalo.
+    const alVolver = () => {
+      if (document.visibilityState === 'visible') {
+        tick();
+        cargarPersonas(true); // por si registraron a alguien nuevo mientras tanto
+      }
+    };
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+  }, [cargarPersonas]);
 
   const eliminarCulto = async () => {
     if (!cultoId) return;
