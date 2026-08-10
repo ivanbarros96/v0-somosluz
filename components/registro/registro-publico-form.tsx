@@ -422,8 +422,7 @@ export function RegistroPublicoForm() {
                     </Select>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Hace cuánto tomaste la decisión de seguir a Cristo. Si prefieres no
-                    responder, déjalo en blanco.
+                    Hace cuánto tomaste la decisión de seguir a Cristo.
                   </p>
                 </div>
 
