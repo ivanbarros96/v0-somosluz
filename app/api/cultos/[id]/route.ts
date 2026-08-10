@@ -89,9 +89,28 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const db = getSupabaseAdmin();
-  // Eliminar asistencias del culto primero (FK)
-  await db.from('asistencias').delete().eq('culto_id', id);
-  const { error } = await db.from('cultos').delete().eq('id', id);
+
+  // El dominical y su clase de Kids son el mismo domingo: se crean juntos, se
+  // cierran juntos y se borran juntos. Si solo se borrara el general, la clase
+  // quedaría huérfana — visible y abierta para la maestra, pero sin domingo al
+  // cual pertenecer, así que sus asistencias no entrarían en ninguna
+  // estadística. Pasó en producción el 09/08/2026 con 6 niños ya marcados.
+  const { data: aBorrar } = await db.from('cultos').select('fecha, tipo').eq('id', id).single();
+  const ids = [String(id)];
+
+  if (aBorrar?.tipo === 'general') {
+    const { data: claseKids } = await db
+      .from('cultos')
+      .select('id')
+      .eq('tipo', 'kids')
+      .eq('fecha', aBorrar.fecha)
+      .maybeSingle();
+    if (claseKids) ids.push(String(claseKids.id));
+  }
+
+  // Las asistencias primero (FK)
+  await db.from('asistencias').delete().in('culto_id', ids);
+  const { error } = await db.from('cultos').delete().in('id', ids);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

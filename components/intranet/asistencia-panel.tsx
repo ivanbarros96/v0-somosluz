@@ -771,7 +771,11 @@ export function AsistenciaPanel() {
               Eliminar culto
             </DialogTitle>
             <DialogDescription>
-              Se eliminará <span className="font-semibold text-foreground">{cultos.find(c => c.id === cultoId)?.descripcion}</span> y todas sus asistencias registradas. Esta acción no se puede deshacer.
+              Se eliminará <span className="font-semibold text-foreground">{cultos.find(c => c.id === cultoId)?.descripcion}</span> y todas sus asistencias registradas.
+              {cultoActual?.tipo === 'general' && (
+                <> También se eliminará la <span className="font-semibold text-foreground">clase de Kids</span> de ese mismo domingo, con las suyas.</>
+              )}
+              {' '}Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
 

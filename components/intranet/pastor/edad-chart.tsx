@@ -1,26 +1,19 @@
 'use client';
 
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartTooltip, SinDatos, COLOR, EJE, GRID, CURSOR } from './chart-kit';
 
 export interface EdadRango {
   rango: string;
   total: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md">
-      <p className="text-muted-foreground">{label}</p>
-      <p className="font-semibold text-indigo-600">{payload[0]?.value} personas</p>
-    </div>
-  );
-};
-
 export function EdadChart({ data, sinDato }: { data: EdadRango[]; sinDato: number }) {
+  const hayDatos = data.some((d) => d.total > 0);
+
   return (
     <Card>
       <CardHeader className="p-4 md:p-6">
@@ -31,17 +24,27 @@ export function EdadChart({ data, sinDato }: { data: EdadRango[]; sinDato: numbe
         </p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-            <XAxis dataKey="rango" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} className="fill-muted-foreground" interval={0} />
-            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)', rx: 4 }} />
-            <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={48}>
-              {data.map((_, i) => <Cell key={i} fill="#8a6d55" />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        {!hayDatos ? (
+          <SinDatos>
+            Nadie tiene fecha de nacimiento cargada, así que no se puede calcular la edad.
+          </SinDatos>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid {...GRID} />
+              <XAxis dataKey="rango" interval={0} {...EJE} tick={{ fontSize: 10 }} />
+              <YAxis allowDecimals={false} {...EJE} />
+              <Tooltip content={<ChartTooltip sufijo="personas" />} cursor={CURSOR} />
+              <Bar
+                dataKey="total"
+                name="Personas"
+                fill={COLOR.terracota}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );

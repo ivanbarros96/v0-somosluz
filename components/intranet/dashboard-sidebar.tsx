@@ -32,34 +32,70 @@ function esNuevo(addedAt?: string): boolean {
   return Date.now() < expira.getTime();
 }
 
-const PASTOR_NAV: NavItem[] = [
-  { href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard },
-  { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
-  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
-  { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
-  { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake, addedAt: '2026-06-22' },
-  { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart, addedAt: '2026-07-07' },
-  { href: '/intranet/dashboard/finanzas', label: 'Finanzas', icon: Wallet, addedAt: '2026-07-23' },
-  { href: '/intranet/dashboard/reservas', label: 'Reservas', icon: PiggyBank, addedAt: '2026-08-05' },
-  { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
-  { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
-  { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
+// El menú va por GRUPOS, no como una lista corrida. Con 11 entradas seguidas
+// había que leerlas todas para encontrar una; agrupadas por para-qué-sirve, el
+// ojo salta primero al grupo y después al ítem.
+// Un grupo sin título (titulo: null) va suelto arriba, sin encabezado: es el
+// caso del Panel Principal, que no pertenece a ninguna familia.
+interface NavGrupo {
+  titulo: string | null;
+  items: NavItem[];
+}
+
+const PASTOR_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [{ href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard }],
+  },
+  {
+    titulo: 'Congregación',
+    items: [
+      { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+      { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+      { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
+    ],
+  },
+  {
+    titulo: 'Cuidado pastoral',
+    items: [
+      { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
+      { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake, addedAt: '2026-06-22' },
+      { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart, addedAt: '2026-07-07' },
+      { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
+    ],
+  },
+  {
+    titulo: 'Administración',
+    items: [
+      { href: '/intranet/dashboard/finanzas', label: 'Finanzas', icon: Wallet, addedAt: '2026-07-23' },
+      { href: '/intranet/dashboard/reservas', label: 'Reservas', icon: PiggyBank, addedAt: '2026-08-05' },
+      { href: '/intranet/dashboard/settings', label: 'Configuración', icon: Settings },
+    ],
+  },
 ];
 
-// Operativo y ministerios: cada uno ve los cumpleaños de su propio público
-// (la página filtra por audiencia con las reglas de lib/cultos-tipos.ts).
-const SOMOSLUZ_NAV: NavItem[] = [
-  { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
-  { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
-  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
-  { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
+// Operativo: 4 ítems, no necesita encabezados — agruparlos sería más ruido que
+// ayuda.
+const SOMOSLUZ_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [
+      { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
+      { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+      { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+      { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
+    ],
+  },
 ];
 
 // Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) y Kids: solo
 // toman asistencia. El resto de la intranet está bloqueado también a nivel de
 // ruta en dashboard/layout.tsx, no solo oculto aquí.
-const MINISTERIO_NAV: NavItem[] = [
-  { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+const MINISTERIO_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [{ href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList }],
+  },
 ];
 
 interface DashboardSidebarProps {
@@ -73,7 +109,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
   const isPastor = user?.role === 'pastor';
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
-  const navItems = isPastor ? PASTOR_NAV : esMinisterio ? MINISTERIO_NAV : SOMOSLUZ_NAV;
+  const navGrupos = isPastor ? PASTOR_NAV : esMinisterio ? MINISTERIO_NAV : SOMOSLUZ_NAV;
 
   // Peticiones de oración sin revisar (solo pastor). Alimenta el badge y el título de pestaña.
   const oracionPendientes = usePeticionesPendientes(isPastor);
@@ -143,9 +179,16 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 p-3">
-        <ul className="space-y-1">
-          {navItems.map((item) => {
+      <nav className="flex-1 overflow-y-auto p-3">
+        {navGrupos.map((grupo, gi) => (
+          <div key={grupo.titulo ?? `grupo-${gi}`} className={gi > 0 ? 'mt-5' : ''}>
+            {grupo.titulo && (
+              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {grupo.titulo}
+              </p>
+            )}
+            <ul className="space-y-1">
+          {grupo.items.map((item) => {
             const pendientes = item.href === '/intranet/dashboard/oracion' ? oracionPendientes : 0;
             return (
               <li key={item.href}>
@@ -185,7 +228,9 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
               </li>
             );
           })}
-        </ul>
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

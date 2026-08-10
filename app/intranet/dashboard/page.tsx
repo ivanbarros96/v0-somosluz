@@ -13,6 +13,9 @@ import { SexoChart, type SexoData } from '@/components/intranet/pastor/sexo-char
 import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-chart';
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
+import { KidsCoberturaChart, type CoberturaKidsDomingo } from '@/components/intranet/pastor/kids-cobertura-chart';
+import { KidsSinClasePanel, type NinoSinKids } from '@/components/intranet/pastor/kids-sin-clase-panel';
+import { ESTADO } from '@/components/intranet/pastor/chart-kit';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
 import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,6 +45,9 @@ function PastorDashboard() {
   const [fidelidadData, setFidelidadData] = useState<FidelidadData[]>([]);
   const [fidelidadEval, setFidelidadEval] = useState(0);
   const [ministerios, setMinisterios] = useState<MinisterioStat[]>([]);
+  const [coberturaKids, setCoberturaKids] = useState<CoberturaKidsDomingo[]>([]);
+  const [ninosSinKids, setNinosSinKids] = useState<NinoSinKids[]>([]);
+  const [domingosConClase, setDomingosConClase] = useState(0);
   const [finanzasTendencia, setFinanzasTendencia] = useState<FinanzasTendenciaMes[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -184,10 +190,12 @@ function PastorDashboard() {
         else if (pct >= 35) media++;
         else baja++;
       }
+      // Colores de ESTADO, no de serie: acá el color comunica bueno/atención/
+      // grave y por eso no sale de la paleta categórica.
       const fidelidad: FidelidadData[] = [
-        { key: 'alta', nivel: 'Alta (≥70%)', total: alta, color: '#22c55e' },
-        { key: 'media', nivel: 'Media (35-69%)', total: media, color: '#f59e0b' },
-        { key: 'baja', nivel: 'Baja (<35%)', total: baja, color: '#ef4444' },
+        { key: 'alta', nivel: 'Alta (≥70%)', total: alta, color: ESTADO.bueno },
+        { key: 'media', nivel: 'Media (35-69%)', total: media, color: ESTADO.atencion },
+        { key: 'baja', nivel: 'Baja (<35%)', total: baja, color: ESTADO.grave },
       ];
 
       // Retención de visitantes: de los visitantes nuevos con al menos una
@@ -246,6 +254,91 @@ function PastorDashboard() {
         };
       });
 
+      // ── Kids: cobertura de la clase ──────────────────────────────────────
+      // Solo tiene sentido en domingos donde existen AMBOS cultos (el general y
+      // el de Kids). Antes del 09/08/2026 la clase no tenía registro propio, así
+      // que esos domingos se ignoran en vez de contarlos como cobertura 0.
+      const cultosKids = (cultosMinisterio ?? []).filter((c) => c.tipo === 'kids');
+      const soloFecha = (f: string) => f.slice(0, 10);
+      const kidsPorFecha = new Map<string, number>();
+      for (const c of cultosKids) kidsPorFecha.set(soloFecha(c.fecha), Number(c.id));
+
+      const idsNinos = new Set(
+        (personas ?? []).filter((p) => p.source_tipo === 'nino').map((p) => Number(p.id)),
+      );
+      const nombrePorId = new Map<number, string>(
+        (personas ?? []).map((p) => [Number(p.id), p.nombre as string]),
+      );
+
+      // Niños presentes por culto (Set para no contar dos veces al mismo)
+      const ninosPorCulto = new Map<number, Set<number>>();
+      for (const a of rawAsist ?? []) {
+        if (a.persona_id == null) continue;
+        const pid = Number(a.persona_id);
+        if (!idsNinos.has(pid)) continue;
+        const cid = Number(a.culto_id);
+        if (!ninosPorCulto.has(cid)) ninosPorCulto.set(cid, new Set());
+        ninosPorCulto.get(cid)!.add(pid);
+      }
+
+      // Se agrupa por FECHA y no por culto: si por error existiera más de un
+      // culto general el mismo domingo, ese día contaría dos veces y el
+      // porcentaje saldría distorsionado. Unir los asistentes del día es además
+      // lo correcto — es el mismo domingo.
+      const unirPorFecha = (lista: typeof cultosOrden) => {
+        const mapa = new Map<string, Set<number>>();
+        for (const c of lista) {
+          if (new Date(c.fecha).getTime() > ahora) continue; // aún no ocurre
+          const f = soloFecha(c.fecha);
+          const set = mapa.get(f) ?? new Set<number>();
+          for (const pid of ninosPorCulto.get(Number(c.id)) ?? []) set.add(pid);
+          mapa.set(f, set);
+        }
+        return mapa;
+      };
+
+      const ninosIglesiaPorFecha = unirPorFecha(cultosOrden);
+      const ninosKidsPorFecha = unirPorFecha(cultosKids);
+
+      const fechasConClase = [...ninosKidsPorFecha.keys()]
+        .filter((f) => ninosIglesiaPorFecha.has(f))
+        .sort();
+
+      const coberturaKids: CoberturaKidsDomingo[] = fechasConClase.slice(-8).map((f) => ({
+        fecha: f,
+        label: format(parseISO(f), 'd MMM', { locale: es }),
+        enIglesia: ninosIglesiaPorFecha.get(f)?.size ?? 0,
+        enKids: ninosKidsPorFecha.get(f)?.size ?? 0,
+      }));
+
+      // Niños que vinieron al culto en domingos CON clase, pero nunca a la sala.
+      // Un niño marcado solo en Kids ya aparece en el dominical por el reflejo
+      // automático (ver reflejarEnDominical), así que basta recorrer la iglesia.
+      const asistenciaPorNino = new Map<number, { domingos: string[]; kids: number }>();
+      for (const f of fechasConClase) {
+        const enIglesia = ninosIglesiaPorFecha.get(f) ?? new Set<number>();
+        const enKids = ninosKidsPorFecha.get(f) ?? new Set<number>();
+        for (const pid of enIglesia) {
+          const acc = asistenciaPorNino.get(pid) ?? { domingos: [], kids: 0 };
+          acc.domingos.push(f);
+          if (enKids.has(pid)) acc.kids += 1;
+          asistenciaPorNino.set(pid, acc);
+        }
+      }
+
+      const ninosSinKids: NinoSinKids[] = [...asistenciaPorNino.entries()]
+        .filter(([, v]) => v.kids === 0)
+        .map(([pid, v]) => {
+          const ultima = v.domingos[v.domingos.length - 1];
+          return {
+            id: pid,
+            nombre: nombrePorId.get(pid) ?? 'Sin nombre',
+            domingosEnIglesia: v.domingos.length,
+            ultimoDomingo: ultima ? format(parseISO(ultima), "d 'de' MMMM", { locale: es }) : null,
+          };
+        })
+        .sort((a, b) => b.domingosEnIglesia - a.domingosEnIglesia || a.nombre.localeCompare(b.nombre));
+
       // Peticiones de oración pendientes (endpoint solo-pastor)
       try {
         const res = await fetch('/api/oracion');
@@ -281,6 +374,9 @@ function PastorDashboard() {
       setFidelidadData(fidelidad);
       setFidelidadEval(evaluadas);
       setMinisterios(statsMinisterios);
+      setCoberturaKids(coberturaKids);
+      setNinosSinKids(ninosSinKids);
+      setDomingosConClase(fechasConClase.length);
       setLoading(false);
     }
 
@@ -354,6 +450,11 @@ function PastorDashboard() {
       />
 
       <MinisteriosPanel data={ministerios} />
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <KidsCoberturaChart data={coberturaKids} />
+        <KidsSinClasePanel data={ninosSinKids} domingosConClase={domingosConClase} />
+      </div>
 
       <FinanzasTendenciaChart data={finanzasTendencia} />
 

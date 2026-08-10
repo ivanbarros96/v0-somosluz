@@ -14,11 +14,17 @@ export interface MinisterioStat {
   ultimaFecha: string | null;
 }
 
-const COLOR: Record<string, string> = {
-  hombres: '#6f814f',
-  mujeres: '#b08072',
-  discipulado: '#8a6d55',
-  youth: '#c08a3e',
+// Color fijo por ministerio, de la paleta validada. Cada fila lleva además su
+// nombre escrito, así que el color acompaña pero nunca es lo único que
+// identifica — por eso acá sí conviven los 5 sin confundirse.
+// Sin 'kids' la clase de niños caía al color por defecto y quedaba idéntica a
+// Hombría al Máximo.
+const COLOR_MINISTERIO: Record<string, string> = {
+  hombres: 'var(--chart-1)',
+  mujeres: 'var(--chart-4)',
+  discipulado: 'var(--chart-3)',
+  youth: 'var(--chart-5)',
+  kids: 'var(--chart-2)',
 };
 
 export function MinisteriosPanel({ data }: { data: MinisterioStat[] }) {
@@ -35,7 +41,7 @@ export function MinisteriosPanel({ data }: { data: MinisterioStat[] }) {
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0 space-y-5">
         {data.map((m) => {
-          const color = COLOR[m.tipo] ?? '#6f814f';
+          const color = COLOR_MINISTERIO[m.tipo] ?? 'var(--chart-1)';
           const pct = m.participacion;
           return (
             <div key={m.tipo}>

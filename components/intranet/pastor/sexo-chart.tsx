@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartTooltip, SinDatos, COLOR } from './chart-kit';
 
 export interface SexoData {
   femenino: number;
@@ -9,39 +10,38 @@ export interface SexoData {
   sin_dato: number;
 }
 
+// "Sin dato" va en gris a propósito: es ausencia de información, no una tercera
+// categoría, y no debe competir visualmente con las dos reales.
 const SLICES = [
-  { key: 'femenino' as keyof SexoData, label: 'Femenino', color: '#b08072' },
-  { key: 'masculino' as keyof SexoData, label: 'Masculino', color: '#6f814f' },
-  { key: 'sin_dato' as keyof SexoData, label: 'Sin dato', color: '#a8a093' },
+  { key: 'femenino' as keyof SexoData, label: 'Femenino', color: COLOR.ciruela },
+  { key: 'masculino' as keyof SexoData, label: 'Masculino', color: COLOR.petroleo },
+  { key: 'sin_dato' as keyof SexoData, label: 'Sin dato', color: 'var(--muted-foreground)' },
 ];
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md">
-      <p className="font-medium text-foreground">{payload[0].name}</p>
-      <p className="font-semibold" style={{ color: payload[0].payload.color }}>
-        {payload[0].value} personas
-      </p>
-    </div>
-  );
-};
-
-const CustomLegend = ({ payload }: any) => (
-  <div className="flex flex-col gap-1.5 mt-2">
+// La leyenda muestra nombre Y cantidad, así que la identidad nunca depende solo
+// del color — condición para que sirva a quien no distingue matices.
+const LeyendaConValores = ({ payload }: any) => (
+  <ul className="mt-2 flex flex-col gap-1.5">
     {payload?.map((entry: any) => (
-      <div key={entry.value} className="flex items-center gap-2 text-xs">
-        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+      <li key={entry.value} className="flex items-center gap-2 text-xs">
+        <span
+          aria-hidden
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: entry.color }}
+        />
         <span className="text-muted-foreground">{entry.value}</span>
-        <span className="text-foreground font-medium ml-auto">{entry.payload.value}</span>
-      </div>
+        <span className="ml-auto font-medium tabular-nums text-foreground">
+          {entry.payload.value}
+        </span>
+      </li>
     ))}
-  </div>
+  </ul>
 );
 
 export function SexoChart({ data }: { data: SexoData }) {
   const total = data.femenino + data.masculino + data.sin_dato;
-  const chartData = SLICES.map((s) => ({ name: s.label, value: data[s.key], color: s.color }))
+  const chartData = SLICES
+    .map((s) => ({ name: s.label, value: data[s.key], color: s.color }))
     .filter((d) => d.value > 0);
 
   return (
@@ -51,15 +51,33 @@ export function SexoChart({ data }: { data: SexoData }) {
         <p className="text-xs text-muted-foreground">{total} personas registradas</p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie data={chartData} cx="40%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value" strokeWidth={0}>
-              {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend layout="vertical" align="right" verticalAlign="middle" content={<CustomLegend />} />
-          </PieChart>
-        </ResponsiveContainer>
+        {total === 0 ? (
+          <SinDatos>Aún no hay personas registradas.</SinDatos>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="40%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={75}
+                paddingAngle={3}
+                dataKey="value"
+                strokeWidth={0}
+              >
+                {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Pie>
+              <Tooltip content={<ChartTooltip sufijo="personas" />} />
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                content={<LeyendaConValores />}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,44 +1,46 @@
 'use client';
 
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartTooltip, SinDatos, COLOR, EJE, GRID, CURSOR } from './chart-kit';
 
 export interface AsistenciaMes {
   mes: string;
   total: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md space-y-0.5">
-      <p className="text-muted-foreground">{label}</p>
-      <p className="font-semibold text-emerald-600">{payload[0]?.value} promedio por culto</p>
-    </div>
-  );
-};
-
 export function AsistenciaMensualChart({ data }: { data: AsistenciaMes[] }) {
   return (
     <Card>
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="text-base">Promedio de Asistencia por Mes</CardTitle>
-        <p className="text-xs text-muted-foreground">Promedio de asistentes por culto dentro de cada mes</p>
+        <p className="text-xs text-muted-foreground">
+          Promedio de asistentes por culto dentro de cada mes
+        </p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-            <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
-            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)', rx: 4 }} />
-            <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={48}>
-              {data.map((_, i) => <Cell key={i} fill="#6f814f" />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        {data.length === 0 ? (
+          <SinDatos>Todavía no hay cultos con asistencia registrada.</SinDatos>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid {...GRID} />
+              <XAxis dataKey="mes" {...EJE} />
+              <YAxis allowDecimals={false} {...EJE} />
+              <Tooltip content={<ChartTooltip sufijo="por culto" />} cursor={CURSOR} />
+              {/* Una sola serie: no lleva leyenda, el título ya la nombra. */}
+              <Bar
+                dataKey="total"
+                name="Promedio"
+                fill={COLOR.salvia}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );

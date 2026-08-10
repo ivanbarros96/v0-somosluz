@@ -20,9 +20,9 @@ interface KpiCardsProps {
 const CARDS = [
   { key: 'totalMiembros' as const, label: 'Total Miembros', icon: Users, color: 'text-primary' },
   { key: 'adultos' as const, label: 'Adultos', icon: UserCheck, color: 'text-accent' },
-  { key: 'jovenes' as const, label: 'Jóvenes', icon: Flame, color: 'text-[#c08a3e]' },
-  { key: 'ninos' as const, label: 'Niños', icon: Baby, color: 'text-green-600' },
-  { key: 'pctAsistenciaPromedio' as const, label: 'Asistencia Prom.', icon: TrendingUp, color: 'text-orange-500', suffix: '%' },
+  { key: 'jovenes' as const, label: 'Jóvenes', icon: Flame, color: 'text-[color:var(--chart-5)]' },
+  { key: 'ninos' as const, label: 'Niños', icon: Baby, color: 'text-[color:var(--chart-2)]' },
+  { key: 'pctAsistenciaPromedio' as const, label: 'Asistencia Prom.', icon: TrendingUp, color: 'text-[color:var(--chart-3)]', suffix: '%' },
   { key: 'retencionVisitantes' as const, label: 'Retención Visitantes', icon: Repeat, color: 'text-primary', suffix: '%', title: 'Porcentaje de visitantes nuevos que volvieron una segunda vez. Se calcula al registrar la asistencia de los visitantes cada culto. Muestra "—" hasta tener datos suficientes.' },
 ];
 

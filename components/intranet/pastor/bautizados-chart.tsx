@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartTooltip, SinDatos, COLOR } from './chart-kit';
 
 export interface BautizadosData {
   bautizados: number;
@@ -9,39 +10,36 @@ export interface BautizadosData {
   no_bautizados: number;
 }
 
+// "Sin bautizar" en gris: es el estado de partida, no un logro que deba
+// competir en color con los otros dos.
 const SLICES = [
-  { key: 'bautizados' as keyof BautizadosData, label: 'Bautizados', color: '#6f814f' },
-  { key: 'en_proceso' as keyof BautizadosData, label: 'En proceso', color: '#c08a3e' },
-  { key: 'no_bautizados' as keyof BautizadosData, label: 'Sin bautizar', color: '#a8a093' },
+  { key: 'bautizados' as keyof BautizadosData, label: 'Bautizados', color: COLOR.salvia },
+  { key: 'en_proceso' as keyof BautizadosData, label: 'En proceso', color: COLOR.dorado },
+  { key: 'no_bautizados' as keyof BautizadosData, label: 'Sin bautizar', color: 'var(--muted-foreground)' },
 ];
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 text-sm shadow-md">
-      <p className="font-medium text-foreground">{payload[0].name}</p>
-      <p className="font-semibold" style={{ color: payload[0].payload.color }}>
-        {payload[0].value} personas
-      </p>
-    </div>
-  );
-};
-
-const CustomLegend = ({ payload }: any) => (
-  <div className="flex flex-col gap-1.5 mt-2">
+const LeyendaConValores = ({ payload }: any) => (
+  <ul className="mt-2 flex flex-col gap-1.5">
     {payload?.map((entry: any) => (
-      <div key={entry.value} className="flex items-center gap-2 text-xs">
-        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+      <li key={entry.value} className="flex items-center gap-2 text-xs">
+        <span
+          aria-hidden
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: entry.color }}
+        />
         <span className="text-muted-foreground">{entry.value}</span>
-        <span className="text-foreground font-medium ml-auto">{entry.payload.value}</span>
-      </div>
+        <span className="ml-auto font-medium tabular-nums text-foreground">
+          {entry.payload.value}
+        </span>
+      </li>
     ))}
-  </div>
+  </ul>
 );
 
 export function BautizadosChart({ data }: { data: BautizadosData }) {
   const total = data.bautizados + data.en_proceso + data.no_bautizados;
-  const chartData = SLICES.map((s) => ({ name: s.label, value: data[s.key], color: s.color }))
+  const chartData = SLICES
+    .map((s) => ({ name: s.label, value: data[s.key], color: s.color }))
     .filter((d) => d.value > 0);
 
   return (
@@ -51,15 +49,33 @@ export function BautizadosChart({ data }: { data: BautizadosData }) {
         <p className="text-xs text-muted-foreground">{total} adultos registrados</p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie data={chartData} cx="40%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value" strokeWidth={0}>
-              {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend layout="vertical" align="right" verticalAlign="middle" content={<CustomLegend />} />
-          </PieChart>
-        </ResponsiveContainer>
+        {total === 0 ? (
+          <SinDatos>Aún no hay adultos registrados.</SinDatos>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="40%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={75}
+                paddingAngle={3}
+                dataKey="value"
+                strokeWidth={0}
+              >
+                {chartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Pie>
+              <Tooltip content={<ChartTooltip sufijo="personas" />} />
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                content={<LeyendaConValores />}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );

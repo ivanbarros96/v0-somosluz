@@ -24,12 +24,21 @@
   --border: oklch(0.88 0.012 75);
   --input: oklch(0.94 0.01 78);
   --ring: oklch(0.5 0.045 130);
-  /* Charts en paleta de marca: salvia, mocha, arena, oliva profundo, rosa tierra */
-  --chart-1: oklch(0.55 0.06 130);
-  --chart-2: oklch(0.5 0.05 60);
-  --chart-3: oklch(0.75 0.04 85);
-  --chart-4: oklch(0.4 0.05 135);
-  --chart-5: oklch(0.6 0.05 30);
+  /* Paleta de datos — NO tocar a ojo. Está validada con el script de la skill
+     dataviz contra 5 criterios: banda de luminosidad, chroma mínimo, separación
+     para daltonismo (protan/deutan/tritan), separación en visión normal y
+     contraste sobre la superficie de la tarjeta.
+     La paleta anterior era de marca pero ilegible: salvia y mocha quedaban a
+     ΔE 8 en visión normal y a 4.7 en deuteranopía — el mismo color en la
+     práctica. Además su chroma (0.04–0.06) leía como gris.
+     Estos 5 matices están FIJOS y en este orden: el mismo dato usa siempre el
+     mismo color, nunca se reasignan según cuántas series haya.
+     Verificar con: node scripts/validate_palette.js "<hex,...>" --mode light */
+  --chart-1: oklch(0.52 0.12 135); /* salvia — serie principal, ancla de marca */
+  --chart-2: oklch(0.58 0.11 225); /* azul petróleo */
+  --chart-3: oklch(0.62 0.15 40);  /* terracota */
+  --chart-4: oklch(0.48 0.14 330); /* ciruela */
+  --chart-5: oklch(0.64 0.13 88);  /* dorado */
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -61,11 +70,17 @@
   --border: oklch(0.35 0.02 35);
   --input: oklch(0.3 0.02 35);
   --ring: oklch(0.65 0.1 40);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  /* Mismos 5 matices que en claro, re-escalonados para fondo oscuro (banda de
+     luminosidad distinta) y validados contra la superficie oscura. NO es un
+     volteo automático del modo claro.
+     Antes acá quedaban los violetas/verdes neón por defecto de shadcn, que no
+     tenían relación con la marca: en modo oscuro los gráficos parecían de otro
+     producto. */
+  --chart-1: oklch(0.66 0.13 135); /* salvia */
+  --chart-2: oklch(0.62 0.11 225); /* azul petróleo */
+  --chart-3: oklch(0.66 0.15 40);  /* terracota */
+  --chart-4: oklch(0.58 0.15 330); /* ciruela */
+  --chart-5: oklch(0.67 0.13 88);  /* dorado */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
