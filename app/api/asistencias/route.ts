@@ -121,7 +121,69 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  await reflejarEnDominical(cultoId, personaId, miembroNuevoId);
+
   return NextResponse.json({ ok: true });
+}
+
+// Estar en la clase de Kids implica haber venido a la iglesia, así que marcar
+// a alguien en el culto de Kids lo marca también en el dominical de esa fecha.
+//
+// La relación NO es simétrica y eso es a propósito:
+//  - dominical sí, Kids no  → vino a la iglesia pero no entró a la sala. Dato
+//    válido: se deja tal cual.
+//  - Kids sí, dominical no  → imposible en la realidad, así que se completa.
+//  - al DESMARCAR de Kids no se toca el dominical: que la maestra corrija su
+//    lista no borra el hecho de que el niño vino a la iglesia.
+async function reflejarEnDominical(
+  cultoId: number | string,
+  personaId?: number | string,
+  miembroNuevoId?: number | string,
+): Promise<void> {
+  const db = getSupabaseAdmin();
+
+  const { data: culto } = await db.from('cultos').select('fecha, tipo').eq('id', cultoId).single();
+  if (culto?.tipo !== 'kids') return;
+
+  const { data: dominical } = await db
+    .from('cultos')
+    .select('id')
+    .eq('tipo', 'general')
+    .eq('fecha', culto.fecha)
+    .maybeSingle();
+  if (!dominical) return; // sin dominical esa fecha no hay nada que reflejar
+
+  const fechaRegistro = new Date().toISOString();
+
+  try {
+    if (personaId) {
+      // La restricción UNIQUE(culto_id, persona_id) hace que, si Somos Luz ya
+      // lo había marcado, esto no duplique ni pise la marca original.
+      await db.from('asistencias').upsert(
+        { culto_id: dominical.id, persona_id: personaId, fecha_registro: fechaRegistro },
+        { onConflict: 'culto_id,persona_id', ignoreDuplicates: true },
+      );
+    } else if (miembroNuevoId) {
+      // Los visitantes no tienen restricción única, así que se comprueba a mano.
+      const { data: yaEsta } = await db
+        .from('asistencias')
+        .select('id')
+        .eq('culto_id', dominical.id)
+        .eq('miembro_nuevo_id', miembroNuevoId)
+        .maybeSingle();
+      if (!yaEsta) {
+        await db.from('asistencias').insert({
+          culto_id: dominical.id,
+          miembro_nuevo_id: miembroNuevoId,
+          fecha_registro: fechaRegistro,
+        });
+      }
+    }
+  } catch (e) {
+    // La marca en Kids —que es lo que pidió la maestra— ya quedó guardada.
+    // Un fallo acá no debe devolver error ni bloquear la toma de asistencia.
+    console.error('No se pudo reflejar la asistencia en el dominical:', e);
+  }
 }
 
 // DELETE /api/asistencias — desmarcar presente
