@@ -19,6 +19,7 @@ import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
 import { getCultos, getAsistencias } from '@/lib/datos';
 import { MemberForm } from '@/components/intranet/member-form';
 import { VisitantesPanel } from '@/components/intranet/visitantes-panel';
+import { PendientesPanel } from '@/components/intranet/pendientes-panel';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 
@@ -343,7 +344,7 @@ export function MembersTable() {
         <CardContent className="px-0 pt-0">
           <Tabs defaultValue="todos">
             <div className="px-6 pb-4">
-              <TabsList className="grid w-full max-w-2xl grid-cols-5">
+              <TabsList className="grid w-full max-w-3xl grid-cols-6">
                 <TabsTrigger value="todos" className="gap-2">
                   Todos <Badge variant="secondary">{todos.length}</Badge>
                 </TabsTrigger>
@@ -360,6 +361,8 @@ export function MembersTable() {
                     su contenido es un componente aparte y no se mezcla con la
                     lista de miembros. */}
                 <TabsTrigger value="visitantes">Visitantes</TabsTrigger>
+                {/* Auto-registros del link público esperando revisión */}
+                <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
               </TabsList>
             </div>
 
@@ -511,6 +514,10 @@ export function MembersTable() {
 
             <TabsContent value="visitantes" className="mt-0">
               <VisitantesPanel />
+            </TabsContent>
+
+            <TabsContent value="pendientes" className="mt-0">
+              <PendientesPanel />
             </TabsContent>
           </Tabs>
         </CardContent>

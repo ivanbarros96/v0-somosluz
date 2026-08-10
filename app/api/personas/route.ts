@@ -78,8 +78,21 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // ?soloPendientes=1 devuelve únicamente lo que llegó por el formulario
+  // público y espera aprobación. Lo usa la pestaña Pendientes de Miembros.
+  if (searchParams.get('soloPendientes')) {
+    return NextResponse.json({
+      personas: (data ?? []).filter((p) => p.pendiente_revision),
+    });
+  }
+
+  // Por defecto salen los ACTIVOS: ni dados de baja ni pendientes de aprobar.
+  // Filtrar acá y no en cada pantalla es lo que garantiza que un auto-registro
+  // sin revisar no se cuele en la asistencia del domingo ni en los KPIs.
   return NextResponse.json({
-    personas: (data ?? []).filter((p) => !retirados.has(Number(p.id))),
+    personas: (data ?? []).filter(
+      (p) => !retirados.has(Number(p.id)) && !p.pendiente_revision,
+    ),
   });
 }
 
