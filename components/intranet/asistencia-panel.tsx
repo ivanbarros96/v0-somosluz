@@ -221,6 +221,10 @@ export function AsistenciaPanel() {
         // Si el elegido dejó de estar visible (ej. lo cerraron), de eso se
         // encarga el efecto de re-selección de más abajo.
         setCultos((await getCultos({ orden: 'desc' })) as Culto[]);
+        // También la lista de personas: si Somos Luz registra a alguien en la
+        // puerta, quien está tomando asistencia debe verlo sin salir y volver
+        // a la pantalla (el caso típico de la maestra de Kids el domingo).
+        await cargarPersonas(true);
         // Con un marcado en vuelo no tocamos la lista de presentes, para no
         // hacer parpadear el check que el usuario acaba de tocar.
         if (cultoId && !savingKey) await cargarAsistencias(cultoId);
@@ -236,17 +240,14 @@ export function AsistenciaPanel() {
     // Al volver a la pestaña/app: es el caso más común en el celular y el que
     // más rápido debe reaccionar, sin esperar al intervalo.
     const alVolver = () => {
-      if (document.visibilityState === 'visible') {
-        tick();
-        cargarPersonas(true); // por si registraron a alguien nuevo mientras tanto
-      }
+      if (document.visibilityState === 'visible') tick();
     };
     document.addEventListener('visibilitychange', alVolver);
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', alVolver);
     };
-  }, [cargarPersonas]);
+  }, []);
 
   const eliminarCulto = async () => {
     if (!cultoId) return;
