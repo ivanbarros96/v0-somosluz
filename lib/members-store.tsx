@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { getPersonas, getIdsRetirados } from '@/lib/datos';
+import { getPersonas } from '@/lib/datos';
 import { useAuth } from '@/lib/auth-context';
 import type { Member, AdultoMember, NinoMember, JovenMember } from '@/lib/types';
 
@@ -130,11 +130,11 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      // Excluir personas retiradas
-      const [personas, retirados] = await Promise.all([getPersonas(), getIdsRetirados()]);
-      setMembers(
-        personas.filter((p) => !retirados.has(Number(p.id))).map(mapToMember),
-      );
+      // Los dados de baja ya vienen excluidos desde GET /api/personas: se
+      // filtran en el servidor para que ninguna pantalla los muestre por
+      // descuido, no solo esta.
+      const personas = await getPersonas();
+      setMembers(personas.map(mapToMember));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudieron cargar los miembros.');
     }

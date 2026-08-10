@@ -53,8 +53,15 @@ export interface PersonaBusqueda {
   telefono: string | null;
 }
 
-export function getPersonas(): Promise<PersonaRow[]> {
-  return pedir<PersonaRow[]>('/api/personas', 'personas');
+/**
+ * Personas activas. Los dados de baja quedan fuera desde el servidor, así que
+ * ninguna pantalla los muestra por descuido.
+ * `incluirRetirados` los trae igual, cada uno con `retirado: boolean` — solo lo
+ * necesita la pantalla de Retiros.
+ */
+export function getPersonas(incluirRetirados = false): Promise<PersonaRow[]> {
+  const url = incluirRetirados ? '/api/personas?incluirRetirados=1' : '/api/personas';
+  return pedir<PersonaRow[]>(url, 'personas');
 }
 
 /** Autocompletar por nombre (máx. 8 resultados). `tipo` filtra por source_tipo. */
@@ -176,13 +183,10 @@ export function getRetiros(): Promise<RetiroRow[]> {
   return pedir<RetiroRow[]>('/api/retiros', 'retiros');
 }
 
-/** IDs de personas ya retiradas — para excluirlas de los listados activos. */
-export async function getIdsRetirados(): Promise<Set<number>> {
-  const retiros = await getRetiros();
-  return new Set(
-    retiros.filter((r) => r.persona_id != null).map((r) => Number(r.persona_id)),
-  );
-}
+// Antes acá vivía getIdsRetirados(), que cada pantalla tenía que acordarse de
+// usar — y varias no lo hacían, así que un dado de baja seguía apareciendo en
+// la asistencia y en los KPIs. Ahora el filtro está en GET /api/personas y no
+// hay nada que recordar.
 
 // ─── Cumpleaños ──────────────────────────────────────────────────────────────
 

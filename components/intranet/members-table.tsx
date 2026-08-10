@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound, UserMinus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,21 @@ import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
 import { getCultos, getAsistencias } from '@/lib/datos';
 import { MemberForm } from '@/components/intranet/member-form';
 import { VisitantesPanel } from '@/components/intranet/visitantes-panel';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { toast } from 'sonner';
+
+// Mismos motivos que la pantalla de Retiros, para que el histórico sea
+// comparable venga de donde venga la baja.
+const MOTIVOS_BAJA = [
+  'Se mudó de ciudad/país',
+  'Problemas personales',
+  'Cambio de iglesia',
+  'Enfermedad o salud',
+  'Trabajo / horario incompatible',
+  'Sin contacto (inubicable)',
+  'Otro',
+] as const;
+const OTRO_BAJA = 'Otro';
 
 function fmt(v: string | number | null | undefined) {
   return v === null || v === undefined || v === '' ? '—' : String(v);
@@ -130,7 +145,7 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
 }
 
 export function MembersTable() {
-  const { members, isLoading, error, deleteMember } = useMembers();
+  const { members, isLoading, error, deleteMember, refreshMembers } = useMembers();
   const { user } = useAuth();
   const esPastor = user?.role === 'pastor';
 
@@ -140,6 +155,10 @@ export function MembersTable() {
 
   // Estado del flujo de eliminación
   const [deleting, setDeleting] = useState<Member | null>(null);
+  const [dandoBaja, setDandoBaja] = useState<Member | null>(null);
+  const [motivoBaja, setMotivoBaja] = useState<string>(MOTIVOS_BAJA[0]);
+  const [motivoOtroBaja, setMotivoOtroBaja] = useState('');
+  const [bajaError, setBajaError] = useState('');
   const [pwd, setPwd] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [working, setWorking] = useState(false);
@@ -199,6 +218,40 @@ export function MembersTable() {
     setDeleteError('');
   };
 
+  const motivoBajaFinal = motivoBaja === OTRO_BAJA ? motivoOtroBaja.trim() : motivoBaja;
+
+  // Dar de baja = registrar un retiro. La ficha no se toca: es la fila de
+  // `retiros` la que saca a la persona de todos los listados (ver
+  // GET /api/personas), así que se puede deshacer sin perder nada.
+  const confirmarBaja = async () => {
+    if (!dandoBaja || !motivoBajaFinal) return;
+    setWorking(true);
+    setBajaError('');
+    try {
+      const res = await fetch('/api/retiros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          persona_id: Number(dandoBaja.id),
+          nombre: dandoBaja.nombre,
+          motivo: motivoBajaFinal,
+          observaciones: null,
+        }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Error al dar de baja.' }));
+        throw new Error(error ?? 'Error al dar de baja.');
+      }
+      toast.success(`${dandoBaja.nombre} quedó inactivo. Puedes reactivarlo desde Retiros.`);
+      setDandoBaja(null);
+      await refreshMembers();
+    } catch (e: any) {
+      setBajaError(e?.message ?? 'Error al dar de baja.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const confirmarEliminar = async () => {
     if (!deleting) return;
     setWorking(true);
@@ -218,13 +271,30 @@ export function MembersTable() {
 
   const Actions = ({ m }: { m: Member }) => (
     <div className="flex justify-end gap-1">
-      <Button variant="ghost" size="icon" onClick={() => setViewing(m)}>
+      <Button variant="ghost" size="icon" onClick={() => setViewing(m)} title="Ver ficha">
         <Eye className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" onClick={() => setEditing(m)}>
+      <Button variant="ghost" size="icon" onClick={() => setEditing(m)} title="Editar">
         <Pencil className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => abrirEliminar(m)}>
+      {/* Dar de baja ≠ eliminar. La baja conserva la ficha y el historial: la
+          persona sale de los listados y las estadísticas, pero el pastor la
+          sigue viendo en Retiros y puede reactivarla. */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => { setDandoBaja(m); setMotivoBaja(MOTIVOS_BAJA[0]); setMotivoOtroBaja(''); setBajaError(''); }}
+        title="Dar de baja (deja de aparecer, pero se conserva)"
+      >
+        <UserMinus className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="text-destructive"
+        onClick={() => abrirEliminar(m)}
+        title="Eliminar definitivamente"
+      >
         <Trash2 className="h-4 w-4" />
       </Button>
     </div>
@@ -457,7 +527,13 @@ export function MembersTable() {
               Eliminar miembro
             </DialogTitle>
             <DialogDescription>
-              Vas a eliminar a <span className="font-semibold text-foreground">{deleting?.nombre}</span>. Esta acción no se puede deshacer.
+              Vas a eliminar a <span className="font-semibold text-foreground">{deleting?.nombre}</span> y
+              todo su historial de asistencia, para siempre. Esta acción no se puede deshacer.
+              <br />
+              <span className="mt-1.5 inline-block">
+                Si solo quieres que deje de aparecer en listados y estadísticas, cierra esto y usa{' '}
+                <strong>Dar de baja</strong>: conserva la ficha y se puede revertir.
+              </span>
             </DialogDescription>
           </DialogHeader>
 
@@ -497,6 +573,56 @@ export function MembersTable() {
               disabled={working || (!esPastor && !pwd)}
             >
               {working ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dar de baja: no borra nada, solo registra el retiro */}
+      <Dialog open={!!dandoBaja} onOpenChange={(o) => { if (!o && !working) setDandoBaja(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserMinus className="h-5 w-5 text-muted-foreground" />
+              Dar de baja
+            </DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-foreground">{dandoBaja?.nombre}</span> dejará de
+              aparecer en los listados, en la asistencia de cada domingo y en las estadísticas.
+              Su ficha y su historial se conservan: el pastor lo sigue viendo en{' '}
+              <strong>Retiros</strong> y puede reactivarlo cuando quiera.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Motivo</Label>
+            <RadioGroup value={motivoBaja} onValueChange={setMotivoBaja} className="gap-2">
+              {MOTIVOS_BAJA.map((m) => (
+                <div key={m} className="flex items-center gap-2">
+                  <RadioGroupItem value={m} id={`baja-${m}`} />
+                  <Label htmlFor={`baja-${m}`} className="cursor-pointer text-sm font-normal">{m}</Label>
+                </div>
+              ))}
+            </RadioGroup>
+            {motivoBaja === OTRO_BAJA && (
+              <Input
+                autoFocus
+                value={motivoOtroBaja}
+                onChange={(e) => setMotivoOtroBaja(e.target.value)}
+                placeholder="Escribe el motivo"
+                disabled={working}
+              />
+            )}
+          </div>
+
+          {bajaError && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{bajaError}</p>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDandoBaja(null)} disabled={working}>Cancelar</Button>
+            <Button onClick={confirmarBaja} disabled={working || !motivoBajaFinal}>
+              {working ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Dar de baja'}
             </Button>
           </DialogFooter>
         </DialogContent>

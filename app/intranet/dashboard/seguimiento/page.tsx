@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getPersonas, getCultos, getAsistencias, getIdsRetirados } from '@/lib/datos';
+import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
@@ -52,13 +52,12 @@ export default function SeguimientoPage() {
     // Cultos GENERALES ya realizados (fecha <= ahora), más reciente primero.
     // Las ausencias consecutivas se miden sobre el culto dominical, no sobre
     // reuniones de ministerio (público parcial).
-    let retirados: Set<number>;
     let personas: Awaited<ReturnType<typeof getPersonas>>;
     let cultos: Awaited<ReturnType<typeof getCultos>>;
     let asist: Awaited<ReturnType<typeof getAsistencias>>;
     try {
-      [retirados, personas, cultos, asist] = await Promise.all([
-        getIdsRetirados(),
+      // getPersonas() ya excluye a los dados de baja desde el servidor.
+      [personas, cultos, asist] = await Promise.all([
         getPersonas(),
         getCultos({ tipo: 'general', orden: 'desc' }),
         getAsistencias(),
@@ -80,7 +79,6 @@ export default function SeguimientoPage() {
     }
 
     const resultado: SeguimientoRow[] = personas
-      .filter((p) => !retirados.has(Number(p.id)))
       .map((p) => {
         const pId = Number(p.id);
         const asistencias = asistMap.get(pId) ?? new Set<number>();

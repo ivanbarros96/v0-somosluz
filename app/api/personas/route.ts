@@ -60,7 +60,27 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ personas: data ?? [] });
+
+  // Los dados de baja se excluyen ACÁ y no en cada pantalla. Antes solo la
+  // lista de Miembros los filtraba, así que un retirado seguía apareciendo
+  // cada domingo para marcar asistencia y seguía sumando en los KPIs y
+  // gráficos del Pastor — "no desaparecía del mapa". Filtrando en el origen
+  // ninguna pantalla puede olvidarse de hacerlo.
+  const { data: retiros, error: errRetiros } = await db.from('retiros').select('persona_id');
+  if (errRetiros) return NextResponse.json({ error: errRetiros.message }, { status: 500 });
+  const retirados = new Set((retiros ?? []).map((r) => Number(r.persona_id)));
+
+  // ?incluirRetirados=1 los trae igual, marcados con `retirado: true`. Lo usa
+  // la pantalla de Retiros, que justamente necesita verlos.
+  if (searchParams.get('incluirRetirados')) {
+    return NextResponse.json({
+      personas: (data ?? []).map((p) => ({ ...p, retirado: retirados.has(Number(p.id)) })),
+    });
+  }
+
+  return NextResponse.json({
+    personas: (data ?? []).filter((p) => !retirados.has(Number(p.id))),
+  });
 }
 
 // POST /api/personas — crear persona (adulto/niño/joven)

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getPersonas, getCultos, getAsistencias, getIdsRetirados } from '@/lib/datos';
+import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -59,15 +59,13 @@ function FidelizacionContent() {
     setLoading(true);
     const ahora = Date.now();
 
-    // Excluir retirados. Solo cultos generales: la fidelidad se mide sobre el
-    // culto dominical.
-    let retirados: Set<number>;
+    // Solo cultos generales: la fidelidad se mide sobre el culto dominical.
+    // Los dados de baja ya vienen excluidos desde el servidor.
     let personas: Awaited<ReturnType<typeof getPersonas>>;
     let cultos: Awaited<ReturnType<typeof getCultos>>;
     let asist: Awaited<ReturnType<typeof getAsistencias>>;
     try {
-      [retirados, personas, cultos, asist] = await Promise.all([
-        getIdsRetirados(),
+      [personas, cultos, asist] = await Promise.all([
         getPersonas(),
         getCultos({ tipo: 'general', orden: 'desc' }),
         getAsistencias(),
@@ -90,7 +88,6 @@ function FidelizacionContent() {
     const resultado: Row[] = [];
     for (const p of personas) {
       const pid = Number(p.id);
-      if (retirados.has(pid)) continue;
       const join = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
       const elegibles = cultosPasados.filter((c) => new Date(c.fecha).getTime() >= join);
       if (elegibles.length === 0) continue; // se unió después del último culto

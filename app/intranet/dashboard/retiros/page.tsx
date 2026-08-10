@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getPersonas, getAsistenciasConFechaCulto, getIdsRetirados } from '@/lib/datos';
+import { getPersonas, getAsistenciasConFechaCulto } from '@/lib/datos';
+import { InactivosPanel } from '@/components/intranet/pastor/inactivos-panel';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -52,13 +53,12 @@ export default function RetirosPage() {
   async function loadAusentes() {
     setLoading(true);
 
-    // IDs ya retirados, personas y asistencias con la fecha de su culto
-    let retiradosIds: Set<number>;
+    // getPersonas() ya excluye a los dados de baja desde el servidor, así que
+    // los candidatos a retiro nunca incluyen a quien ya está inactivo.
     let personas: Awaited<ReturnType<typeof getPersonas>>;
     let asistencias: Awaited<ReturnType<typeof getAsistenciasConFechaCulto>>;
     try {
-      [retiradosIds, personas, asistencias] = await Promise.all([
-        getIdsRetirados(),
+      [personas, asistencias] = await Promise.all([
         getPersonas(),
         getAsistenciasConFechaCulto(),
       ]);
@@ -80,7 +80,6 @@ export default function RetirosPage() {
 
     const hoy = Date.now();
     const resultado: AusenteRow[] = personas
-      .filter((p) => !retiradosIds.has(Number(p.id)))
       .map((p) => {
         const pId = Number(p.id);
         const ultima = ultimaFechaPorPersona[pId] ?? null;
@@ -212,6 +211,13 @@ export default function RetirosPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Quienes ya fueron dados de baja. onCambio recarga los candidatos: al
+          reactivar a alguien vuelve a la lista de activos y puede reaparecer
+          acá arriba si sigue sin asistir. */}
+      <div className="mt-6">
+        <InactivosPanel onCambio={loadAusentes} />
+      </div>
 
       {/* Modal */}
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
