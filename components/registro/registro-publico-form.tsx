@@ -16,6 +16,7 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 const DIAS = Array.from({ length: 31 }, (_, i) => i + 1);
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = Array.from({ length: ANIO_ACTUAL - 1929 }, (_, i) => ANIO_ACTUAL - i);
+const NUMS_CONVERSION = Array.from({ length: 50 }, (_, i) => i + 1);
 const MAX_NINOS = 10;
 
 interface Nino {
@@ -99,12 +100,18 @@ export function RegistroPublicoForm() {
   const [form, setForm] = useState({
     nombre: '', sexo: '',
     codTel: '+56', telefono: '',
+    codWa: '+56', whatsapp: '',
     email: '',
     region: '', comuna: '',
     direccion: '',
     dia: '', mes: '', anio: '',
     bautizado: false,
+    convNum: '', convUnidad: '',
   });
+  // Casi siempre el WhatsApp es el mismo número. Marcado por defecto para no
+  // hacer tipear dos veces lo mismo desde el celular; al desmarcar aparece el
+  // campo aparte.
+  const [waIgualTelefono, setWaIgualTelefono] = useState(true);
   const [ninos, setNinos] = useState<Nino[]>([]);
   // Campo trampa: una persona nunca lo ve (está fuera de pantalla). Si viene
   // con algo, quien envió es un bot.
@@ -133,11 +140,16 @@ export function RegistroPublicoForm() {
             sexo: form.sexo,
             fecha_nacimiento: fechaDMY(form.dia, form.mes, form.anio),
             telefono: form.telefono ? `${form.codTel} ${form.telefono}` : null,
+            whatsapp: waIgualTelefono
+              ? (form.telefono ? `${form.codTel} ${form.telefono}` : null)
+              : (form.whatsapp ? `${form.codWa} ${form.whatsapp}` : null),
             email: form.email,
             region: form.region,
             comuna: form.comuna,
             direccion: form.direccion,
             bautizado: form.bautizado,
+            tiempo_conversion:
+              form.convNum && form.convUnidad ? `${form.convNum} ${form.convUnidad}` : null,
           },
           ninos: ninos
             .filter((n) => n.nombre.trim())
@@ -305,6 +317,40 @@ export function RegistroPublicoForm() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={waIgualTelefono}
+                    onChange={(e) => setWaIgualTelefono(e.target.checked)}
+                    className="h-4 w-4 accent-[var(--primary)]"
+                  />
+                  <span className="text-foreground">Mi WhatsApp es el mismo número</span>
+                </label>
+                {!waIgualTelefono && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="whatsapp">WhatsApp</Label>
+                    <div className="flex gap-2">
+                      <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
+                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PAISES.map((p) => (
+                            <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        id="whatsapp"
+                        value={form.whatsapp}
+                        onChange={(e) => set('whatsapp', e.target.value)}
+                        placeholder="9 1234 5678"
+                        inputMode="tel"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="email">Correo</Label>
                 <Input
@@ -340,15 +386,57 @@ export function RegistroPublicoForm() {
                 </div>
               </div>
 
-              <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border p-3">
-                <input
-                  type="checkbox"
-                  checked={form.bautizado}
-                  onChange={(e) => set('bautizado', e.target.checked)}
-                  className="h-4 w-4 accent-[var(--primary)]"
+              <div className="space-y-1.5">
+                <Label htmlFor="direccion">Dirección</Label>
+                <Input
+                  id="direccion"
+                  value={form.direccion}
+                  onChange={(e) => set('direccion', e.target.value)}
+                  placeholder="Ej: Av. Brasil 1234"
+                  autoComplete="street-address"
                 />
-                <span className="text-sm text-foreground">Ya fui bautizado</span>
-              </label>
+              </div>
+
+              <div className="space-y-3 border-t border-border pt-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Fe y comunidad
+                </p>
+
+                <div className="space-y-1.5">
+                  <Label>Tiempo de conversión</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
+                      <SelectTrigger><SelectValue placeholder="N°" /></SelectTrigger>
+                      <SelectContent>
+                        {NUMS_CONVERSION.map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={form.convUnidad} onValueChange={(v) => set('convUnidad', v)}>
+                      <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Meses">Meses</SelectItem>
+                        <SelectItem value="Años">Años</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Hace cuánto tomaste la decisión de seguir a Cristo. Si prefieres no
+                    responder, déjalo en blanco.
+                  </p>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border p-3">
+                  <input
+                    type="checkbox"
+                    checked={form.bautizado}
+                    onChange={(e) => set('bautizado', e.target.checked)}
+                    className="h-4 w-4 accent-[var(--primary)]"
+                  />
+                  <span className="text-sm text-foreground">Ya fui bautizado</span>
+                </label>
+              </div>
 
               <div className="flex gap-2 pt-1">
                 <Button variant="outline" onClick={() => setPaso(1)} className="gap-1">

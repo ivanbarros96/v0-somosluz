@@ -51,6 +51,16 @@ function fechaValida(v: unknown): string | null {
   return `${d}/${mes}/${anio}`;
 }
 
+// El formulario lo arma como "3 Años" / "8 Meses". Se valida en vez de confiar:
+// este endpoint es público, así que cualquiera podría mandar texto libre.
+function tiempoConversion(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const m = v.trim().match(/^(\d{1,2})\s+(Meses|Años)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 50 ? `${n} ${m[2]}` : null;
+}
+
 function edadDesde(fecha: string | null): number | null {
   if (!fecha) return null;
   const [d, m, a] = fecha.split('/').map(Number);
@@ -139,6 +149,10 @@ export async function POST(req: NextRequest) {
     comuna: texto(adulto.comuna),
     direccion: texto(adulto.direccion, MAX_DIRECCION),
     bautizado: adulto.bautizado === true ? 'si' : 'no',
+    // Se guarda tal cual lo arma el formulario ("3 Años"), igual que en la
+    // intranet, pero validado: solo un número seguido de Meses o Años. Así un
+    // texto arbitrario desde fuera no entra a la ficha.
+    tiempo_conversion: tiempoConversion(adulto.tiempo_conversion),
   };
 
   const { data: creado, error } = await db
