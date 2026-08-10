@@ -9,10 +9,12 @@ export const ROLES = {
   hombres: { name: 'Hombría al Máximo', badge: 'Ministerio', envVar: 'HOMBRES_PASSWORD', ministerio: 'hombres' },
   discipulado: { name: 'Viernes de Discipulado', badge: 'Ministerio', envVar: 'DISCIPULADO_PASSWORD', ministerio: 'discipulado' },
   youth: { name: 'Generación Youth', badge: 'Ministerio', envVar: 'YOUTH_PASSWORD', ministerio: 'youth' },
-  // Kids NO tiene reunión propia (ministerio: null a propósito): toma la
-  // asistencia de los niños DENTRO del culto general que abre Somos Luz. Su
-  // límite es de público (niños), no de tipo de culto — ver esRolKids().
-  kids: { name: 'Kids', badge: 'Ministerio', envVar: 'KIDS_PASSWORD', ministerio: null },
+  // Kids sí tiene reunión propia desde el 09/08/2026: la clase de niños corre
+  // en paralelo al dominical. Antes compartía el registro del general y las
+  // marcas se pisaban (ver lib/cultos-tipos.ts). Sigue siendo especial en dos
+  // cosas — no abre ni cierra su culto (se crea solo con el dominical) y solo
+  // ve el que está abierto — ver esRolKids().
+  kids: { name: 'Kids', badge: 'Ministerio', envVar: 'KIDS_PASSWORD', ministerio: 'kids' },
 } as const satisfies Record<
   string,
   { name: string; badge: string; envVar: string; ministerio: CultoTipo | null }
@@ -32,9 +34,9 @@ export function ministerioDeRol(role: string): CultoTipo | null {
   return esRolValido(role) ? ROLES[role].ministerio : null;
 }
 
-// Kids: caso aparte. No filtra por tipo de culto (trabaja sobre el culto
-// general de Somos Luz) sino por público — solo puede marcar niños, y solo
-// mientras el culto siga abierto. Somos Luz es quien crea y cierra el culto.
+// Kids es un ministerio como los demás (ministerio: 'kids'), pero con dos
+// reglas propias: su culto lo crea y cierra el sistema junto con el dominical
+// —nunca la maestra— y solo ve el que está abierto, para no tocar historial.
 export function esRolKids(role: string): boolean {
   return role === 'kids';
 }

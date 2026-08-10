@@ -17,9 +17,10 @@ async function cultoFueraDeAlcance(role: string, cultoId: number | string): Prom
   return !data || data.tipo !== ministerio;
 }
 
-// Kids: solo el culto general que esté abierto, y solo sobre niños o
-// visitantes. Se valida aquí y no solo en la UI porque ocultar un botón no
-// impide llamar al endpoint a mano. Devuelve el motivo del rechazo o null.
+// Kids: además de la regla de ministerio (que ya lo limita a cultos de tipo
+// 'kids'), solo mientras el culto siga abierto y solo sobre niños o visitantes.
+// Se valida aquí y no solo en la UI porque ocultar un botón no impide llamar
+// al endpoint a mano. Devuelve el motivo del rechazo o null.
 async function kidsFueraDeAlcance(
   role: string,
   cultoId: number | string,
@@ -28,12 +29,10 @@ async function kidsFueraDeAlcance(
   if (!esRolKids(role)) return null;
 
   const db = getSupabaseAdmin();
-  const { data: culto } = await db.from('cultos').select('tipo, activo').eq('id', cultoId).single();
-  if (!culto || culto.tipo !== 'general') {
-    return 'Tu perfil solo toma asistencia en el culto dominical';
-  }
+  const { data: culto } = await db.from('cultos').select('activo').eq('id', cultoId).single();
+  if (!culto) return 'El culto no existe';
   if (!culto.activo) {
-    return 'El culto ya fue cerrado por Somos Luz';
+    return 'La clase ya fue cerrada junto con el culto dominical';
   }
 
   // Sin personaId es un visitante (miembros_nuevos): no trae categoría y Kids

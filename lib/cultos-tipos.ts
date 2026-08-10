@@ -1,8 +1,14 @@
 // Catálogo de tipos de culto/reunión y sus reglas de público.
-// Fuente: definición del cliente (jul-2026). Niños no tienen reunión propia:
-// asisten con sus padres al Culto General.
-
-export type CultoTipo = 'general' | 'hombres' | 'mujeres' | 'discipulado' | 'youth';
+// Fuente: definición del cliente (jul-2026), actualizada en ago-2026.
+//
+// 'kids' se agregó el 09/08/2026: la clase de niños ocurre EN PARALELO al
+// culto dominical, en otra sala. Antes compartía el registro del general, así
+// que quien tomaba la asistencia general se llevaba la marca y después no se
+// podía responder "cuántos niños entraron a la clase de Kids" — solo "cuántos
+// niños vinieron a la iglesia". Con su propio tipo son dos hechos separados y
+// ya no se pisan. El culto de Kids se crea solo junto al dominical
+// (ver POST /api/cultos).
+export type CultoTipo = 'general' | 'hombres' | 'mujeres' | 'discipulado' | 'youth' | 'kids';
 
 export interface PersonaAudiencia {
   source_tipo: 'adulto' | 'nino' | 'joven' | 'nuevo';
@@ -84,6 +90,16 @@ export const CULTO_TIPOS: Record<
       // solo por edad — necesita al menos una asistencia previa registrada
       // en un culto de Youth.
       return p.asistioAYouthAlgunaVez ? 'si' : 'no';
+    },
+  },
+  kids: {
+    label: 'Clase de Kids',
+    publico: 'Niños',
+    elegibilidad: (p) => {
+      if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
+      // Manda la categoría de registro, no la edad: así un niño sin fecha de
+      // nacimiento cargada igual aparece en la lista de la maestra.
+      return p.source_tipo === 'nino' ? 'si' : 'no';
     },
   },
 };

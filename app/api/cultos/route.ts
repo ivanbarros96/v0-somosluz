@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { esCultoTipo } from '@/lib/cultos-tipos';
+import { esCultoTipo, descripcionCulto } from '@/lib/cultos-tipos';
 import { ministerioDeRol, esRolKids } from '@/lib/roles';
 
 // GET /api/cultos — lectura de cultos. Requiere sesión.
@@ -67,14 +67,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Tu perfil solo puede crear reuniones de su ministerio' }, { status: 403 });
   }
 
-  const { data, error } = await getSupabaseAdmin()
+  const db = getSupabaseAdmin();
+  const tipoFinal = tipo ?? 'general';
+
+  const { data, error } = await db
     .from('cultos')
-    .insert({ fecha, descripcion, activo: true, tipo: tipo ?? 'general' })
+    .insert({ fecha, descripcion, activo: true, tipo: tipoFinal })
     .select()
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // La clase de Kids corre en paralelo al dominical, así que se abre sola con
+  // él: la maestra no tiene permiso para crear cultos y así no depende de que
+  // alguien se acuerde. Si ya existe uno para esa fecha no se duplica.
+  if (tipoFinal === 'general') {
+    const { data: yaExiste } = await db
+      .from('cultos')
+      .select('id')
+      .eq('tipo', 'kids')
+      .eq('fecha', fecha)
+      .maybeSingle();
+
+    if (!yaExiste) {
+      // Un fallo acá no debe tumbar la creación del dominical, que es lo que
+      // el usuario pidió: se registra y sigue. Kids lo vería como "sin culto
+      // abierto" y se puede crear después.
+      const { error: errKids } = await db.from('cultos').insert({
+        fecha,
+        descripcion: descripcionCulto('kids', fecha),
+        activo: true,
+        tipo: 'kids',
+      });
+      if (errKids) console.error('No se pudo crear el culto de Kids:', errKids.message);
+    }
   }
 
   return NextResponse.json({ culto: data });

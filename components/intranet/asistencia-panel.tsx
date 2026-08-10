@@ -356,12 +356,13 @@ export function AsistenciaPanel() {
 
   // Cultos visibles según el rol:
   // - pastor: todos · ministerio: solo su tipo
-  // - kids: solo el culto general que esté ABIERTO (el del domingo en curso).
-  //   Al cerrarlo Somos Luz, desaparece de su vista: Kids no toca historial.
+  // - kids: además, solo el que está ABIERTO. Se abre y cierra junto con el
+  //   dominical, así que al cerrarlo Somos Luz desaparece de su vista y la
+  //   maestra no toca historial.
   // - somosluz: solo generales (ministerios ocultos hasta desbloquear con clave del pastor)
   const cultosVisibles = cultos.filter((c) => {
     if (esPastor) return true;
-    if (esKids) return c.tipo === 'general' && c.activo;
+    if (esKids) return c.tipo === 'kids' && c.activo;
     if (ministerio) return c.tipo === ministerio;
     return ministeriosDesbloqueados || c.tipo === 'general';
   });
@@ -403,10 +404,10 @@ export function AsistenciaPanel() {
       asistioAYouthAlgunaVez: asistioYouthIds.has(p.id),
     });
 
-  // Kids ignora el público del culto (el general acepta a todos) y filtra por
-  // su propio público: los registrados como Niño. Los visitantes ("Nuevo") no
-  // traen edad ni categoría, así que aparecen solo al activar "Ver todos".
-  const enPublicoDelRol = (p: Persona) => (esKids ? p.tipo === 'nino' : elegibilidadDe(p) !== 'no');
+  // El público sale del tipo de culto (CULTO_TIPOS): en el de Kids son los
+  // registrados como Niño. Los visitantes quedan fuera por defecto porque no
+  // traen edad ni categoría — se ven al activar "Ver todos".
+  const enPublicoDelRol = (p: Persona) => elegibilidadDe(p) !== 'no';
 
   const filtradas = personas
     .filter((p) => filtro === 'todos' || p.tipo === filtro)
@@ -625,7 +626,7 @@ export function AsistenciaPanel() {
                   {label}
                 </button>
               ))}
-              {(tipoCulto !== 'general' || esKids) && (
+              {tipoCulto !== 'general' && (
                 <button
                   onClick={() => setVerTodos((v) => !v)}
                   className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors

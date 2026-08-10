@@ -39,9 +39,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 });
   }
 
-  const { error } = await getSupabaseAdmin().from('cultos').update(patch).eq('id', id);
+  const db = getSupabaseAdmin();
+  const { data: actualizado, error } = await db
+    .from('cultos')
+    .update(patch)
+    .eq('id', id)
+    .select('fecha, tipo')
+    .single();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // El culto de Kids se abre solo con el dominical, así que también se cierra
+  // con él: la maestra no puede cerrarlo y si no, quedaría abierto para siempre.
+  if (actualizado?.tipo === 'general' && patch.activo === false) {
+    const { error: errKids } = await db
+      .from('cultos')
+      .update({ activo: false })
+      .eq('tipo', 'kids')
+      .eq('fecha', actualizado.fecha);
+    if (errKids) console.error('No se pudo cerrar el culto de Kids:', errKids.message);
   }
 
   return NextResponse.json({ ok: true });
