@@ -20,15 +20,53 @@ export async function GET(req: NextRequest) {
     const termino = nombreExacto.trim();
     if (!termino) return NextResponse.json({ existe: false });
 
-    const { data, error } = await db
-      .from('miembros_nuevos')
-      .select('id')
-      .ilike('nombre', termino)
-      .limit(1)
-      .maybeSingle();
+    let query = db.from('miembros_nuevos').select('id').ilike('nombre', termino);
+    // Al convertir un visitante en miembro hay que excluirlo a sí mismo, o se
+    // detectaría como su propio duplicado.
+    const excluirId = searchParams.get('excluirId');
+    if (excluirId) query = query.neq('id', excluirId);
+
+    const { data, error } = await query.limit(1).maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ existe: !!data });
+  }
+
+  // ?conVisitas=1 agrega cuántas veces vino cada visitante y su última fecha.
+  // Sirve para decidir a quién conviene convertir en miembro: alguien con 5
+  // visitas ya no es "una visita".
+  if (searchParams.get('conVisitas')) {
+    const [{ data: visitantes, error: errV }, { data: asistencias, error: errA }] = await Promise.all([
+      db.from('miembros_nuevos').select('id, nombre, telefono, email, fecha_registro').order('nombre'),
+      db.from('asistencias').select('miembro_nuevo_id, cultos(fecha)').not('miembro_nuevo_id', 'is', null),
+    ]);
+    if (errV) return NextResponse.json({ error: errV.message }, { status: 500 });
+    if (errA) return NextResponse.json({ error: errA.message }, { status: 500 });
+
+    const porVisitante = new Map<number, { visitas: number; ultima: string | null }>();
+    for (const a of asistencias ?? []) {
+      // El join de Supabase puede llegar como objeto o como arreglo de un
+      // elemento según cómo infiera la relación; se normalizan ambos.
+      const fila = a as unknown as {
+        miembro_nuevo_id: number;
+        cultos?: { fecha: string } | { fecha: string }[] | null;
+      };
+      const id = Number(fila.miembro_nuevo_id);
+      const rel = Array.isArray(fila.cultos) ? fila.cultos[0] : fila.cultos;
+      const fecha = rel?.fecha ?? null;
+      const acc = porVisitante.get(id) ?? { visitas: 0, ultima: null };
+      acc.visitas += 1;
+      if (fecha && (!acc.ultima || fecha > acc.ultima)) acc.ultima = fecha;
+      porVisitante.set(id, acc);
+    }
+
+    return NextResponse.json({
+      miembrosNuevos: (visitantes ?? []).map((v) => ({
+        ...v,
+        visitas: porVisitante.get(Number(v.id))?.visitas ?? 0,
+        ultimaVisita: porVisitante.get(Number(v.id))?.ultima ?? null,
+      })),
+    });
   }
 
   const { data, error } = await db

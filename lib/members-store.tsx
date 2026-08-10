@@ -13,9 +13,59 @@ type MembersContextType = {
   addMember: (data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'> | Omit<JovenMember, 'id' | 'created_at'>) => Promise<void>;
   updateMember: (id: string, data: Partial<Member>) => Promise<void>;
   deleteMember: (id: string, pastorPassword?: string) => Promise<void>;
+  convertirVisitante: (visitanteId: number, data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'> | Omit<JovenMember, 'id' | 'created_at'>) => Promise<void>;
 };
 
 const MembersContext = createContext<MembersContextType | undefined>(undefined);
+
+type NuevoMiembro =
+  | Omit<AdultoMember, 'id' | 'created_at'>
+  | Omit<NinoMember, 'id' | 'created_at'>
+  | Omit<JovenMember, 'id' | 'created_at'>;
+
+// Traduce la ficha del formulario a la fila de la tabla `personas`. Compartido
+// entre crear un miembro y convertir un visitante, para que ambos caminos
+// guarden exactamente los mismos campos.
+// `fecha_nac`, `cumple_mes` y `cumple_dia` no van acá: los deriva de
+// `fecha_nacimiento` el trigger trg_personas_sync_fecha_nac.
+function memberToRow(data: NuevoMiembro): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    source_tipo: data.tipo,
+    fecha_registro: data.fecha_registro,
+    nombre: data.nombre,
+    sexo: data.sexo,
+    telefono: data.telefono,
+    whatsapp: data.whatsapp,
+    email: data.email,
+    region: data.region,
+    comuna: data.comuna,
+    direccion: data.direccion,
+  };
+
+  if (data.tipo === 'adulto') {
+    const a = data as Omit<AdultoMember, 'id' | 'created_at'>;
+    row.bautizado = a.bautizado;
+    row.tiempo_conversion = a.tiempo_conversion;
+    row.fecha_nacimiento = a.fecha_nacimiento ?? null;
+    row.edad = a.edad ?? null;
+  } else if (data.tipo === 'joven') {
+    const j = data as Omit<JovenMember, 'id' | 'created_at'>;
+    row.bautizado = j.bautizado;
+    row.tiempo_conversion = j.tiempo_conversion;
+    row.fecha_nacimiento = j.fecha_nacimiento ?? null;
+    row.edad = j.edad ?? null;
+    row.nombre_apoderado = j.nombre_apoderado ?? null;
+    row.telefono_apoderado = j.telefono_apoderado ?? null;
+  } else {
+    const n = data as Omit<NinoMember, 'id' | 'created_at'>;
+    row.fecha_nacimiento = n.fecha_nacimiento;
+    row.edad = n.edad;
+    row.nombre_apoderado = n.nombre_apoderado;
+    row.telefono_apoderado = n.telefono_apoderado;
+  }
+
+  return row;
+}
 
 function mapToMember(row: any): Member {
   const base = {
@@ -91,52 +141,31 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const addMember = useCallback(async (
-    data: Omit<AdultoMember, 'id' | 'created_at'> | Omit<NinoMember, 'id' | 'created_at'> | Omit<JovenMember, 'id' | 'created_at'>
-  ) => {
-    const row: any = {
-      source_tipo: data.tipo,
-      fecha_registro: data.fecha_registro,
-      nombre: data.nombre,
-      sexo: data.sexo,
-      telefono: data.telefono,
-      whatsapp: data.whatsapp,
-      email: data.email,
-      region: data.region,
-      comuna: data.comuna,
-      direccion: data.direccion,
-    };
-
-    if (data.tipo === 'adulto') {
-      const a = data as Omit<AdultoMember, 'id' | 'created_at'>;
-      row.bautizado = a.bautizado;
-      row.tiempo_conversion = a.tiempo_conversion;
-      row.fecha_nacimiento = a.fecha_nacimiento ?? null; // ✅ sin as any
-      row.edad = a.edad ?? null;                         // ✅ sin as any
-    } else if (data.tipo === 'joven') {
-      const j = data as Omit<JovenMember, 'id' | 'created_at'>;
-      row.bautizado = j.bautizado;
-      row.tiempo_conversion = j.tiempo_conversion;
-      row.fecha_nacimiento = j.fecha_nacimiento ?? null;
-      row.edad = j.edad ?? null;
-      row.nombre_apoderado = j.nombre_apoderado ?? null;
-      row.telefono_apoderado = j.telefono_apoderado ?? null;
-    } else {
-      const n = data as Omit<NinoMember, 'id' | 'created_at'>;
-      row.fecha_nacimiento = n.fecha_nacimiento;
-      row.edad = n.edad;
-      row.nombre_apoderado = n.nombre_apoderado;
-      row.telefono_apoderado = n.telefono_apoderado;
-    }
-
+  const addMember = useCallback(async (data: NuevoMiembro) => {
     const res = await fetch('/api/personas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(row),
+      body: JSON.stringify(memberToRow(data)),
     });
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: 'Error al crear el miembro.' }));
       throw new Error(error ?? 'Error al crear el miembro.');
+    }
+    await refreshMembers();
+  }, [refreshMembers]);
+
+  // Convierte un visitante en miembro conservando su historial de asistencias.
+  // Usa el mismo mapeo que addMember: la diferencia está en el endpoint, que
+  // además re-apunta las asistencias y borra el registro de visitante.
+  const convertirVisitante = useCallback(async (visitanteId: number, data: NuevoMiembro) => {
+    const res = await fetch(`/api/miembros-nuevos/${visitanteId}/convertir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(memberToRow(data)),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: 'Error al convertir el visitante.' }));
+      throw new Error(error ?? 'Error al convertir el visitante.');
     }
     await refreshMembers();
   }, [refreshMembers]);
@@ -197,7 +226,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, refreshMembers]);
 
   return (
-    <MembersContext.Provider value={{ members, isLoading, error, refreshMembers, addMember, updateMember, deleteMember }}>
+    <MembersContext.Provider value={{ members, isLoading, error, refreshMembers, addMember, updateMember, deleteMember, convertirVisitante }}>
       {children}
     </MembersContext.Provider>
   );

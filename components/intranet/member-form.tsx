@@ -42,8 +42,20 @@ function modosPermitidosParaRol(role: string | undefined): Modo[] {
   return ['adulto', 'joven', 'nino', 'nuevo'];
 }
 
+// Visitante que se está convirtiendo en miembro. Cuando viene, el formulario
+// arranca con sus datos ya cargados y al guardar usa el endpoint de conversión
+// (que además le traspasa el historial de asistencias) en vez de crear una
+// ficha suelta.
+export interface VisitanteAConvertir {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  email: string | null;
+}
+
 interface MemberFormProps {
   member?: Member | null;
+  visitante?: VisitanteAConvertir | null;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -197,14 +209,27 @@ function computeForm(member: Member | null | undefined) {
   return base;
 }
 
-export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
-  const { addMember, updateMember } = useMembers();
+export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFormProps) {
+  const { addMember, updateMember, convertirVisitante } = useMembers();
   const { user } = useAuth();
   const isEditing = !!member;
+  const esConversion = !!visitante;
+
+  // Un único punto de guardado para las tres pestañas (adulto/joven/niño):
+  // convertir un visitante, editar, o crear desde cero.
+  const guardar = async (data: Parameters<typeof addMember>[0]) => {
+    if (visitante) return convertirVisitante(visitante.id, data);
+    if (isEditing) return updateMember(member!.id, data);
+    return addMember(data);
+  };
 
   // Pestañas que este rol puede usar al CREAR (en edición, el modo ya viene
   // fijado por el tipo del miembro que se está editando, no por el rol).
-  const modosPermitidos = modosPermitidosParaRol(user?.role);
+  // Al convertir se saca "Nuevo": la persona YA es una visita, la gracia es
+  // pasarla a una categoría real.
+  const modosPermitidos = modosPermitidosParaRol(user?.role).filter(
+    (m) => !esConversion || m !== 'nuevo',
+  );
 
   const [modo, setModo] = useState<Modo>(() => {
     if (member) {
@@ -215,7 +240,21 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
     return modosPermitidos[0] ?? 'adulto';
   });
 
-  const [form, setForm] = useState(() => computeForm(member));
+  const [form, setForm] = useState(() => {
+    const base = computeForm(member);
+    if (!visitante) return base;
+    // El teléfono del visitante viene como "+56 912345678": se separa para
+    // que calce con el selector de país + número del formulario.
+    const [cod, ...resto] = (visitante.telefono ?? '').trim().split(' ');
+    const tieneCodigo = cod.startsWith('+') && resto.length > 0;
+    return {
+      ...base,
+      nombre: visitante.nombre,
+      codTel: tieneCodigo ? cod : base.codTel,
+      telefono: tieneCodigo ? resto.join(' ') : (visitante.telefono ?? ''),
+      email: visitante.email ?? '',
+    };
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
@@ -305,7 +344,11 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         // Al editar, el propio registro puede venir de una migración de un
         // "Nuevo" ya convertido — no hay id de miembros_nuevos que excluir
         // porque esa fila ya no existe, así que solo se filtra en modo alta.
-        isEditing ? Promise.resolve(false) : existeMiembroNuevo(form.nombre.trim()),
+        // Al convertir hay que excluir al propio visitante: si no, se detecta
+        // a sí mismo y la conversión queda bloqueada para siempre.
+        isEditing
+          ? Promise.resolve(false)
+          : existeMiembroNuevo(form.nombre.trim(), visitante?.id),
       ]);
 
       if (existeEnPersonas || existeEnNuevos) {
@@ -364,7 +407,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           nombre_apoderado: apoderadoSeleccionado!.nombre,
           telefono_apoderado: apoderadoSeleccionado!.telefono,
         };
-        isEditing ? await updateMember(member!.id, data) : await addMember(data);
+        await guardar(data);
         setOk(true);
         if (!isEditing) { setForm(emptyForm()); setApoderadoQuery(''); setApoderadoSeleccionado(null); }
         onSuccess?.();
@@ -396,7 +439,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
           nombre_apoderado: previo?.nombre_apoderado ?? null,
           telefono_apoderado: previo?.telefono_apoderado ?? null,
         };
-        isEditing ? await updateMember(member!.id, data) : await addMember(data);
+        await guardar(data);
         setOk(true);
         if (!isEditing) setForm(emptyForm());
         onSuccess?.();
@@ -420,7 +463,7 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         fecha_nacimiento: fecha,
         edad,
       };
-      isEditing ? await updateMember(member!.id, data) : await addMember(data);
+      await guardar(data);
 
       setOk(true);
       if (!isEditing) setForm(emptyForm());
@@ -795,7 +838,9 @@ export function MemberForm({ member, onSuccess, onCancel }: MemberFormProps) {
         )}
         <Button type="submit" disabled={loading} className="flex-1">
           {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-          {isEditing
+          {esConversion
+            ? 'Convertir en miembro ✓'
+            : isEditing
             ? 'Guardar Cambios ✓'
             : modo === 'nino'
               ? 'Registrar Niño ✓'

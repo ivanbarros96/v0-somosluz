@@ -18,6 +18,7 @@ import { ministerioDeRol } from '@/lib/roles';
 import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
 import { getCultos, getAsistencias } from '@/lib/datos';
 import { MemberForm } from '@/components/intranet/member-form';
+import { VisitantesPanel } from '@/components/intranet/visitantes-panel';
 
 function fmt(v: string | number | null | undefined) {
   return v === null || v === undefined || v === '' ? '—' : String(v);
@@ -272,7 +273,7 @@ export function MembersTable() {
         <CardContent className="px-0 pt-0">
           <Tabs defaultValue="todos">
             <div className="px-6 pb-4">
-              <TabsList className="grid w-full max-w-xl grid-cols-4">
+              <TabsList className="grid w-full max-w-2xl grid-cols-5">
                 <TabsTrigger value="todos" className="gap-2">
                   Todos <Badge variant="secondary">{todos.length}</Badge>
                 </TabsTrigger>
@@ -285,6 +286,10 @@ export function MembersTable() {
                 <TabsTrigger value="ninos" className="gap-2">
                   Niños <Badge variant="secondary">{ninos.length}</Badge>
                 </TabsTrigger>
+                {/* Los visitantes viven en otra tabla (miembros_nuevos), por eso
+                    su contenido es un componente aparte y no se mezcla con la
+                    lista de miembros. */}
+                <TabsTrigger value="visitantes">Visitantes</TabsTrigger>
               </TabsList>
             </div>
 
@@ -432,6 +437,10 @@ export function MembersTable() {
                     ))}
                 </TableBody>
               </Table>
+            </TabsContent>
+
+            <TabsContent value="visitantes" className="mt-0">
+              <VisitantesPanel />
             </TabsContent>
           </Tabs>
         </CardContent>

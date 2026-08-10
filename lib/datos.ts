@@ -83,8 +83,11 @@ export function getMiembrosNuevos(): Promise<MiembroNuevoRow[]> {
   return pedir<MiembroNuevoRow[]>('/api/miembros-nuevos', 'miembrosNuevos');
 }
 
-export function existeMiembroNuevo(nombre: string): Promise<boolean> {
+/** ¿Existe ya un visitante con ese nombre? `excluirId` sirve al convertirlo
+ *  en miembro: si no, el visitante se detecta a sí mismo como duplicado. */
+export function existeMiembroNuevo(nombre: string, excluirId?: number): Promise<boolean> {
   const params = new URLSearchParams({ nombreExacto: nombre });
+  if (excluirId != null) params.set('excluirId', String(excluirId));
   return pedir<boolean>(`/api/miembros-nuevos?${params}`, 'existe');
 }
 
