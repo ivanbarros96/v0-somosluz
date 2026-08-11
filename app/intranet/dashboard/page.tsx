@@ -14,6 +14,7 @@ import { EdadChart, type EdadRango } from '@/components/intranet/pastor/edad-cha
 import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor/fidelidad-chart';
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
 import { KidsCoberturaChart, type CoberturaKidsDomingo } from '@/components/intranet/pastor/kids-cobertura-chart';
+import { AsistenciaPronosticoChart, type DomingoAsistencia } from '@/components/intranet/pastor/asistencia-pronostico-chart';
 import { KidsSinClasePanel, type NinoSinKids } from '@/components/intranet/pastor/kids-sin-clase-panel';
 import { ESTADO } from '@/components/intranet/pastor/chart-kit';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
@@ -36,6 +37,7 @@ function PastorDashboard() {
   const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, jovenes: 0, ninos: 0, pctAsistenciaPromedio: 0, retencionVisitantes: null });
   const [oracionPendientes, setOracionPendientes] = useState(0);
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
+  const [serieDomingos, setSerieDomingos] = useState<DomingoAsistencia[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
@@ -139,6 +141,12 @@ function PastorDashboard() {
         total: conteoPorCulto[Number(c.id)] ?? 0,
         descripcion: c.descripcion,
       }));
+
+      // Serie COMPLETA de domingos ya realizados (para tendencia y pronóstico).
+      // A diferencia de `ultimos8`, aquí van todos, en orden cronológico.
+      const serieDomingos: DomingoAsistencia[] = cultosOrden
+        .filter((c) => new Date(c.fecha).getTime() <= Date.now())
+        .map((c) => ({ fecha: c.fecha, total: conteoPorCulto[Number(c.id)] ?? 0 }));
 
       // Asistencia por MES (promedio por culto dentro del mes)
       const fechaPorCulto: Record<number, string> = {};
@@ -365,6 +373,7 @@ function PastorDashboard() {
 
       setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
+      setSerieDomingos(serieDomingos);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
@@ -432,6 +441,8 @@ function PastorDashboard() {
         <AsistenciaChart data={asistenciaData} />
         <AsistenciaMensualChart data={asistenciaMensual} />
       </div>
+
+      <AsistenciaPronosticoChart data={serieDomingos} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <CrecimientoChart data={crecimientoData} />
