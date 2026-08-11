@@ -2,19 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
+import { calcularRiesgo, type NivelRiesgo } from '@/lib/seguimiento';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-
-// Umbrales (ausencias consecutivas): 0-1 verde · 2 amarillo · 3+ rojo
-type Nivel = 'verde' | 'amarillo' | 'rojo';
-
-function clasificar(streak: number): Nivel {
-  if (streak >= 3) return 'rojo';
-  if (streak === 2) return 'amarillo';
-  return 'verde';
-}
 
 interface SeguimientoRow {
   id: number;
@@ -24,7 +16,9 @@ interface SeguimientoRow {
   nombre_apoderado: string | null;
   telefono_apoderado: string | null;
   streak: number;
-  nivel: Nivel;
+  nivel: NivelRiesgo;
+  puntaje: number;
+  motivos: string[];
 }
 
 interface PendingCall {
@@ -32,10 +26,10 @@ interface PendingCall {
   label: string; // "nombre" o "Apoderado de nombre"
 }
 
-const NIVEL_STYLE: Record<Nivel, { dot: string; badge: string; label: string }> = {
-  verde:    { dot: 'bg-green-500',  badge: 'bg-green-500/10 text-green-600',    label: 'Al día' },
-  amarillo: { dot: 'bg-amber-500',  badge: 'bg-amber-500/10 text-amber-600',    label: 'Atención' },
-  rojo:     { dot: 'bg-red-500',    badge: 'bg-red-500/10 text-red-600',        label: 'Urgente' },
+const NIVEL_STYLE: Record<NivelRiesgo, { dot: string; badge: string; label: string }> = {
+  bajo:  { dot: 'bg-green-500', badge: 'bg-green-500/10 text-green-600', label: 'Al día' },
+  medio: { dot: 'bg-amber-500', badge: 'bg-amber-500/10 text-amber-600', label: 'Atención' },
+  alto:  { dot: 'bg-red-500',   badge: 'bg-red-500/10 text-red-600',     label: 'Riesgo alto' },
 };
 
 export default function SeguimientoPage() {
@@ -78,20 +72,16 @@ export default function SeguimientoPage() {
       asistMap.get(pId)!.add(Number(a.culto_id));
     }
 
+    // Cultos dominicales ya realizados, más reciente primero (para el score).
+    const cultosDesc = cultosPasados.map((c) => ({ id: Number(c.id), fecha: c.fecha }));
+
     const resultado: SeguimientoRow[] = personas
       .map((p) => {
         const pId = Number(p.id);
         const asistencias = asistMap.get(pId) ?? new Set<number>();
         const joinTime = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
 
-        // Contar cultos consecutivos sin asistir, desde el más reciente
-        let streak = 0;
-        for (const c of cultosPasados) {
-          const ct = new Date(c.fecha).getTime();
-          if (ct < joinTime) break;              // antes de unirse: no cuenta
-          if (asistencias.has(Number(c.id))) break; // asistió: corta la racha
-          streak++;
-        }
+        const riesgo = calcularRiesgo(cultosDesc, asistencias, joinTime, ahora);
 
         return {
           id: pId,
@@ -100,8 +90,10 @@ export default function SeguimientoPage() {
           telefono: p.telefono,
           nombre_apoderado: p.nombre_apoderado ?? null,
           telefono_apoderado: p.telefono_apoderado ?? null,
-          streak,
-          nivel: clasificar(streak),
+          streak: riesgo.streak,
+          nivel: riesgo.nivel,
+          puntaje: riesgo.puntaje,
+          motivos: riesgo.motivos,
         };
       });
 
@@ -109,14 +101,15 @@ export default function SeguimientoPage() {
     setLoading(false);
   }
 
-  const verdes = rows.filter((r) => r.nivel === 'verde').length;
-  const amarillos = rows.filter((r) => r.nivel === 'amarillo').length;
-  const rojos = rows.filter((r) => r.nivel === 'rojo').length;
+  const verdes = rows.filter((r) => r.nivel === 'bajo').length;
+  const amarillos = rows.filter((r) => r.nivel === 'medio').length;
+  const rojos = rows.filter((r) => r.nivel === 'alto').length;
 
-  // Lista accionable: amarillo + rojo, más críticos primero
+  // Lista accionable: medio + alto, mayor riesgo primero (por puntaje, que ya
+  // combina ausencias + caída + antigüedad).
   const accionables = rows
-    .filter((r) => r.nivel !== 'verde')
-    .sort((a, b) => b.streak - a.streak);
+    .filter((r) => r.nivel !== 'bajo')
+    .sort((a, b) => b.puntaje - a.puntaje);
 
   return (
     <div>
@@ -126,7 +119,8 @@ export default function SeguimientoPage() {
           Seguimiento
         </h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Ausencias consecutivas a los cultos · 0-1 al día · 2 atención · 3+ urgente
+          Score de riesgo por miembro: combina ausencias seguidas, si su asistencia venía
+          cayendo y hace cuánto se unió. A mayor riesgo, más arriba en la lista.
         </p>
       </div>
 
@@ -139,10 +133,10 @@ export default function SeguimientoPage() {
           {/* Resumen semáforo */}
           <div className="grid grid-cols-3 gap-3 md:gap-6 mb-6">
             {([
-              ['verde', verdes],
-              ['amarillo', amarillos],
-              ['rojo', rojos],
-            ] as [Nivel, number][]).map(([nivel, count]) => (
+              ['bajo', verdes],
+              ['medio', amarillos],
+              ['alto', rojos],
+            ] as [NivelRiesgo, number][]).map(([nivel, count]) => (
               <Card key={nivel}>
                 <CardContent className="p-4 md:p-6 flex items-center gap-3">
                   <span className={`w-3 h-3 rounded-full shrink-0 ${NIVEL_STYLE[nivel].dot}`} />
@@ -196,12 +190,19 @@ export default function SeguimientoPage() {
                                 </>
                               )}
                             </div>
+                            {/* El "por qué" del nivel, en palabras: lo que vuelve
+                                explicable al score en vez de un número opaco. */}
+                            {r.motivos.length > 0 && (
+                              <p className="text-muted-foreground text-xs mt-1">
+                                {r.motivos.join(' · ')}
+                              </p>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
                           <span className={`text-xs px-2 py-1 rounded-md font-medium ${st.badge}`}>
-                            {r.streak} cultos
+                            {st.label}
                           </span>
                           {(() => {
                             const esNino = r.source_tipo === 'nino';
