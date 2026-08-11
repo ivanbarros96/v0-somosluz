@@ -15,6 +15,8 @@ import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
 import { KidsCoberturaChart, type CoberturaKidsDomingo } from '@/components/intranet/pastor/kids-cobertura-chart';
 import { AsistenciaPronosticoChart, type DomingoAsistencia } from '@/components/intranet/pastor/asistencia-pronostico-chart';
+import { RetencionCohortesChart } from '@/components/intranet/pastor/retencion-cohortes-chart';
+import { calcularCohortes, type MiembroCohorte, type CohorteRetencion } from '@/lib/cohortes';
 import { KidsSinClasePanel, type NinoSinKids } from '@/components/intranet/pastor/kids-sin-clase-panel';
 import { ESTADO } from '@/components/intranet/pastor/chart-kit';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
@@ -38,6 +40,7 @@ function PastorDashboard() {
   const [oracionPendientes, setOracionPendientes] = useState(0);
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
   const [serieDomingos, setSerieDomingos] = useState<DomingoAsistencia[]>([]);
+  const [cohortes, setCohortes] = useState<CohorteRetencion[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
@@ -57,6 +60,11 @@ function PastorDashboard() {
     async function fetchAll() {
       // Personas
       const personas = await getPersonas().catch(() => [] as Awaited<ReturnType<typeof getPersonas>>);
+
+      // Para las cohortes se piden TAMBIÉN los dados de baja: son parte del
+      // denominador (ver lib/cohortes.ts), o la retención saldría inflada por
+      // sobrevivencia. Se excluyen solo los pendientes de aprobación.
+      const personasConBaja = await getPersonas(true).catch(() => [] as Awaited<ReturnType<typeof getPersonas>>);
 
       const total = personas?.length ?? 0;
       const adultos = personas?.filter((p) => p.source_tipo === 'adulto').length ?? 0;
@@ -168,6 +176,27 @@ function PastorDashboard() {
           mes: capMes(parseISO(key + '-01')),
           total: Math.round(v.total / v.cultos.size),
         }));
+
+      // Retención por cohorte: meses (yyyy-MM) con al menos una asistencia a un
+      // culto GENERAL, por persona. La asistencia dominical es la señal de
+      // "sigue viniendo", consistente con Seguimiento.
+      const mesesAsistPorPersona = new Map<number, Set<string>>();
+      for (const a of rawAsist ?? []) {
+        if (a.persona_id == null) continue;
+        const fecha = fechaPorCulto[Number(a.culto_id)]; // fechaPorCulto solo tiene generales
+        if (!fecha) continue;
+        const ym = format(parseISO(fecha), 'yyyy-MM');
+        const pid = Number(a.persona_id);
+        if (!mesesAsistPorPersona.has(pid)) mesesAsistPorPersona.set(pid, new Set());
+        mesesAsistPorPersona.get(pid)!.add(ym);
+      }
+      const miembrosCohorte: MiembroCohorte[] = (personasConBaja ?? [])
+        .filter((p) => !(p as { pendiente_revision?: boolean }).pendiente_revision)
+        .map((p) => ({
+          joinMes: format(parseISO((p.fecha_registro ?? p.created_at) as string), 'yyyy-MM'),
+          mesesAsistidos: mesesAsistPorPersona.get(Number(p.id)) ?? new Set<string>(),
+        }));
+      const cohortes = calcularCohortes(miembrosCohorte, format(new Date(), 'yyyy-MM'));
 
       // % asistencia promedio sobre últimos 8 cultos
       const totalPresencias = ultimos8.reduce((s, c) => s + (conteoPorCulto[Number(c.id)] ?? 0), 0);
@@ -374,6 +403,7 @@ function PastorDashboard() {
       setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
       setSerieDomingos(serieDomingos);
+      setCohortes(cohortes);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
@@ -448,6 +478,8 @@ function PastorDashboard() {
         <CrecimientoChart data={crecimientoData} />
         <BautizadosChart data={bautizadosData} />
       </div>
+
+      <RetencionCohortesChart data={cohortes} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <SexoChart data={sexoData} />
