@@ -89,7 +89,7 @@ export function MapaAsistencia({
                     {domingos.map((d) => (
                       <th
                         key={d.id}
-                        className="px-1 py-1 text-center text-[10px] font-medium text-muted-foreground whitespace-nowrap"
+                        className="px-1 py-1 text-center text-[10px] font-medium text-muted-foreground whitespace-nowrap md:text-xs"
                       >
                         {d.label}
                       </th>
@@ -125,7 +125,7 @@ export function MapaAsistencia({
                         return (
                           <td key={d.id} className="p-0">
                             <div
-                              className={`h-6 w-6 rounded-[4px] ${estilo}`}
+                              className={`h-7 w-7 rounded-[4px] md:h-9 md:w-9 ${estilo}`}
                               title={titulo}
                               aria-label={titulo}
                             />

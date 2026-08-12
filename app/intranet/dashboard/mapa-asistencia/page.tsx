@@ -9,9 +9,10 @@ import {
   MapaAsistencia, type DomingoColumna, type FilaAsistencia,
 } from '@/components/intranet/pastor/mapa-asistencia';
 
-// Cuántos domingos mostrar. Más que esto y la grilla se vuelve ilegible sin
-// scroll horizontal en pantallas normales.
-const DOMINGOS = 12;
+// Cuántos domingos mostrar. Con celdas de 36px caben ~20 en un notebook
+// estándar antes de necesitar scroll horizontal; pasado eso el contenedor
+// scrollea solo, así que el tope es por legibilidad, no por límite técnico.
+const DOMINGOS = 20;
 
 export default function MapaAsistenciaPage() {
   const [domingos, setDomingos] = useState<DomingoColumna[]>([]);
