@@ -26,10 +26,12 @@ const VISIBLES = 25;
 const TIPO_CORTO: Record<string, string> = { adulto: 'Adulto', joven: 'Joven', nino: 'Niño' };
 
 export function MapaAsistencia({
-  domingos, filas,
+  domingos, filas, conEncabezado = true,
 }: {
   domingos: DomingoColumna[];
   filas: FilaAsistencia[];
+  /** false cuando la página ya pone su propio título, para no repetirlo. */
+  conEncabezado?: boolean;
 }) {
   const [busqueda, setBusqueda] = useState('');
   const [verTodas, setVerTodas] = useState(false);
@@ -56,14 +58,16 @@ export function MapaAsistencia({
 
   return (
     <Card>
-      <CardHeader className="p-4 md:p-6">
-        <CardTitle className="text-base">Mapa de asistencia</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Cada fila es una persona y cada columna un domingo. Se ven de un vistazo los
-          patrones: quién viene una semana sí y otra no, y quién dejó de venir.
-        </p>
-      </CardHeader>
-      <CardContent className="p-4 md:p-6 pt-0">
+      {conEncabezado && (
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-base">Mapa de asistencia</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Cada fila es una persona y cada columna un domingo. Se ven de un vistazo los
+            patrones: quién viene una semana sí y otra no, y quién dejó de venir.
+          </p>
+        </CardHeader>
+      )}
+      <CardContent className={conEncabezado ? 'p-4 md:p-6 pt-0' : 'p-4 md:p-6'}>
         {domingos.length === 0 || filas.length === 0 ? (
           <SinDatos>Todavía no hay domingos con asistencia registrada.</SinDatos>
         ) : (

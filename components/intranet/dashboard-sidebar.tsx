@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
-  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake,
+  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, esRolValido, soloTomaAsistencia } from '@/lib/roles';
@@ -52,6 +52,7 @@ const PASTOR_NAV: NavGrupo[] = [
     items: [
       { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
       { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+      { href: '/intranet/dashboard/mapa-asistencia', label: 'Mapa de asistencia', icon: Grid3x3, addedAt: '2026-08-10' },
       { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
     ],
   },
