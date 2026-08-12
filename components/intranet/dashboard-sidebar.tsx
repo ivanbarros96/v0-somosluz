@@ -51,9 +51,14 @@ const PASTOR_NAV: NavGrupo[] = [
     titulo: 'Congregación',
     items: [
       { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
-      { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
-      { href: '/intranet/dashboard/mapa-asistencia', label: 'Mapa de asistencia', icon: Grid3x3, addedAt: '2026-08-10' },
       { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
+    ],
+  },
+  {
+    titulo: 'Asistencia',
+    items: [
+      { href: '/intranet/dashboard/asistencia', label: 'Tomar asistencia', icon: ClipboardList },
+      { href: '/intranet/dashboard/mapa-asistencia', label: 'Mapa de asistencia', icon: Grid3x3, addedAt: '2026-08-10' },
     ],
   },
   {

@@ -17,6 +17,9 @@ import { KidsCoberturaChart, type CoberturaKidsDomingo } from '@/components/intr
 import { AsistenciaPronosticoChart, type DomingoAsistencia } from '@/components/intranet/pastor/asistencia-pronostico-chart';
 import { KidsSinClasePanel, type NinoSinKids } from '@/components/intranet/pastor/kids-sin-clase-panel';
 import { ESTADO } from '@/components/intranet/pastor/chart-kit';
+import { SeccionPanel } from '@/components/intranet/pastor/seccion-panel';
+import { SeguimientoResumen, type ResumenRiesgo } from '@/components/intranet/pastor/seguimiento-resumen';
+import { calcularRiesgo } from '@/lib/seguimiento';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
 import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -50,6 +53,7 @@ function PastorDashboard() {
   const [coberturaKids, setCoberturaKids] = useState<CoberturaKidsDomingo[]>([]);
   const [ninosSinKids, setNinosSinKids] = useState<NinoSinKids[]>([]);
   const [domingosConClase, setDomingosConClase] = useState(0);
+  const [resumenRiesgo, setResumenRiesgo] = useState<ResumenRiesgo>({ bajo: 0, medio: 0, alto: 0, nombresAlto: [] });
   const [finanzasTendencia, setFinanzasTendencia] = useState<FinanzasTendenciaMes[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -185,6 +189,33 @@ function PastorDashboard() {
         if (!asistPorPersona.has(pid)) asistPorPersona.set(pid, new Set());
         asistPorPersona.get(pid)!.add(Number(a.culto_id));
       }
+      // Resumen de seguimiento: el mismo score que usa la pantalla de
+      // Seguimiento (lib/seguimiento.ts), para que el titular del home y el
+      // detalle del menú no puedan contradecirse.
+      // calcularRiesgo espera los cultos del más reciente al más antiguo.
+      const cultosDesc = [...cultosPasados]
+        .reverse()
+        .map((c) => ({ id: Number(c.id), fecha: c.fecha }));
+      const riesgo: ResumenRiesgo = { bajo: 0, medio: 0, alto: 0, nombresAlto: [] };
+      const enAlto: { nombre: string; puntaje: number }[] = [];
+      for (const p of personas ?? []) {
+        const join = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
+        const r = calcularRiesgo(
+          cultosDesc,
+          asistPorPersona.get(Number(p.id)) ?? new Set<number>(),
+          join,
+          ahora,
+        );
+        riesgo[r.nivel] += 1;
+        if (r.nivel === 'alto') enAlto.push({ nombre: p.nombre, puntaje: r.puntaje });
+      }
+      // Solo los 3 más críticos: el home da nombres, la lista completa está en
+      // la pantalla de Seguimiento.
+      riesgo.nombresAlto = enAlto
+        .sort((a, b) => b.puntaje - a.puntaje)
+        .slice(0, 3)
+        .map((x) => x.nombre);
+
       let alta = 0, media = 0, baja = 0, evaluadas = 0;
       for (const p of personas ?? []) {
         const join = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
@@ -382,6 +413,7 @@ function PastorDashboard() {
       setEdadSinDato(sinEdad);
       setFidelidadData(fidelidad);
       setFidelidadEval(evaluadas);
+      setResumenRiesgo(riesgo);
       setMinisterios(statsMinisterios);
       setCoberturaKids(coberturaKids);
       setNinosSinKids(ninosSinKids);
@@ -437,64 +469,66 @@ function PastorDashboard() {
 
       <KpiCards data={kpis} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <AsistenciaChart data={asistenciaData} />
-        <AsistenciaMensualChart data={asistenciaMensual} />
-      </div>
+      {/* Las secciones y sus títulos son los mismos grupos del menú izquierdo
+          (ver dashboard-sidebar.tsx): acá va el titular, allá el detalle. */}
+      <SeccionPanel
+        titulo="Congregación"
+        descripcion="Quiénes somos y cómo venimos creciendo"
+        href="/intranet/dashboard/members"
+        hrefLabel="Ver miembros"
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <CrecimientoChart data={crecimientoData} />
+          <BautizadosChart data={bautizadosData} />
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <SexoChart data={sexoData} />
+          <EdadChart data={edadData} sinDato={edadSinDato} />
+        </div>
+      </SeccionPanel>
 
-      <AsistenciaPronosticoChart data={serieDomingos} />
+      <SeccionPanel
+        titulo="Asistencia"
+        descripcion="Cuánta gente viene y hacia dónde va la tendencia"
+        href="/intranet/dashboard/mapa-asistencia"
+        hrefLabel="Ver mapa de asistencia"
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <AsistenciaChart data={asistenciaData} />
+          <AsistenciaMensualChart data={asistenciaMensual} />
+        </div>
+        <AsistenciaPronosticoChart data={serieDomingos} />
+        <MinisteriosPanel data={ministerios} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <KidsCoberturaChart data={coberturaKids} />
+          <KidsSinClasePanel data={ninosSinKids} domingosConClase={domingosConClase} />
+        </div>
+      </SeccionPanel>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <CrecimientoChart data={crecimientoData} />
-        <BautizadosChart data={bautizadosData} />
-      </div>
+      <SeccionPanel
+        titulo="Cuidado pastoral"
+        descripcion="A quién hay que buscar esta semana"
+        href="/intranet/dashboard/seguimiento"
+        hrefLabel="Ver seguimiento"
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <SeguimientoResumen data={resumenRiesgo} />
+          <FidelidadChart
+            data={fidelidadData}
+            evaluadas={fidelidadEval}
+            onSelect={(nivel) => router.push(`/intranet/dashboard/fidelizacion?nivel=${nivel}`)}
+          />
+        </div>
+      </SeccionPanel>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <SexoChart data={sexoData} />
-        <EdadChart data={edadData} sinDato={edadSinDato} />
-      </div>
-
-      <FidelidadChart
-        data={fidelidadData}
-        evaluadas={fidelidadEval}
-        onSelect={(nivel) => router.push(`/intranet/dashboard/fidelizacion?nivel=${nivel}`)}
-      />
-
-      <MinisteriosPanel data={ministerios} />
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <KidsCoberturaChart data={coberturaKids} />
-        <KidsSinClasePanel data={ninosSinKids} domingosConClase={domingosConClase} />
-      </div>
-
-      <FinanzasTendenciaChart data={finanzasTendencia} />
-
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base">Accesos Rápidos</CardTitle>
-          <CardDescription>Funciones principales del sistema</CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { href: '/intranet/dashboard/finanzas', icon: Wallet, label: 'Finanzas', desc: 'Ingresos, egresos y saldo' },
-              { href: '/intranet/dashboard/seguimiento', icon: Activity, label: 'Seguimiento', desc: 'Ausencias consecutivas' },
-              { href: '/intranet/dashboard/retiros', icon: UserX, label: 'Retiros', desc: '+30 días sin asistir' },
-              { href: '/intranet/dashboard/settings', icon: Settings, label: 'Configuración', desc: 'Ajustes del sistema' },
-            ].map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="block p-4 rounded-lg border border-border hover:bg-secondary transition"
-              >
-                <item.icon className="h-6 w-6 text-primary mb-2" />
-                <h3 className="font-semibold text-foreground text-sm">{item.label}</h3>
-                <p className="text-xs text-muted-foreground">{item.desc}</p>
-              </a>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <SeccionPanel
+        titulo="Administración"
+        descripcion="Cómo se mueven los recursos"
+        href="/intranet/dashboard/finanzas"
+        hrefLabel="Ver finanzas"
+      >
+        <FinanzasTendenciaChart data={finanzasTendencia} />
+      </SeccionPanel>
     </div>
   );
 }
