@@ -15,6 +15,7 @@ import { FidelidadChart, type FidelidadData } from '@/components/intranet/pastor
 import { MinisteriosPanel, type MinisterioStat } from '@/components/intranet/pastor/ministerios-panel';
 import { KidsCoberturaChart, type CoberturaKidsDomingo } from '@/components/intranet/pastor/kids-cobertura-chart';
 import { AsistenciaPronosticoChart, type DomingoAsistencia } from '@/components/intranet/pastor/asistencia-pronostico-chart';
+import { MapaAsistencia, type DomingoColumna, type FilaAsistencia } from '@/components/intranet/pastor/mapa-asistencia';
 import { KidsSinClasePanel, type NinoSinKids } from '@/components/intranet/pastor/kids-sin-clase-panel';
 import { ESTADO } from '@/components/intranet/pastor/chart-kit';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
@@ -38,6 +39,8 @@ function PastorDashboard() {
   const [oracionPendientes, setOracionPendientes] = useState(0);
   const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
   const [serieDomingos, setSerieDomingos] = useState<DomingoAsistencia[]>([]);
+  const [mapaDomingos, setMapaDomingos] = useState<DomingoColumna[]>([]);
+  const [mapaFilas, setMapaFilas] = useState<FilaAsistencia[]>([]);
   const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
@@ -147,6 +150,33 @@ function PastorDashboard() {
       const serieDomingos: DomingoAsistencia[] = cultosOrden
         .filter((c) => new Date(c.fecha).getTime() <= Date.now())
         .map((c) => ({ fecha: c.fecha, total: conteoPorCulto[Number(c.id)] ?? 0 }));
+
+      // Mapa de asistencia: últimos 10 domingos × personas. Reutiliza asistPorPersona
+      // (que se arma más abajo para fidelidad) no está disponible aún acá, así que
+      // se construye su propio índice a partir de rawAsist.
+      const asistPorPersonaMapa = new Map<number, Set<number>>();
+      for (const a of rawAsist ?? []) {
+        if (a.persona_id == null) continue;
+        const pid = Number(a.persona_id);
+        if (!asistPorPersonaMapa.has(pid)) asistPorPersonaMapa.set(pid, new Set());
+        asistPorPersonaMapa.get(pid)!.add(Number(a.culto_id));
+      }
+      const ultimos10 = cultosOrden
+        .filter((c) => new Date(c.fecha).getTime() <= Date.now())
+        .slice(-10);
+      const mapaDomingos: DomingoColumna[] = ultimos10.map((c) => ({
+        id: Number(c.id),
+        fecha: c.fecha,
+        label: format(parseISO(c.fecha), 'd MMM', { locale: es }),
+      }));
+      const mapaFilas: FilaAsistencia[] = (personas ?? []).map((p) => ({
+        id: Number(p.id),
+        nombre: p.nombre,
+        tipo: p.source_tipo,
+        asistio: asistPorPersonaMapa.get(Number(p.id)) ?? new Set<number>(),
+        // Las celdas anteriores a su ingreso no cuentan como falta.
+        desde: new Date((p.fecha_registro ?? p.created_at) as string).getTime(),
+      }));
 
       // Asistencia por MES (promedio por culto dentro del mes)
       const fechaPorCulto: Record<number, string> = {};
@@ -374,6 +404,8 @@ function PastorDashboard() {
       setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
       setAsistenciaData(asistencias);
       setSerieDomingos(serieDomingos);
+      setMapaDomingos(mapaDomingos);
+      setMapaFilas(mapaFilas);
       setAsistenciaMensual(mensual);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
@@ -443,6 +475,8 @@ function PastorDashboard() {
       </div>
 
       <AsistenciaPronosticoChart data={serieDomingos} />
+
+      <MapaAsistencia domingos={mapaDomingos} filas={mapaFilas} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <CrecimientoChart data={crecimientoData} />
