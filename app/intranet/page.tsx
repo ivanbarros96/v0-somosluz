@@ -6,21 +6,37 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
 
 type Profile = UserRole | null;
 
 // Perfiles del equipo (todo lo que no es pastor) con su ícono
-const EQUIPO: { role: UserRole; icon: React.ElementType; desc: string }[] = [
+// ⚠️ Agregar acá TODO rol nuevo de lib/roles.ts que no sea Pastor. Si falta,
+// el perfil existe y su contraseña funciona, pero nadie puede elegirlo: no
+// aparece en esta pantalla.
+// El Co-pastor va primero: es rol pastoral, no un ministerio.
+// `satisfies` en vez de anotar el tipo: anotarlo colapsa cada `role` a
+// UserRole y la verificación de abajo dejaría de detectar nada.
+const EQUIPO = [
+  { role: 'copastor', icon: HeartHandshake, desc: 'Seguimiento y cuidado de las personas' },
   { role: 'somosluz', icon: Sun, desc: 'Acceso operativo · Registro y asistencia general' },
   { role: 'amadas', icon: Heart, desc: 'Ministerio de mujeres' },
   { role: 'hombres', icon: Shield, desc: 'Ministerio de varones' },
   { role: 'discipulado', icon: GraduationCap, desc: 'Formación espiritual · Adultos' },
   { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
   { role: 'kids', icon: Baby, desc: 'Niños · Culto dominical' },
-];
+] satisfies { role: UserRole; icon: React.ElementType; desc: string }[];
+
+// Red de seguridad: si se agrega un rol a lib/roles.ts y se olvida acá, el
+// perfil queda invisible en el login aunque su contraseña funcione —
+// exactamente lo que pasó al crear el Co-pastor. Esto rompe el BUILD en vez de
+// dejar que el error llegue a producción.
+type RolesEnLogin = (typeof EQUIPO)[number]['role'] | 'pastor';
+type FaltanEnLogin = Exclude<UserRole, RolesEnLogin>;
+const _todosLosRolesEstanEnLogin: FaltanEnLogin extends never ? true : never = true;
+void _todosLosRolesEstanEnLogin;
 
 export default function IntranetLoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -158,7 +174,7 @@ export default function IntranetLoginPage() {
                 </div>
                 <div>
                   <p className="text-foreground font-semibold">Equipo y Ministerios</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">Operativo · Amadas · Hombría · Discipulado · Youth · Kids</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">Co-pastor · Operativo · Amadas · Hombría · Discipulado · Youth · Kids</p>
                 </div>
               </div>
             </button>
