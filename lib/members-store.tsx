@@ -48,6 +48,7 @@ function memberToRow(data: NuevoMiembro): Record<string, unknown> {
     row.tiempo_conversion = a.tiempo_conversion;
     row.fecha_nacimiento = a.fecha_nacimiento ?? null;
     row.edad = a.edad ?? null;
+    row.primera_iglesia = a.primera_iglesia ?? null;
   } else if (data.tipo === 'joven') {
     const j = data as Omit<JovenMember, 'id' | 'created_at'>;
     row.bautizado = j.bautizado;
@@ -56,6 +57,7 @@ function memberToRow(data: NuevoMiembro): Record<string, unknown> {
     row.edad = j.edad ?? null;
     row.nombre_apoderado = j.nombre_apoderado ?? null;
     row.telefono_apoderado = j.telefono_apoderado ?? null;
+    row.primera_iglesia = j.primera_iglesia ?? null;
   } else {
     const n = data as Omit<NinoMember, 'id' | 'created_at'>;
     row.fecha_nacimiento = n.fecha_nacimiento;
@@ -99,6 +101,7 @@ function mapToMember(row: any): Member {
       tipo: 'joven',
       bautizado: row.bautizado ?? null,
       tiempo_conversion: row.tiempo_conversion ?? null,
+      primera_iglesia: row.primera_iglesia ?? null,
       fecha_nacimiento: row.fecha_nacimiento ?? null,
       edad: row.edad ?? null,
       nombre_apoderado: row.nombre_apoderado ?? null,
@@ -111,6 +114,7 @@ function mapToMember(row: any): Member {
     tipo: 'adulto',
     bautizado: row.bautizado ?? null,
     tiempo_conversion: row.tiempo_conversion ?? null,
+    primera_iglesia: row.primera_iglesia ?? null,
     fecha_nacimiento: row.fecha_nacimiento ?? null, // ✅
     edad: row.edad ?? null,                          // ✅
   } as AdultoMember;
@@ -183,6 +187,7 @@ export function MembersProvider({ children }: { children: ReactNode }) {
     if (data.fecha_registro !== undefined) row.fecha_registro = data.fecha_registro;
     if ('bautizado' in data) row.bautizado = data.bautizado;
     if ('tiempo_conversion' in data) row.tiempo_conversion = data.tiempo_conversion;
+    if ('primera_iglesia' in data) row.primera_iglesia = (data as { primera_iglesia?: boolean | null }).primera_iglesia;
     if ('fecha_nacimiento' in data) row.fecha_nacimiento = data.fecha_nacimiento;
     if ('edad' in data) row.edad = data.edad;
     if ('nombre_apoderado' in data) row.nombre_apoderado = data.nombre_apoderado;

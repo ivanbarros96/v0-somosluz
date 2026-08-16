@@ -32,8 +32,10 @@ const EDAD_YOUTH_MAX = 20;
 //   - Amadas / Hombría / Discipulado: su gente adulta y los niños que traen
 //     (los niños no tienen reunión propia, van al general).
 //   - Youth: solo su propia audiencia.
-//   - "Nuevo" lo puede usar cualquiera menos Pastor: puede llegar una visita
-//     a cualquier reunión, no solo al culto general.
+//   - "Visita" lo puede usar cualquiera menos Pastor: puede llegar una visita
+//     a cualquier reunión, no solo al culto general. (El modo se sigue
+//     llamando 'nuevo' en el código y escribe en la tabla miembros_nuevos;
+//     solo cambió la etiqueta visible.)
 function modosPermitidosParaRol(role: string | undefined): Modo[] {
   const ministerio = ministerioDeRol(role ?? '');
   if (ministerio === 'youth') return ['joven', 'nuevo'];
@@ -65,7 +67,7 @@ const TAB_LABELS: Record<Modo, string> = {
   adulto: '👤 Adulto',
   joven: '🧑 Youth',
   nino: '🧒 Niño',
-  nuevo: '✨ Nuevo',
+  nuevo: '✨ Visita',
 };
 
 // Recordatorio sutil de a quién corresponde cada pestaña, para quien no se
@@ -74,7 +76,7 @@ const TAB_HINT: Record<Modo, string> = {
   adulto: '+18 años, en general',
   joven: '15–20 años',
   nino: '14 años o menos — requiere un apoderado',
-  nuevo: 'Visita, primera vez, invitado o no miembro',
+  nuevo: 'Vino a la iglesia pero aún no es miembro',
 };
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -94,6 +96,8 @@ function emptyForm() {
     bautizado: false,
     convNum: '', convUnidad: '',
     dia: '', mes: '', anio: '',
+    // '' = sin responder · 'si' = primera iglesia · 'no' = ya venía del evangelio
+    primeraIglesia: '' as '' | 'si' | 'no',
   };
 }
 
@@ -144,6 +148,7 @@ function computeForm(member: Member | null | undefined) {
     bautizado: false,
     convNum: '', convUnidad: '',
     dia: '', mes: '', anio: '',
+    primeraIglesia: '' as '' | 'si' | 'no',
   };
 
   // Adulto y Youth comparten exactamente los mismos campos (Youth asiste por
@@ -154,6 +159,9 @@ function computeForm(member: Member | null | undefined) {
     base.codWa = wa.code;
     base.whatsapp = wa.num;
     base.bautizado = a.bautizado === 'si';
+    // null (sin dato) se mantiene como '' para no forzar una respuesta que
+    // nadie dio: las fichas anteriores a agosto 2026 no traen este campo.
+    base.primeraIglesia = a.primera_iglesia === true ? 'si' : a.primera_iglesia === false ? 'no' : '';
     const conv = parseTiempoConversion(a.tiempo_conversion);
     base.convNum = conv.num;
     base.convUnidad = conv.unidad;
@@ -351,8 +359,14 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
       const waFull = form.whatsapp
         ? `${form.codWa} ${form.whatsapp}`
         : form.telefono ? `${form.codTel} ${form.telefono}` : null;
-      const convFull = (form.convNum && form.convUnidad)
-        ? `${form.convNum} ${form.convUnidad}` : null;
+      // Si declaró que es su primera iglesia, el tiempo en el evangelio no
+      // aplica: se guarda null aunque hubiera quedado algo escrito antes de
+      // cambiar la respuesta.
+      const primeraIglesia = form.primeraIglesia === 'si' ? true
+        : form.primeraIglesia === 'no' ? false
+        : null;
+      const convFull = primeraIglesia === true ? null
+        : (form.convNum && form.convUnidad) ? `${form.convNum} ${form.convUnidad}` : null;
 
       const fecha = (form.dia && form.mes && form.anio)
         ? `${form.dia}/${form.mes}/${form.anio}` : null;
@@ -403,6 +417,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           direccion: form.direccion.trim() || null,
           bautizado: form.bautizado ? 'si' : 'no',
           tiempo_conversion: convFull,
+          primera_iglesia: primeraIglesia,
           fecha_nacimiento: fecha,
           edad,
           nombre_apoderado: previo?.nombre_apoderado ?? null,
@@ -429,6 +444,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
         direccion: form.direccion.trim() || null,
         bautizado: form.bautizado ? 'si' : 'no',
         tiempo_conversion: convFull,
+        primera_iglesia: primeraIglesia,
         fecha_nacimiento: fecha,
         edad,
       };
@@ -567,8 +583,39 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           {(modo === 'adulto' || modo === 'joven') && (
             <div className="border-t pt-4 space-y-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Fe y Comunidad</p>
+
+              {/* Va ANTES del tiempo de conversión porque lo condiciona: a
+                  quien está en su primera iglesia no tiene sentido preguntarle
+                  hace cuánto conoce el evangelio. */}
+              <div className="space-y-1.5">
+                <Label>¿Es su primera vez en una iglesia cristiana?</Label>
+                <div className="flex gap-2">
+                  {([['si', 'Sí, es la primera vez'], ['no', 'No, ya venía antes']] as const).map(([valor, texto]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      onClick={() => set('primeraIglesia', form.primeraIglesia === valor ? '' : valor)}
+                      aria-pressed={form.primeraIglesia === valor}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                        form.primeraIglesia === valor
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {texto}
+                    </button>
+                  ))}
+                </div>
+                {form.primeraIglesia === 'si' && (
+                  <p className="text-xs text-muted-foreground">
+                    Se marcará para el acompañamiento de quienes recién conocen el evangelio.
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
+                {/* Solo aplica a quien ya venía del evangelio */}
+                <div className={`space-y-1 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
                   <Label>Tiempo de Conversión</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
@@ -816,7 +863,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
               : modo === 'joven'
                 ? 'Registrar Youth ✓'
                 : modo === 'nuevo'
-                  ? 'Registrar Visitante ✓'
+                  ? 'Registrar Visita ✓'
                   : 'Registrar Miembro ✓'}
         </Button>
       </div>

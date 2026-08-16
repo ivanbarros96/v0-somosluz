@@ -107,6 +107,8 @@ export function RegistroPublicoForm() {
     dia: '', mes: '', anio: '',
     bautizado: false,
     convNum: '', convUnidad: '',
+    // '' = sin responder · 'si' = primera iglesia · 'no' = ya venía del evangelio
+    primeraIglesia: '' as '' | 'si' | 'no',
   });
   // Casi siempre el WhatsApp es el mismo número. Marcado por defecto para no
   // hacer tipear dos veces lo mismo desde el celular; al desmarcar aparece el
@@ -148,8 +150,12 @@ export function RegistroPublicoForm() {
             comuna: form.comuna,
             direccion: form.direccion,
             bautizado: form.bautizado,
+            primera_iglesia:
+              form.primeraIglesia === 'si' ? true : form.primeraIglesia === 'no' ? false : null,
+            // Si es su primera iglesia, el tiempo en el evangelio no aplica.
             tiempo_conversion:
-              form.convNum && form.convUnidad ? `${form.convNum} ${form.convUnidad}` : null,
+              form.primeraIglesia === 'si' ? null
+                : form.convNum && form.convUnidad ? `${form.convNum} ${form.convUnidad}` : null,
           },
           ninos: ninos
             .filter((n) => n.nombre.trim())
@@ -403,6 +409,28 @@ export function RegistroPublicoForm() {
                 </p>
 
                 <div className="space-y-1.5">
+                  <Label>¿Es tu primera vez en una iglesia cristiana?</Label>
+                  <div className="flex gap-2">
+                    {([['si', 'Sí, primera vez'], ['no', 'No, ya venía antes']] as const).map(([valor, texto]) => (
+                      <button
+                        key={valor}
+                        type="button"
+                        onClick={() => set('primeraIglesia', form.primeraIglesia === valor ? '' : valor)}
+                        aria-pressed={form.primeraIglesia === valor}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                          form.primeraIglesia === valor
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {texto}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Solo aplica a quien ya venía del evangelio */}
+                <div className={`space-y-1.5 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
                   <Label>Tiempo de conversión</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>

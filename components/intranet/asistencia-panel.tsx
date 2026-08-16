@@ -49,7 +49,7 @@ function tipoBadge(tipo: Persona['tipo']) {
   if (tipo === 'adulto') return <Badge className="bg-primary/10 text-primary border-primary/25 text-xs">Adulto</Badge>;
   if (tipo === 'joven') return <Badge className="bg-[#c08a3e]/10 text-[#a06f2e] border-[#c08a3e]/25 text-xs">Joven</Badge>;
   if (tipo === 'nino') return <Badge className="bg-accent/10 text-accent border-accent/25 text-xs">Niño</Badge>;
-  return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">Nuevo</Badge>;
+  return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">Visita</Badge>;
 }
 
 function formatFecha(iso: string) {
@@ -427,7 +427,7 @@ export function AsistenciaPanel() {
     { key: 'adulto', label: 'Adultos' },
     { key: 'joven', label: 'Jóvenes' },
     { key: 'nino', label: 'Niños' },
-    { key: 'nuevo', label: 'Nuevos' },
+    { key: 'nuevo', label: 'Visitas' },
   ];
 
   return (

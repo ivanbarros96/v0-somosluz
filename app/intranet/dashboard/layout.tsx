@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
-import { soloTomaAsistencia } from '@/lib/roles';
+import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
 
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
@@ -25,6 +25,11 @@ export default function DashboardLayout({
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
   const rutaPermitida = !esMinisterio || pathname.startsWith(RUTA_ASISTENCIA);
 
+  // El Co-pastor sí navega la intranet, pero Finanzas, Reservas y
+  // Configuración quedan fuera de su alcance aunque escriba la URL a mano.
+  const esCopastor = !!user && esRolCopastor(user.role);
+  const rutaPermitidaCopastor = !esCopastor || copastorPuedeVer(pathname);
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/intranet');
@@ -32,10 +37,14 @@ export default function DashboardLayout({
     }
     if (!rutaPermitida) {
       router.push(RUTA_ASISTENCIA);
+      return;
     }
-  }, [isAuthenticated, rutaPermitida, router]);
+    if (!rutaPermitidaCopastor) {
+      router.push('/intranet/dashboard');
+    }
+  }, [isAuthenticated, rutaPermitida, rutaPermitidaCopastor, router]);
 
-  if (!isAuthenticated || !user || !rutaPermitida) {
+  if (!isAuthenticated || !user || !rutaPermitida || !rutaPermitidaCopastor) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

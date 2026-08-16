@@ -42,6 +42,9 @@ export interface AdultoMember extends PersonaBase {
   tiempo_conversion: string | null;
   fecha_nacimiento: string | null;
   edad: number | null;
+  /** true = es su primera vez en una iglesia cristiana. null = sin dato.
+   *  Si es true, `tiempo_conversion` no aplica (ver member-form.tsx). */
+  primera_iglesia: boolean | null;
 }
 
 export interface NinoMember extends PersonaBase {
@@ -63,6 +66,8 @@ export interface JovenMember extends PersonaBase {
   edad: number | null;
   nombre_apoderado: string | null;
   telefono_apoderado: string | null;
+  /** Ver AdultoMember.primera_iglesia. A los niños no se les pregunta. */
+  primera_iglesia: boolean | null;
 }
 
 export type Member = AdultoMember | NinoMember | JovenMember;

@@ -20,6 +20,8 @@ import { ESTADO } from '@/components/intranet/pastor/chart-kit';
 import { SeccionPanel } from '@/components/intranet/pastor/seccion-panel';
 import { SeguimientoResumen, type ResumenRiesgo } from '@/components/intranet/pastor/seguimiento-resumen';
 import { calcularRiesgo } from '@/lib/seguimiento';
+import { esRolCopastor } from '@/lib/roles';
+import { CopastorDashboard } from '@/components/intranet/copastor-dashboard';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
 import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -628,5 +630,9 @@ function SomosluzDashboard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  return user?.role === 'pastor' ? <PastorDashboard /> : <SomosluzDashboard />;
+  if (user?.role === 'pastor') return <PastorDashboard />;
+  // El Co-pastor tiene su propio panel: el del Pastor es gerencial y el de
+  // Somos Luz es operativo, pero su trabajo es a quién llamar esta semana.
+  if (esRolCopastor(user?.role ?? '')) return <CopastorDashboard />;
+  return <SomosluzDashboard />;
 }

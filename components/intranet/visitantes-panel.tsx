@@ -51,7 +51,7 @@ export function VisitantesPanel() {
         ),
       );
     } catch {
-      toast.error('No se pudieron cargar los visitantes.');
+      toast.error('No se pudieron cargar las visitas.');
     }
     setCargando(false);
   }, []);
@@ -69,7 +69,7 @@ export function VisitantesPanel() {
   if (visitantes.length === 0) {
     return (
       <p className="py-10 text-center text-muted-foreground text-sm">
-        No hay visitantes registrados.
+        No hay visitas registradas.
       </p>
     );
   }
@@ -83,7 +83,7 @@ export function VisitantesPanel() {
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
           <span>
             <strong>{habituales}</strong>{' '}
-            {habituales === 1 ? 'visitante ya vino' : 'visitantes ya vinieron'}{' '}
+            {habituales === 1 ? 'visita ya vino' : 'visitas ya vinieron'}{' '}
             {VISITAS_HABITUAL} veces o más. Al convertirlos en miembros conservan todo su
             historial de asistencia.
           </span>

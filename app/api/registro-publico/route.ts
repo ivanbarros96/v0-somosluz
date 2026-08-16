@@ -152,7 +152,12 @@ export async function POST(req: NextRequest) {
     // Se guarda tal cual lo arma el formulario ("3 Años"), igual que en la
     // intranet, pero validado: solo un número seguido de Meses o Años. Así un
     // texto arbitrario desde fuera no entra a la ficha.
-    tiempo_conversion: tiempoConversion(adulto.tiempo_conversion),
+    // Si declaró que es su primera iglesia, no aplica: se fuerza null aunque
+    // el cliente mande algo.
+    tiempo_conversion:
+      adulto.primera_iglesia === true ? null : tiempoConversion(adulto.tiempo_conversion),
+    // Solo se acepta true/false explícito; cualquier otra cosa queda sin dato.
+    primera_iglesia: typeof adulto.primera_iglesia === 'boolean' ? adulto.primera_iglesia : null,
   };
 
   const { data: creado, error } = await db

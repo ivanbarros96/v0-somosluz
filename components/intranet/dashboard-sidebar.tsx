@@ -12,7 +12,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido, soloTomaAsistencia } from '@/lib/roles';
+import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -80,6 +80,37 @@ const PASTOR_NAV: NavGrupo[] = [
   },
 ];
 
+// Co-pastor: mismos grupos que el Pastor pero sin Administración. Su foco es
+// el seguimiento de personas, así que Cuidado pastoral va primero.
+const COPASTOR_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [{ href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard }],
+  },
+  {
+    titulo: 'Cuidado pastoral',
+    items: [
+      { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
+      { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake },
+      { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
+    ],
+  },
+  {
+    titulo: 'Congregación',
+    items: [
+      { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
+      { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
+      { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake },
+    ],
+  },
+  {
+    titulo: 'Asistencia',
+    items: [
+      { href: '/intranet/dashboard/mapa-asistencia', label: 'Mapa de asistencia', icon: Grid3x3 },
+    ],
+  },
+];
+
 // Operativo: 4 ítems, no necesita encabezados — agruparlos sería más ruido que
 // ayuda.
 const SOMOSLUZ_NAV: NavGrupo[] = [
@@ -114,10 +145,19 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const pathname = usePathname();
 
   const isPastor = user?.role === 'pastor';
+  const esCopastor = !!user && esRolCopastor(user.role);
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
-  const navGrupos = isPastor ? PASTOR_NAV : esMinisterio ? MINISTERIO_NAV : SOMOSLUZ_NAV;
+  const navGrupos = isPastor
+    ? PASTOR_NAV
+    : esCopastor
+      ? COPASTOR_NAV
+      : esMinisterio
+        ? MINISTERIO_NAV
+        : SOMOSLUZ_NAV;
 
   // Peticiones de oración sin revisar (solo pastor). Alimenta el badge y el título de pestaña.
+  // El contador de peticiones sin revisar lo ven quienes hacen cuidado
+  // pastoral: pastor y co-pastor.
   const oracionPendientes = usePeticionesPendientes(isPastor);
 
   useEffect(() => {

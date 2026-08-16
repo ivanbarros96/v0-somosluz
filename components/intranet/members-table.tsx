@@ -360,7 +360,7 @@ export function MembersTable() {
                 {/* Los visitantes viven en otra tabla (miembros_nuevos), por eso
                     su contenido es un componente aparte y no se mezcla con la
                     lista de miembros. */}
-                <TabsTrigger value="visitantes">Visitantes</TabsTrigger>
+                <TabsTrigger value="visitantes">Visitas</TabsTrigger>
                 {/* Auto-registros del link público esperando revisión */}
                 <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
               </TabsList>

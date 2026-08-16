@@ -4,6 +4,10 @@ import type { CultoTipo } from './cultos-tipos';
 
 export const ROLES = {
   pastor: { name: 'Pastor', badge: 'Gerencial', envVar: 'PASTOR_PASSWORD', ministerio: null },
+  // Co-pastor: seguimiento a las personas. Llama y acompaña a quienes están
+  // faltando y a quienes recién llegan. Ve y registra gente, pero no toca
+  // Finanzas ni Configuración — ver esRolCopastor().
+  copastor: { name: 'Co-pastor', badge: 'Pastoral', envVar: 'COPASTOR_PASSWORD', ministerio: null },
   somosluz: { name: 'Somos Luz', badge: 'Operativo', envVar: 'SOMOSLUZ_PASSWORD', ministerio: null },
   amadas: { name: 'Amadas', badge: 'Ministerio', envVar: 'AMADAS_PASSWORD', ministerio: 'mujeres' },
   hombres: { name: 'Hombría al Máximo', badge: 'Ministerio', envVar: 'HOMBRES_PASSWORD', ministerio: 'hombres' },
@@ -50,4 +54,21 @@ export const TIPOS_MARCABLES_KIDS = ['nino', 'nuevo'];
 // intranet (ver dashboard-sidebar.tsx y dashboard/layout.tsx).
 export function soloTomaAsistencia(role: string): boolean {
   return ministerioDeRol(role) !== null || esRolKids(role);
+}
+
+export function esRolCopastor(role: string): boolean {
+  return role === 'copastor';
+}
+
+// Rutas que el Co-pastor NO puede abrir. Su trabajo es el cuidado de las
+// personas, no la administración: el dinero y los ajustes del sistema quedan
+// fuera. Se valida también en dashboard/layout.tsx, no solo ocultando el menú.
+export const RUTAS_VEDADAS_COPASTOR = [
+  '/intranet/dashboard/finanzas',
+  '/intranet/dashboard/reservas',
+  '/intranet/dashboard/settings',
+];
+
+export function copastorPuedeVer(pathname: string): boolean {
+  return !RUTAS_VEDADAS_COPASTOR.some((r) => pathname.startsWith(r));
 }
