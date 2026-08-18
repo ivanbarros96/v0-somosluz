@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "app/intranet/dashboard/layout.tsx"
+        ],
+        "createdAt": "2026-08-18T22:05:38.697Z",
+        "reason": "L60 es el spinner de carga (rounded-full + border-b-2 para animar la rotacion), patron universal, no una tarjeta con borde de acento"
+      }
+    ]
+  }
+}
