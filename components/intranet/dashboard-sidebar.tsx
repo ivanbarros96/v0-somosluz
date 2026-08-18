@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
-  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3, Sprout,
+  LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor } from '@/lib/roles';
@@ -83,8 +83,10 @@ const COPASTOR_NAV: NavGrupo[] = [
   {
     titulo: 'Cuidado pastoral',
     items: [
+      // Los nuevos en la fe ya no tienen pantalla propia: entran a la misma
+      // bandeja de Seguimiento etiquetados con su motivo. La acción del
+      // Co-pastor es la misma (contactar), solo cambia la conversación.
       { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
-      { href: '/intranet/dashboard/nuevos-en-la-fe', label: 'Nuevos en la fe', icon: Sprout, addedAt: '2026-08-12' },
       { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake },
       { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
     ],

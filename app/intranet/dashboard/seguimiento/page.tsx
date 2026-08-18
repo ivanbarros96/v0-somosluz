@@ -1,260 +1,207 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Activity, Loader2 } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
-import { calcularRiesgo, type NivelRiesgo } from '@/lib/seguimiento';
+import { calcularRiesgo } from '@/lib/seguimiento';
+import { nuevosEnLaFe } from '@/lib/nuevos-en-la-fe';
+import { useAuth } from '@/lib/auth-context';
+import { esRolCopastor } from '@/lib/roles';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Activity, Loader2, Phone, CheckCircle2, PhoneCall } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  SeguimientoBandeja, type CasoEnBandeja, type Contacto,
+} from '@/components/intranet/seguimiento-bandeja';
 
-interface SeguimientoRow {
+interface CasoApi {
   id: number;
-  nombre: string;
-  source_tipo: string;
-  telefono: string | null;
-  nombre_apoderado: string | null;
-  telefono_apoderado: string | null;
-  streak: number;
-  nivel: NivelRiesgo;
-  puntaje: number;
-  motivos: string[];
+  persona_id: number;
+  motivo: 'ausencia' | 'nuevo_en_la_fe';
+  estado: 'abierto' | 'cerrado';
+  desenlace: string | null;
+  contactos: Contacto[];
 }
 
-interface PendingCall {
-  tel: string;
-  label: string; // "nombre" o "Apoderado de nombre"
-}
-
-const NIVEL_STYLE: Record<NivelRiesgo, { dot: string; badge: string; label: string }> = {
-  bajo:  { dot: 'bg-green-500', badge: 'bg-green-500/10 text-green-600', label: 'Al día' },
-  medio: { dot: 'bg-amber-500', badge: 'bg-amber-500/10 text-amber-600', label: 'Atención' },
-  alto:  { dot: 'bg-red-500',   badge: 'bg-red-500/10 text-red-600',     label: 'Riesgo alto' },
+const DESENLACE_LABEL: Record<string, string> = {
+  volvio: 'Volvió', se_retiro: 'Se retiró', sin_contacto: 'Sin contacto',
 };
 
 export default function SeguimientoPage() {
-  const [rows, setRows] = useState<SeguimientoRow[]>([]);
+  const { user } = useAuth();
+  const puedeRegistrar = esRolCopastor(user?.role ?? '');
+
+  const [porContactar, setPorContactar] = useState<CasoEnBandeja[]>([]);
+  const [enProceso, setEnProceso] = useState<CasoEnBandeja[]>([]);
+  const [cerrados, setCerrados] = useState<{ nombre: string; desenlace: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pendingCall, setPendingCall] = useState<PendingCall | null>(null);
 
-  useEffect(() => { load(); }, []);
-
-  async function load() {
+  const cargar = useCallback(async () => {
     setLoading(true);
-    const ahora = Date.now();
-
-    // Cultos GENERALES ya realizados (fecha <= ahora), más reciente primero.
-    // Las ausencias consecutivas se miden sobre el culto dominical, no sobre
-    // reuniones de ministerio (público parcial).
-    let personas: Awaited<ReturnType<typeof getPersonas>>;
-    let cultos: Awaited<ReturnType<typeof getCultos>>;
-    let asist: Awaited<ReturnType<typeof getAsistencias>>;
     try {
-      // getPersonas() ya excluye a los dados de baja desde el servidor.
-      [personas, cultos, asist] = await Promise.all([
+      const [personas, cultos, asist, resCasos] = await Promise.all([
         getPersonas(),
         getCultos({ tipo: 'general', orden: 'desc' }),
         getAsistencias(),
+        fetch('/api/seguimiento', { cache: 'no-store' }).then((r) => r.json()),
       ]);
-    } catch {
-      setLoading(false);
-      return;
-    }
 
-    const cultosPasados = cultos.filter((c) => new Date(c.fecha).getTime() <= ahora);
+      const ahora = Date.now();
+      const cultosDesc = cultos
+        .filter((c) => new Date(c.fecha).getTime() <= ahora)
+        .map((c) => ({ id: Number(c.id), fecha: c.fecha }));
 
-    // Asistencias → Map persona -> Set(culto_id)
-    const asistMap = new Map<number, Set<number>>();
-    for (const a of asist) {
-      if (a.persona_id == null) continue;
-      const pId = Number(a.persona_id);
-      if (!asistMap.has(pId)) asistMap.set(pId, new Set());
-      asistMap.get(pId)!.add(Number(a.culto_id));
-    }
+      const asistPorPersona = new Map<number, Set<number>>();
+      for (const a of asist) {
+        if (a.persona_id == null) continue;
+        const pid = Number(a.persona_id);
+        if (!asistPorPersona.has(pid)) asistPorPersona.set(pid, new Set());
+        asistPorPersona.get(pid)!.add(Number(a.culto_id));
+      }
 
-    // Cultos dominicales ya realizados, más reciente primero (para el score).
-    const cultosDesc = cultosPasados.map((c) => ({ id: Number(c.id), fecha: c.fecha }));
+      const casos: CasoApi[] = resCasos?.casos ?? [];
+      const abiertoPorPersona = new Map<number, CasoApi>();
+      for (const c of casos) if (c.estado === 'abierto') abiertoPorPersona.set(c.persona_id, c);
 
-    const resultado: SeguimientoRow[] = personas
-      .map((p) => {
-        const pId = Number(p.id);
-        const asistencias = asistMap.get(pId) ?? new Set<number>();
-        const joinTime = new Date((p.fecha_registro ?? p.created_at) as string).getTime();
+      // Quiénes entran a la bandeja. La acción es la misma (contactar); lo que
+      // cambia es la razón, que se muestra en cada fila.
+      const candidatos = new Map<number, { razon: string; motivo: 'ausencia' | 'nuevo_en_la_fe' }>();
 
-        const riesgo = calcularRiesgo(cultosDesc, asistencias, joinTime, ahora);
+      for (const p of personas) {
+        const r = calcularRiesgo(
+          cultosDesc,
+          asistPorPersona.get(Number(p.id)) ?? new Set<number>(),
+          new Date((p.fecha_registro ?? p.created_at) as string).getTime(),
+          ahora,
+        );
+        if (r.nivel !== 'bajo') {
+          candidatos.set(Number(p.id), {
+            razon: r.motivos[0] ?? 'Requiere seguimiento',
+            motivo: 'ausencia',
+          });
+        }
+      }
+      // Los nuevos en la fe entran aunque asistan perfecto: el acompañamiento
+      // no es por ausencia sino por formación.
+      for (const n of nuevosEnLaFe(personas as never)) {
+        if (!candidatos.has(n.id)) {
+          candidatos.set(n.id, {
+            razon: n.motivo === 'declaro'
+              ? 'Es su primera iglesia'
+              : `Lleva ${n.tiempoConversion} en el evangelio`,
+            motivo: 'nuevo_en_la_fe',
+          });
+        }
+      }
 
+      const porNombre = new Map(personas.map((p) => [Number(p.id), p]));
+      const arma = (id: number, info: { razon: string; motivo: 'ausencia' | 'nuevo_en_la_fe' }): CasoEnBandeja | null => {
+        const p = porNombre.get(id);
+        if (!p) return null;
+        const caso = abiertoPorPersona.get(id);
         return {
-          id: pId,
+          personaId: id,
           nombre: p.nombre,
-          source_tipo: p.source_tipo,
           telefono: p.telefono,
-          nombre_apoderado: p.nombre_apoderado ?? null,
-          telefono_apoderado: p.telefono_apoderado ?? null,
-          streak: riesgo.streak,
-          nivel: riesgo.nivel,
-          puntaje: riesgo.puntaje,
-          motivos: riesgo.motivos,
+          whatsapp: (p.whatsapp as string | null) ?? null,
+          razon: info.razon,
+          motivo: caso?.motivo ?? info.motivo,
+          casoId: caso?.id ?? null,
+          contactos: caso?.contactos ?? [],
         };
-      });
+      };
 
-    setRows(resultado);
+      const todos = [...candidatos.entries()]
+        .map(([id, info]) => arma(id, info))
+        .filter((c): c is CasoEnBandeja => c !== null);
+
+      setPorContactar(todos.filter((c) => c.contactos.length === 0));
+      setEnProceso(todos.filter((c) => c.contactos.length > 0));
+
+      setCerrados(
+        casos
+          .filter((c) => c.estado === 'cerrado')
+          .slice(0, 12)
+          .map((c) => ({
+            nombre: porNombre.get(c.persona_id)?.nombre ?? 'Persona',
+            desenlace: DESENLACE_LABEL[c.desenlace ?? ''] ?? '—',
+          })),
+      );
+    } catch {
+      // Sin bloqueo: las tarjetas muestran su propio estado vacío.
+    }
     setLoading(false);
-  }
+  }, []);
 
-  const verdes = rows.filter((r) => r.nivel === 'bajo').length;
-  const amarillos = rows.filter((r) => r.nivel === 'medio').length;
-  const rojos = rows.filter((r) => r.nivel === 'alto').length;
-
-  // Lista accionable: medio + alto, mayor riesgo primero (por puntaje, que ya
-  // combina ausencias + caída + antigüedad).
-  const accionables = rows
-    .filter((r) => r.nivel !== 'bajo')
-    .sort((a, b) => b.puntaje - a.puntaje);
+  useEffect(() => { cargar(); }, [cargar]);
 
   return (
     <div>
       <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground md:text-3xl">
           <Activity className="h-6 w-6 text-primary" />
           Seguimiento
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Score de riesgo por miembro: combina ausencias seguidas, si su asistencia venía
-          cayendo y hace cuánto se unió. A mayor riesgo, más arriba en la lista.
+        <p className="mt-1 text-sm text-muted-foreground md:text-base">
+          {puedeRegistrar
+            ? 'A quién contactar y qué pasó en cada llamada. Cada fila dice por qué está aquí.'
+            : 'Trabajo de acompañamiento del Co-pastor: a quién ha contactado y cómo va cada caso.'}
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
-        <>
-          {/* Resumen semáforo */}
-          <div className="grid grid-cols-3 gap-3 md:gap-6 mb-6">
-            {([
-              ['bajo', verdes],
-              ['medio', amarillos],
-              ['alto', rojos],
-            ] as [NivelRiesgo, number][]).map(([nivel, count]) => (
-              <Card key={nivel}>
-                <CardContent className="p-4 md:p-6 flex items-center gap-3">
-                  <span className={`w-3 h-3 rounded-full shrink-0 ${NIVEL_STYLE[nivel].dot}`} />
-                  <div>
-                    <div className="text-xl md:text-2xl font-bold text-foreground">{count}</div>
-                    <div className="text-xs text-muted-foreground">{NIVEL_STYLE[nivel].label}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base">
+                Por contactar
+                {porContactar.length > 0 && <Badge variant="secondary">{porContactar.length}</Badge>}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Nadie los ha llamado todavía</p>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <SeguimientoBandeja casos={porContactar} soloLectura={!puedeRegistrar} onCambio={cargar} />
+            </CardContent>
+          </Card>
 
-          {/* Lista accionable */}
-          {accionables.length === 0 ? (
+          <Card>
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base">
+                En proceso
+                {enProceso.length > 0 && <Badge variant="secondary">{enProceso.length}</Badge>}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Ya hubo al menos un intento; abajo de cada uno está lo que pasó
+              </p>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <SeguimientoBandeja casos={enProceso} soloLectura={!puedeRegistrar} onCambio={cargar} />
+            </CardContent>
+          </Card>
+
+          {cerrados.length > 0 && (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-                <h3 className="font-semibold text-foreground text-lg">Todos al día</h3>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Ningún miembro acumula 2 o más ausencias consecutivas.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader className="p-4 md:p-6 border-b border-border">
-                <CardTitle className="text-base">{accionables.length} requieren seguimiento</CardTitle>
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="text-base">Casos cerrados</CardTitle>
+                <p className="text-xs text-muted-foreground">Últimos acompañamientos terminados</p>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-border">
-                  {accionables.map((r) => {
-                    const st = NIVEL_STYLE[r.nivel];
-                    return (
-                      <div key={r.id} className="flex items-center justify-between px-4 md:px-6 py-4 hover:bg-secondary/50 transition-colors gap-2">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${st.dot}`} />
-                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
-                            {r.nombre.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-foreground font-medium text-sm truncate">{r.nombre}</p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-muted-foreground text-xs capitalize">{r.source_tipo}</span>
-                              {r.telefono && (
-                                <>
-                                  <span className="text-muted-foreground">·</span>
-                                  <span className="text-muted-foreground text-xs flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {r.telefono}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                            {/* El "por qué" del nivel, en palabras: lo que vuelve
-                                explicable al score en vez de un número opaco. */}
-                            {r.motivos.length > 0 && (
-                              <p className="text-muted-foreground text-xs mt-1">
-                                {r.motivos.join(' · ')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-xs px-2 py-1 rounded-md font-medium ${st.badge}`}>
-                            {st.label}
-                          </span>
-                          {(() => {
-                            const esNino = r.source_tipo === 'nino';
-                            const tel = esNino ? r.telefono_apoderado : r.telefono;
-                            const label = esNino
-                              ? `Apoderado de ${r.nombre}${r.nombre_apoderado ? ` (${r.nombre_apoderado})` : ''}`
-                              : r.nombre;
-                            return tel ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 w-8 p-0 shrink-0"
-                                onClick={() => setPendingCall({ tel, label })}
-                                aria-label={`Llamar a ${label}`}
-                              >
-                                <PhoneCall className="h-3.5 w-3.5" />
-                              </Button>
-                            ) : <div className="w-8" />;
-                          })()}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <CardContent className="p-4 md:p-6 pt-0">
+                <ul className="divide-y divide-border">
+                  {cerrados.map((c, i) => (
+                    <li key={i} className="flex items-center justify-between gap-3 py-2">
+                      <span className="truncate text-sm text-foreground">{c.nombre}</span>
+                      <Badge variant="outline" className="shrink-0 text-xs">{c.desenlace}</Badge>
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}
-        </>
+        </div>
       )}
-
-      {/* Confirmación de llamada */}
-      <AlertDialog open={!!pendingCall} onOpenChange={(o) => { if (!o) setPendingCall(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <PhoneCall className="h-5 w-5 text-primary" />
-              Confirmar llamada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Está a punto de llamar a <span className="font-semibold text-foreground">{pendingCall?.label}</span> al número <span className="font-semibold text-foreground">{pendingCall?.tel}</span>. ¿Desea continuar?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <a href={`tel:${pendingCall?.tel}`} onClick={() => setPendingCall(null)}>
-                Llamar
-              </a>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

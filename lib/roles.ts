@@ -60,6 +60,11 @@ export function esRolCopastor(role: string): boolean {
   return role === 'copastor';
 }
 
+// Intentos de contacto antes de tener que cerrar el caso con un desenlace.
+// No es un tope arbitrario: convierte el seguimiento en un ciclo con final, en
+// vez de una lista que crece para siempre.
+export const MAX_CONTACTOS = 3;
+
 // Rutas que el Co-pastor NO puede abrir. Su trabajo es el cuidado de las
 // personas, no la administración: el dinero y los ajustes del sistema quedan
 // fuera. Se valida también en dashboard/layout.tsx, no solo ocultando el menú.
