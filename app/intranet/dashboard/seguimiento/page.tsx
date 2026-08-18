@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { calcularRiesgo } from '@/lib/seguimiento';
@@ -26,14 +26,27 @@ const DESENLACE_LABEL: Record<string, string> = {
   volvio: 'Volvió', se_retiro: 'Se retiró', sin_contacto: 'Sin contacto',
 };
 
+type Filtro = 'todos' | 'ausencia' | 'nuevo_en_la_fe';
+
+const FILTROS: { valor: Filtro; label: string }[] = [
+  { valor: 'todos', label: 'Todos' },
+  { valor: 'ausencia', label: 'Ausencia' },
+  { valor: 'nuevo_en_la_fe', label: 'Nuevos en la fe' },
+];
+
 export default function SeguimientoPage() {
   const { user } = useAuth();
   const puedeRegistrar = esRolCopastor(user?.role ?? '');
 
   const [porContactar, setPorContactar] = useState<CasoEnBandeja[]>([]);
   const [enProceso, setEnProceso] = useState<CasoEnBandeja[]>([]);
-  const [cerrados, setCerrados] = useState<{ nombre: string; desenlace: string }[]>([]);
+  const [cerrados, setCerrados] = useState<
+    { nombre: string; desenlace: string; motivo: 'ausencia' | 'nuevo_en_la_fe' }[]
+  >([]);
   const [loading, setLoading] = useState(true);
+  // Un clic separa "no conoce al Señor" de "está decayendo": son
+  // conversaciones distintas y mezcladas se vuelven difíciles de trabajar.
+  const [filtro, setFiltro] = useState<Filtro>('todos');
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -124,6 +137,7 @@ export default function SeguimientoPage() {
           .map((c) => ({
             nombre: porNombre.get(c.persona_id)?.nombre ?? 'Persona',
             desenlace: DESENLACE_LABEL[c.desenlace ?? ''] ?? '—',
+            motivo: c.motivo,
           })),
       );
     } catch {
@@ -133,6 +147,19 @@ export default function SeguimientoPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  const porContactarFiltrado = useMemo(
+    () => (filtro === 'todos' ? porContactar : porContactar.filter((c) => c.motivo === filtro)),
+    [porContactar, filtro],
+  );
+  const enProcesoFiltrado = useMemo(
+    () => (filtro === 'todos' ? enProceso : enProceso.filter((c) => c.motivo === filtro)),
+    [enProceso, filtro],
+  );
+  const cerradosFiltrado = useMemo(
+    () => (filtro === 'todos' ? cerrados : cerrados.filter((c) => c.motivo === filtro)),
+    [cerrados, filtro],
+  );
 
   return (
     <div>
@@ -146,6 +173,24 @@ export default function SeguimientoPage() {
             ? 'A quién contactar y qué pasó en cada llamada. Cada fila dice por qué está aquí.'
             : 'Trabajo de acompañamiento del Co-pastor: a quién ha contactado y cómo va cada caso.'}
         </p>
+
+        <div className="mt-4 flex gap-2" role="group" aria-label="Filtrar por motivo">
+          {FILTROS.map((f) => (
+            <button
+              key={f.valor}
+              type="button"
+              onClick={() => setFiltro(f.valor)}
+              aria-pressed={filtro === f.valor}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                filtro === f.valor
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -158,12 +203,12 @@ export default function SeguimientoPage() {
             <CardHeader className="p-4 md:p-6">
               <CardTitle className="flex items-center gap-2 text-base">
                 Por contactar
-                {porContactar.length > 0 && <Badge variant="secondary">{porContactar.length}</Badge>}
+                {porContactarFiltrado.length > 0 && <Badge variant="secondary">{porContactarFiltrado.length}</Badge>}
               </CardTitle>
               <p className="text-xs text-muted-foreground">Nadie los ha llamado todavía</p>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
-              <SeguimientoBandeja casos={porContactar} soloLectura={!puedeRegistrar} onCambio={cargar} />
+              <SeguimientoBandeja casos={porContactarFiltrado} soloLectura={!puedeRegistrar} onCambio={cargar} />
             </CardContent>
           </Card>
 
@@ -171,18 +216,18 @@ export default function SeguimientoPage() {
             <CardHeader className="p-4 md:p-6">
               <CardTitle className="flex items-center gap-2 text-base">
                 En proceso
-                {enProceso.length > 0 && <Badge variant="secondary">{enProceso.length}</Badge>}
+                {enProcesoFiltrado.length > 0 && <Badge variant="secondary">{enProcesoFiltrado.length}</Badge>}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
                 Ya hubo al menos un intento; abajo de cada uno está lo que pasó
               </p>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
-              <SeguimientoBandeja casos={enProceso} soloLectura={!puedeRegistrar} onCambio={cargar} />
+              <SeguimientoBandeja casos={enProcesoFiltrado} soloLectura={!puedeRegistrar} onCambio={cargar} />
             </CardContent>
           </Card>
 
-          {cerrados.length > 0 && (
+          {cerradosFiltrado.length > 0 && (
             <Card>
               <CardHeader className="p-4 md:p-6">
                 <CardTitle className="text-base">Casos cerrados</CardTitle>
@@ -190,7 +235,7 @@ export default function SeguimientoPage() {
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
                 <ul className="divide-y divide-border">
-                  {cerrados.map((c, i) => (
+                  {cerradosFiltrado.map((c, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 py-2">
                       <span className="truncate text-sm text-foreground">{c.nombre}</span>
                       <Badge variant="outline" className="shrink-0 text-xs">{c.desenlace}</Badge>
