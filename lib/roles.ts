@@ -8,6 +8,11 @@ export const ROLES = {
   // faltando y a quienes recién llegan. Ve y registra gente, pero no toca
   // Finanzas ni Configuración — ver esRolCopastor().
   copastor: { name: 'Co-pastor', badge: 'Pastoral', envVar: 'COPASTOR_PASSWORD', ministerio: null },
+  // Oración: entra SOLO al panel de peticiones. Ve todo (interno + externo),
+  // anota las peticiones de los propios miembros y lleva la trazabilidad
+  // (en espera → orando → contestada). No ve el resto de la intranet, igual
+  // que un ministerio pero con su propio panel — ver esRolOracion().
+  oracion: { name: 'Oración', badge: 'Pastoral', envVar: 'ORACION_PASSWORD', ministerio: null },
   somosluz: { name: 'Somos Luz', badge: 'Operativo', envVar: 'SOMOSLUZ_PASSWORD', ministerio: null },
   amadas: { name: 'Amadas', badge: 'Ministerio', envVar: 'AMADAS_PASSWORD', ministerio: 'mujeres' },
   hombres: { name: 'Hombría al Máximo', badge: 'Ministerio', envVar: 'HOMBRES_PASSWORD', ministerio: 'hombres' },
@@ -58,6 +63,19 @@ export function soloTomaAsistencia(role: string): boolean {
 
 export function esRolCopastor(role: string): boolean {
   return role === 'copastor';
+}
+
+// Oración entra solo a su panel (/intranet/dashboard/oracion). Se bloquea
+// también a nivel de ruta en dashboard/layout.tsx, no solo ocultando el menú.
+export function esRolOracion(role: string): boolean {
+  return role === 'oracion';
+}
+
+// Quiénes ven y gestionan el panel de oración: el Pastor (supervisa) y el
+// perfil Oración (opera). Ningún otro rol lee peticiones — pueden traer
+// información sensible de los miembros.
+export function puedeVerOracion(role: string): boolean {
+  return role === 'pastor' || esRolOracion(role);
 }
 
 // Intentos de contacto antes de tener que cerrar el caso con un desenlace.

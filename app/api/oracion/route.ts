@@ -2,8 +2,9 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { getResend } from '@/lib/resend';
+import { puedeVerOracion } from '@/lib/roles';
 
-const ESTADOS = ['pendiente', 'orando', 'completada'] as const;
+const ESTADOS = ['pendiente', 'orando', 'contestada'] as const;
 
 // Escapa texto de formulario público antes de meterlo en el HTML del correo.
 function escapeHtml(s: string): string {
@@ -45,16 +46,16 @@ async function notificarPastor(nombre: string, email: string, peticion: string) 
   }
 }
 
-// GET /api/oracion — listar peticiones (SOLO pastor)
+// GET /api/oracion — listar peticiones (pastor y perfil Oración)
 export async function GET(req: NextRequest) {
   const session = getSession(req);
-  if (!session || session.role !== 'pastor') {
+  if (!session || !puedeVerOracion(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
   const { data, error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .select('id, nombre, email, peticion, estado, created_at')
+    .select('id, nombre, email, peticion, estado, origen, persona_id, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -64,10 +65,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ peticiones: data ?? [] });
 }
 
-// PATCH /api/oracion — cambiar el estado de una petición (SOLO pastor)
+// PATCH /api/oracion — cambiar el estado de una petición (pastor y Oración)
 export async function PATCH(req: NextRequest) {
   const session = getSession(req);
-  if (!session || session.role !== 'pastor') {
+  if (!session || !puedeVerOracion(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     nombre: n,
     email: e || null,
     peticion: p,
+    origen: 'externa',
   });
 
   if (error) {

@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
+import { puedeVerOracion } from '@/lib/roles';
 
 // Lee cookie de sesión => siempre dinámico, nunca cacheado.
 export const dynamic = 'force-dynamic';
 
-// GET /api/oracion/pendientes — conteo de peticiones sin revisar (SOLO pastor).
-// Liviano: head+count, no trae filas. Alimenta el badge del sidebar vía polling.
+// GET /api/oracion/pendientes — conteo de peticiones sin revisar (pastor y
+// perfil Oración). Liviano: head+count, no trae filas. Alimenta el badge del
+// sidebar vía polling.
 export async function GET(req: NextRequest) {
   const session = getSession(req);
-  if (!session || session.role !== 'pastor') {
+  if (!session || !puedeVerOracion(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 

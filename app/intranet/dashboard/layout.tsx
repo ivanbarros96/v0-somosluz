@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
-import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer } from '@/lib/roles';
+import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer, esRolOracion } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
 
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
+const RUTA_ORACION = '/intranet/dashboard/oracion';
 
 export default function DashboardLayout({
   children,
@@ -30,6 +31,11 @@ export default function DashboardLayout({
   const esCopastor = !!user && esRolCopastor(user.role);
   const rutaPermitidaCopastor = !esCopastor || copastorPuedeVer(pathname);
 
+  // El perfil Oración solo entra a su panel; cualquier otra ruta lo devuelve
+  // ahí, aunque escriba la URL a mano.
+  const esOracion = !!user && esRolOracion(user.role);
+  const rutaPermitidaOracion = !esOracion || pathname.startsWith(RUTA_ORACION);
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/intranet');
@@ -39,12 +45,16 @@ export default function DashboardLayout({
       router.push(RUTA_ASISTENCIA);
       return;
     }
+    if (!rutaPermitidaOracion) {
+      router.push(RUTA_ORACION);
+      return;
+    }
     if (!rutaPermitidaCopastor) {
       router.push('/intranet/dashboard');
     }
-  }, [isAuthenticated, rutaPermitida, rutaPermitidaCopastor, router]);
+  }, [isAuthenticated, rutaPermitida, rutaPermitidaOracion, rutaPermitidaCopastor, router]);
 
-  if (!isAuthenticated || !user || !rutaPermitida || !rutaPermitidaCopastor) {
+  if (!isAuthenticated || !user || !rutaPermitida || !rutaPermitidaOracion || !rutaPermitidaCopastor) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

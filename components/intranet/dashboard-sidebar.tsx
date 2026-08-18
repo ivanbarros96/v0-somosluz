@@ -12,7 +12,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor } from '@/lib/roles';
+import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -129,6 +129,14 @@ const MINISTERIO_NAV: NavGrupo[] = [
   },
 ];
 
+// Oración: un solo panel, como los ministerios pero el suyo.
+const ORACION_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [{ href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart }],
+  },
+];
+
 interface DashboardSidebarProps {
   onClose?: () => void;
 }
@@ -140,19 +148,22 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
   const isPastor = user?.role === 'pastor';
   const esCopastor = !!user && esRolCopastor(user.role);
+  const esOracion = !!user && esRolOracion(user.role);
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
   const navGrupos = isPastor
     ? PASTOR_NAV
     : esCopastor
       ? COPASTOR_NAV
-      : esMinisterio
-        ? MINISTERIO_NAV
-        : SOMOSLUZ_NAV;
+      : esOracion
+        ? ORACION_NAV
+        : esMinisterio
+          ? MINISTERIO_NAV
+          : SOMOSLUZ_NAV;
 
-  // Peticiones de oración sin revisar (solo pastor). Alimenta el badge y el título de pestaña.
-  // El contador de peticiones sin revisar lo ven quienes hacen cuidado
-  // pastoral: pastor y co-pastor.
-  const oracionPendientes = usePeticionesPendientes(isPastor);
+  // Peticiones de oración sin revisar. Alimenta el badge y el título de
+  // pestaña. Lo ven quienes gestionan el panel de oración: pastor y el
+  // perfil Oración.
+  const oracionPendientes = usePeticionesPendientes(isPastor || esOracion);
 
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\)\s*/, '');

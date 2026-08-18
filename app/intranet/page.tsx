@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
 
@@ -21,6 +21,7 @@ type Profile = UserRole | null;
 // UserRole y la verificación de abajo dejaría de detectar nada.
 const EQUIPO = [
   { role: 'copastor', icon: HeartHandshake, desc: 'Seguimiento y cuidado de las personas' },
+  { role: 'oracion', icon: HandHeart, desc: 'Peticiones de oración · trazabilidad' },
   { role: 'somosluz', icon: Sun, desc: 'Acceso operativo · Registro y asistencia general' },
   { role: 'amadas', icon: Heart, desc: 'Ministerio de mujeres' },
   { role: 'hombres', icon: Shield, desc: 'Ministerio de varones' },
