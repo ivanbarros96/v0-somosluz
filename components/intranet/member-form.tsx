@@ -367,6 +367,11 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
         : null;
       const convFull = primeraIglesia === true ? null
         : (form.convNum && form.convUnidad) ? `${form.convNum} ${form.convUnidad}` : null;
+      // Nadie puede estar bautizado sin haber pisado nunca una iglesia: si
+      // declaró que es su primera vez, se guarda 'no' aunque el check hubiera
+      // quedado marcado antes de cambiar la respuesta.
+      const bautizadoFinal: 'si' | 'no' =
+        primeraIglesia === true ? 'no' : form.bautizado ? 'si' : 'no';
 
       const fecha = (form.dia && form.mes && form.anio)
         ? `${form.dia}/${form.mes}/${form.anio}` : null;
@@ -415,7 +420,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           region: form.region || null,
           comuna: form.comuna || null,
           direccion: form.direccion.trim() || null,
-          bautizado: form.bautizado ? 'si' : 'no',
+          bautizado: bautizadoFinal,
           tiempo_conversion: convFull,
           primera_iglesia: primeraIglesia,
           fecha_nacimiento: fecha,
@@ -442,7 +447,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
         region: form.region || null,
         comuna: form.comuna || null,
         direccion: form.direccion.trim() || null,
-        bautizado: form.bautizado ? 'si' : 'no',
+        bautizado: bautizadoFinal,
         tiempo_conversion: convFull,
         primera_iglesia: primeraIglesia,
         fecha_nacimiento: fecha,
@@ -635,7 +640,10 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1">
+                {/* También depende de la primera pregunta: el bautismo ocurre
+                    EN una iglesia, así que quien nunca ha pisado una no puede
+                    estar bautizado. Preguntarlo sería contradictorio. */}
+                <div className={`space-y-1 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
                   <Label>¿Bautizado/a?</Label>
                   <div
                     onClick={() => set('bautizado', !form.bautizado)}

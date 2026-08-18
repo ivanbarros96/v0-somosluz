@@ -41,6 +41,8 @@ export interface PersonaRow {
   direccion: string | null;
   tiempo_conversion: string | null;
   bautizado: string | null;
+  /** true = declaró que es su primera vez en una iglesia cristiana. null = sin dato. */
+  primera_iglesia: boolean | null;
   nombre_apoderado: string | null;
   telefono_apoderado: string | null;
   created_at: string | null;

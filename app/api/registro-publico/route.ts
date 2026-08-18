@@ -148,7 +148,9 @@ export async function POST(req: NextRequest) {
     region: texto(adulto.region),
     comuna: texto(adulto.comuna),
     direccion: texto(adulto.direccion, MAX_DIRECCION),
-    bautizado: adulto.bautizado === true ? 'si' : 'no',
+    // Nadie puede estar bautizado sin haber pisado nunca una iglesia: si
+    // declaró primera vez, se fuerza 'no' aunque el cliente mande otra cosa.
+    bautizado: adulto.primera_iglesia === true ? 'no' : adulto.bautizado === true ? 'si' : 'no',
     // Se guarda tal cual lo arma el formulario ("3 Años"), igual que en la
     // intranet, pero validado: solo un número seguido de Meses o Años. Así un
     // texto arbitrario desde fuera no entra a la ficha.

@@ -149,7 +149,8 @@ export function RegistroPublicoForm() {
             region: form.region,
             comuna: form.comuna,
             direccion: form.direccion,
-            bautizado: form.bautizado,
+            // Nadie puede estar bautizado sin haber pisado una iglesia.
+            bautizado: form.primeraIglesia === 'si' ? false : form.bautizado,
             primera_iglesia:
               form.primeraIglesia === 'si' ? true : form.primeraIglesia === 'no' ? false : null,
             // Si es su primera iglesia, el tiempo en el evangelio no aplica.
@@ -454,7 +455,9 @@ export function RegistroPublicoForm() {
                   </p>
                 </div>
 
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border p-3">
+                {/* Depende de la primera pregunta: el bautismo ocurre EN una
+                    iglesia, así que a quien nunca ha ido no se le pregunta. */}
+                <label className={`flex cursor-pointer items-center gap-2.5 rounded-lg border border-border p-3 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
                   <input
                     type="checkbox"
                     checked={form.bautizado}
