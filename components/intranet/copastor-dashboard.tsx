@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Activity, UserPlus, HeartHandshake, Loader2 } from 'lucide-react';
+import { ArrowRight, Activity, UserPlus, HeartHandshake, Loader2, Sprout } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { calcularRiesgo } from '@/lib/seguimiento';
+import { nuevosEnLaFe, type PersonaNueva } from '@/lib/nuevos-en-la-fe';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { SeguimientoResumen, type ResumenRiesgo } from '@/components/intranet/pastor/seguimiento-resumen';
 
 interface VisitaResumen {
@@ -24,6 +26,7 @@ export function CopastorDashboard() {
   const { user } = useAuth();
   const [riesgo, setRiesgo] = useState<ResumenRiesgo>({ bajo: 0, medio: 0, alto: 0, nombresAlto: [] });
   const [visitas, setVisitas] = useState<VisitaResumen[]>([]);
+  const [nuevos, setNuevos] = useState<PersonaNueva[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,6 +68,7 @@ export function CopastorDashboard() {
         }
         acc.nombresAlto = altos.sort((a, b) => b.puntaje - a.puntaje).slice(0, 3).map((x) => x.nombre);
         setRiesgo(acc);
+        setNuevos(nuevosEnLaFe(personas as never));
 
         setVisitas(
           ((resVisitas?.miembrosNuevos ?? []) as VisitaResumen[])
@@ -143,6 +147,42 @@ export function CopastorDashboard() {
 
       <Card>
         <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sprout className="h-5 w-5 text-primary" aria-hidden />
+            Nuevos en la fe
+            {nuevos.length > 0 && <Badge variant="secondary">{nuevos.length}</Badge>}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Recién conocen el evangelio y necesitan acompañamiento
+          </p>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0">
+          {nuevos.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nadie por ahora.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-foreground">
+                {nuevos.slice(0, 4).map((n) => n.nombre).join(' · ')}
+                {nuevos.length > 4 && (
+                  <span className="text-muted-foreground"> y {nuevos.length - 4} más</span>
+                )}
+              </p>
+              <a
+                href="/intranet/dashboard/nuevos-en-la-fe"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              >
+                Ver la lista y contactar
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </a>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-base">Accesos rápidos</CardTitle>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
@@ -150,7 +190,7 @@ export function CopastorDashboard() {
             {[
               { href: '/intranet/dashboard/seguimiento', icon: Activity, label: 'Seguimiento', desc: 'A quién llamar' },
               { href: '/intranet/dashboard/fidelizacion', icon: HeartHandshake, label: 'Fidelización', desc: 'Quién asiste poco' },
-              { href: '/intranet/dashboard/registro', icon: UserPlus, label: 'Registro', desc: 'Anotar a alguien' },
+              { href: '/intranet/dashboard/members', icon: UserPlus, label: 'Miembros', desc: 'Buscar una ficha' },
             ].map((item) => (
               <a
                 key={item.href}

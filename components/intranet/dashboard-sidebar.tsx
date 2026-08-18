@@ -55,17 +55,9 @@ const PASTOR_NAV: NavGrupo[] = [
     ],
   },
   {
-    titulo: 'Asistencia',
-    items: [
-      { href: '/intranet/dashboard/asistencia', label: 'Tomar asistencia', icon: ClipboardList },
-      { href: '/intranet/dashboard/mapa-asistencia', label: 'Mapa de asistencia', icon: Grid3x3, addedAt: '2026-08-10' },
-    ],
-  },
-  {
     titulo: 'Cuidado pastoral',
     items: [
       { href: '/intranet/dashboard/seguimiento', label: 'Seguimiento', icon: Activity },
-      { href: '/intranet/dashboard/nuevos-en-la-fe', label: 'Nuevos en la fe', icon: Sprout, addedAt: '2026-08-12' },
       { href: '/intranet/dashboard/fidelizacion', label: 'Fidelización', icon: HeartHandshake, addedAt: '2026-06-22' },
       { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart, addedAt: '2026-07-07' },
       { href: '/intranet/dashboard/retiros', label: 'Retiros', icon: UserX },
@@ -100,9 +92,7 @@ const COPASTOR_NAV: NavGrupo[] = [
   {
     titulo: 'Congregación',
     items: [
-      { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus },
       { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
-      { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake },
     ],
   },
   {
