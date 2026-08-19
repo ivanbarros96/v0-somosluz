@@ -46,11 +46,58 @@ export function JsonLd() {
     })),
   };
 
+  // Cada reunión como Event recurrente. El openingHours de arriba dice "está
+  // abierto"; esto dice "esto pasa acá, este día, a esta hora, y cualquiera
+  // puede venir" — que es lo que un asistente de IA necesita para responder
+  // "¿a qué hora es el culto en Somos Luz?" con una frase citable.
+  //
+  // Todos los datos salen de AGENDA_SEMANAL, la misma fuente que pinta la
+  // agenda visible en la página: si cambia un horario, cambian los dos juntos.
+  // Marcar aquí algo que no esté a la vista contradice las guías de Google.
+  const eventos = AGENDA_SEMANAL.map((a) => ({
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: a.nombre,
+    description: a.tipo,
+    eventSchedule: {
+      '@type': 'Schedule',
+      byDay: `https://schema.org/${DIAS_SCHEMA[a.dia] ?? a.dia}`,
+      startTime: a.hora,
+      repeatFrequency: 'P1W',
+      scheduleTimezone: 'America/Santiago',
+    },
+    eventAttendanceMode: a.online
+      ? 'https://schema.org/OnlineEventAttendanceMode'
+      : 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+    location: a.online
+      ? { '@type': 'VirtualLocation', url: REDES.instagramIglesia }
+      : {
+          '@type': 'Place',
+          name: 'Somos Luz Iglesia',
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: 'Almirante Goñi 251, esquina Cochrane',
+            addressLocality: 'Valparaíso',
+            addressRegion: 'Valparaíso',
+            addressCountry: 'CL',
+          },
+        },
+    organizer: { '@type': 'Church', name: 'Somos Luz Iglesia', url: SITE_URL },
+    isAccessibleForFree: true,
+  }));
+
   return (
-    <script
-      type="application/ld+json"
-      // JSON generado desde datos propios (no input de usuario) → seguro
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        // JSON generado desde datos propios (no input de usuario) → seguro
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventos) }}
+      />
+    </>
   );
 }
