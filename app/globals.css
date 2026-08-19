@@ -91,6 +91,98 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* ─── Marca en la intranet ────────────────────────────────────────────────
+   Colores exactos del Manual de Marca (Equipo Creativo, 2026):
+     #ECE9D8 crema · #BCA286 arena · #6E4E37 mocha · #6C7C5B salvia · #223F2F bosque
+
+   Va acotado a `.marca-intranet` (ver app/intranet/layout.tsx) y no a :root
+   para no alterar la landing, que se revisa aparte.
+
+   Dos decisiones que conviene no "corregir" más adelante:
+
+   1. El verde de acción es #5B694E, no el #6C7C5B del manual. El del manual
+      con texto crema encima da 3.68:1 de contraste y WCAG AA pide 4.5:1 —
+      queda ilegible para mucha gente. #5B694E es ese mismo verde oscurecido
+      lo justo para llegar a 4.81:1, y es el que ya venía usando el proyecto.
+      El #6C7C5B del manual sí se usa, pero solo donde no lleva texto encima.
+
+   2. #BCA286 (arena) nunca se usa como texto: sobre crema da 1.99:1. Sirve
+      de fondo, borde y separador, que es su papel en el manual.
+
+   El verde bosque #223F2F, que no se usaba en ningún lado, pasa a ser el
+   color del texto: 9.46:1 sobre crema, el contraste más alto de la paleta. */
+.marca-intranet {
+  --background: #ECE9D8;
+  --foreground: #223F2F;
+  --card: #F5F3EA;
+  --card-foreground: #223F2F;
+  --popover: #F5F3EA;
+  --popover-foreground: #223F2F;
+
+  --primary: #5B694E;
+  --primary-foreground: #ECE9D8;
+  --secondary: #DFD8C8;
+  --secondary-foreground: #33402F;
+  --muted: #E3DECF;
+  --muted-foreground: #5C5A4A;
+  --accent: #6E4E37;
+  --accent-foreground: #ECE9D8;
+
+  --border: #D6CDB9;
+  --input: #E8E2D3;
+  --ring: #5B694E;
+
+  /* La barra lateral usaba grises puros, sin nada de la marca. */
+  --sidebar: #F5F3EA;
+  --sidebar-foreground: #223F2F;
+  --sidebar-primary: #5B694E;
+  --sidebar-primary-foreground: #ECE9D8;
+  --sidebar-accent: #E3DECF;
+  --sidebar-accent-foreground: #223F2F;
+  --sidebar-border: #D6CDB9;
+  --sidebar-ring: #5B694E;
+
+  font-family: var(--font-cuerpo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Títulos en League Spartan, la tipografía de título del manual. */
+.marca-intranet :is(h1, h2, h3, h4) {
+  font-family: var(--font-titulo), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Modo oscuro: el bosque pasa a ser la superficie y el crema el texto.
+   Los verdes se aclaran porque sobre fondo oscuro el contraste se invierte. */
+.dark .marca-intranet {
+  --background: #1A2E22;
+  --foreground: #ECE9D8;
+  --card: #223F2F;
+  --card-foreground: #ECE9D8;
+  --popover: #223F2F;
+  --popover-foreground: #ECE9D8;
+
+  --primary: #93A67E;
+  --primary-foreground: #1A2E22;
+  --secondary: #2F4635;
+  --secondary-foreground: #ECE9D8;
+  --muted: #2A3E30;
+  --muted-foreground: #B5BFAC;
+  --accent: #B08E6F;
+  --accent-foreground: #1A2E22;
+
+  --border: #334A3A;
+  --input: #2F4635;
+  --ring: #93A67E;
+
+  --sidebar: #223F2F;
+  --sidebar-foreground: #ECE9D8;
+  --sidebar-primary: #93A67E;
+  --sidebar-primary-foreground: #1A2E22;
+  --sidebar-accent: #2F4635;
+  --sidebar-accent-foreground: #ECE9D8;
+  --sidebar-border: #334A3A;
+  --sidebar-ring: #93A67E;
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
