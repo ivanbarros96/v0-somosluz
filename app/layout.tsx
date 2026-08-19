@@ -53,23 +53,18 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
+  // Un solo diseño, no variantes por tema: Google indexa UN favicon por sitio
+  // y las variantes light/dark solo multiplican los archivos que pueden
+  // faltar. De hecho, los cuatro que se declaraban antes daban 404 y por eso
+  // Google no mostraba el logo en los resultados.
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon-32x32.png', type: 'image/png', sizes: '32x32' },
     ],
     apple: '/apple-icon.png',
   },
+  manifest: '/manifest.webmanifest',
 }
 
 export default function RootLayout({
