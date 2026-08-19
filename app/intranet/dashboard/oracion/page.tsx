@@ -14,7 +14,8 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check } from 'lucide-react';
+import { HandHeart, Clock, Mail, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPersonas, getMiembrosNuevos, type PersonaRow, type MiembroNuevoRow } from '@/lib/datos';
@@ -72,6 +73,36 @@ export default function OracionPage() {
   const [filtroOrigen, setFiltroOrigen] = useState<Origen | 'todos'>('todos');
   const [actualizando, setActualizando] = useState<string | null>(null);
   const [nuevaAbierta, setNuevaAbierta] = useState(false);
+  // Petición que se está por eliminar. Borrar es definitivo, así que pide la
+  // clave del pastor (se valida en el servidor, no solo acá).
+  const [aEliminar, setAEliminar] = useState<Peticion | null>(null);
+  const [pwdEliminar, setPwdEliminar] = useState('');
+  const [errorEliminar, setErrorEliminar] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+
+  async function eliminar() {
+    if (!aEliminar) return;
+    setEliminando(true);
+    setErrorEliminar('');
+    try {
+      const res = await fetch(`/api/oracion/${aEliminar.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwdEliminar }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'No pudimos eliminar' }));
+        setErrorEliminar(error ?? 'No pudimos eliminar');
+        return;
+      }
+      setPeticiones((ps) => ps.filter((p) => p.id !== aEliminar.id));
+      toast.success('Petición eliminada');
+      setAEliminar(null);
+      setPwdEliminar('');
+    } finally {
+      setEliminando(false);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -277,6 +308,16 @@ export default function OracionPage() {
                       Reabrir
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    title="Eliminar petición"
+                    aria-label={`Eliminar la petición de ${p.nombre}`}
+                    onClick={() => { setAEliminar(p); setPwdEliminar(''); setErrorEliminar(''); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -289,6 +330,57 @@ export default function OracionPage() {
         onOpenChange={setNuevaAbierta}
         onCreada={load}
       />
+
+      {/* Eliminar — pide la clave del pastor */}
+      <Dialog
+        open={!!aEliminar}
+        onOpenChange={(v) => { if (!v && !eliminando) { setAEliminar(null); setPwdEliminar(''); setErrorEliminar(''); } }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar petición</DialogTitle>
+            <DialogDescription>
+              Se borrará la petición de{' '}
+              <span className="font-semibold text-foreground">{aEliminar?.nombre}</span>. Esta
+              acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+
+          {aEliminar && (
+            <blockquote className="border-l-2 border-border pl-3 text-sm italic text-muted-foreground line-clamp-3">
+              {aEliminar.peticion}
+            </blockquote>
+          )}
+
+          <form
+            onSubmit={(e) => { e.preventDefault(); eliminar(); }}
+            className="space-y-1.5"
+          >
+            <Label htmlFor="pwd-eliminar">Contraseña del pastor</Label>
+            <Input
+              id="pwd-eliminar"
+              type="password"
+              value={pwdEliminar}
+              onChange={(e) => { setPwdEliminar(e.target.value); setErrorEliminar(''); }}
+              autoFocus
+            />
+            {errorEliminar && <p className="text-xs text-destructive">{errorEliminar}</p>}
+          </form>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setAEliminar(null); setPwdEliminar(''); setErrorEliminar(''); }}
+              disabled={eliminando}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={eliminar} disabled={eliminando || !pwdEliminar}>
+              {eliminando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando…</> : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
