@@ -6,13 +6,14 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, ClipboardList, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, ClipboardList, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart, Users2, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
 
 type Profile = UserRole | null;
 
-// Los perfiles agrupados, en una sola pantalla.
+// Los perfiles agrupados. El login abre corto —solo los dos grupos— y recién
+// al elegir uno se despliegan sus perfiles.
 //
 // La división no es cosmética: "Equipo" son los que navegan paneles de gestión
 // y "Reuniones" los que solo marcan asistencia de su propia reunión — la misma
@@ -21,13 +22,18 @@ type Profile = UserRole | null;
 // Se evita a propósito la palabra "Ministerios": Discipulado es una reunión de
 // formación, no un ministerio, y agruparlo así obligaba a llamarlo lo que no es.
 //
+// `corto` es el nombre para la vista previa de la tarjeta del grupo, donde los
+// nombres completos no caben.
+//
 // ⚠️ Agregar acá TODO rol nuevo de lib/roles.ts. Si falta, el perfil existe y
 // su contraseña funciona, pero nadie puede elegirlo.
 // `satisfies` en vez de anotar el tipo: anotarlo colapsa cada `role` a UserRole
 // y la verificación de abajo dejaría de detectar nada.
 const GRUPOS = [
   {
+    id: 'equipo',
     titulo: 'Equipo',
+    icon: Users2,
     perfiles: [
       { role: 'pastor', icon: BookOpen, desc: 'Estadísticas y reportes' },
       { role: 'copastor', icon: HeartHandshake, desc: 'Seguimiento y cuidado de las personas' },
@@ -36,16 +42,23 @@ const GRUPOS = [
     ],
   },
   {
+    id: 'reuniones',
     titulo: 'Reuniones',
+    icon: CalendarDays,
     perfiles: [
       { role: 'kids', icon: Baby, desc: 'Niños · en paralelo al dominical' },
       { role: 'amadas', icon: Heart, desc: 'Mujeres' },
-      { role: 'hombres', icon: Shield, desc: 'Varones' },
-      { role: 'discipulado', icon: GraduationCap, desc: 'Formación · viernes' },
-      { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
+      { role: 'hombres', icon: Shield, desc: 'Varones', corto: 'Hombría' },
+      { role: 'discipulado', icon: GraduationCap, desc: 'Formación · viernes', corto: 'Discipulado' },
+      { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20', corto: 'Youth' },
     ],
   },
-] satisfies { titulo: string; perfiles: { role: UserRole; icon: React.ElementType; desc: string }[] }[];
+] satisfies {
+  id: string;
+  titulo: string;
+  icon: React.ElementType;
+  perfiles: { role: UserRole; icon: React.ElementType; desc: string; corto?: string }[];
+}[];
 
 // Red de seguridad: si se agrega un rol a lib/roles.ts y se olvida acá, el
 // perfil queda invisible en el login aunque su contraseña funcione —
@@ -68,6 +81,8 @@ export default function IntranetLoginPage() {
   const router = useRouter();
 
   const [selectedProfile, setSelectedProfile] = useState<Profile>(null);
+  // Grupo desplegado. null = pantalla inicial, corta.
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,52 +181,80 @@ export default function IntranetLoginPage() {
           <p className="text-muted-foreground text-sm">Sistema de Gestión Interna</p>
         </div>
 
-        {/* Selector de perfil — una sola pantalla, agrupada */}
-        {!selectedProfile ? (
-          <div className="space-y-6">
-            {GRUPOS.map(({ titulo, perfiles }) => (
-              <div key={titulo}>
-                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-3">
-                  {titulo}
-                </p>
-                <div className="space-y-2">
-                  {perfiles.map(({ role, icon: Icon, desc }) => {
-                    // El Pastor conserva su color propio: es el único acceso
-                    // gerencial y se distingue del resto de un vistazo.
-                    const esPastor = role === 'pastor';
-                    return (
-                      <button
-                        key={role}
-                        onClick={() => selectProfile(role)}
-                        className={cn(
-                          'w-full p-4 rounded-xl border bg-card transition-all duration-200 text-left group',
-                          esPastor
-                            ? 'border-border hover:bg-secondary hover:border-accent/50'
-                            : 'border-border hover:bg-secondary hover:border-primary/50',
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={cn(
-                              'w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-colors',
-                              esPastor
-                                ? 'bg-accent/10 border-accent/20 group-hover:bg-accent/20'
-                                : 'bg-primary/10 border-primary/20 group-hover:bg-primary/20',
-                            )}
-                          >
-                            <Icon className={cn('h-4 w-4', esPastor ? 'text-accent' : 'text-primary')} />
-                          </div>
-                          <div>
-                            <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
-                            <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+        {/* Paso 1 — solo los grupos, para que la entrada se vea corta */}
+        {!selectedProfile && !grupoAbierto ? (
+          <div className="space-y-3">
+            <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-5">
+              Selecciona tu perfil de acceso
+            </p>
+            {GRUPOS.map(({ id, titulo, icon: Icon, perfiles }) => (
+              <button
+                key={id}
+                onClick={() => setGrupoAbierto(id)}
+                className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-foreground font-semibold">{titulo}</p>
+                    {/* Generada desde los perfiles: escrita a mano se quedaba
+                        vieja al agregar un rol — así fue como Oración quedó
+                        invisible acá. */}
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      {perfiles.map((p) => ('corto' in p ? p.corto : ROLES[p.role].name)).join(' · ')}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </button>
             ))}
+          </div>
+        ) : !selectedProfile && grupoAbierto ? (
+          /* Paso 2 — los perfiles del grupo elegido */
+          <div className="space-y-2">
+            <button
+              onClick={() => setGrupoAbierto(null)}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-3 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Volver
+            </button>
+            <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-4">
+              {GRUPOS.find((g) => g.id === grupoAbierto)?.titulo}
+            </p>
+            {GRUPOS.find((g) => g.id === grupoAbierto)?.perfiles.map(({ role, icon: Icon, desc }) => {
+              // El Pastor conserva su color propio: es el único acceso
+              // gerencial y se distingue del resto de un vistazo.
+              const esPastor = role === 'pastor';
+              return (
+                <button
+                  key={role}
+                  onClick={() => selectProfile(role)}
+                  className={cn(
+                    'w-full p-4 rounded-xl border border-border bg-card hover:bg-secondary transition-all duration-200 text-left group',
+                    esPastor ? 'hover:border-accent/50' : 'hover:border-primary/50',
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        'w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-colors',
+                        esPastor
+                          ? 'bg-accent/10 border-accent/20 group-hover:bg-accent/20'
+                          : 'bg-primary/10 border-primary/20 group-hover:bg-primary/20',
+                      )}
+                    >
+                      <Icon className={cn('h-4 w-4', esPastor ? 'text-accent' : 'text-primary')} />
+                    </div>
+                    <div>
+                      <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         ) : (
           /* Formulario de contraseña */
