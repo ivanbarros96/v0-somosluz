@@ -13,7 +13,12 @@ export const ROLES = {
   // (en espera → orando → contestada). No ve el resto de la intranet, igual
   // que un ministerio pero con su propio panel — ver esRolOracion().
   oracion: { name: 'Oración', badge: 'Pastoral', envVar: 'ORACION_PASSWORD', ministerio: null },
-  somosluz: { name: 'Somos Luz', badge: 'Operativo', envVar: 'SOMOSLUZ_PASSWORD', ministerio: null },
+  // Secretaría: mantiene los datos de las personas — registro, miembros,
+  // asistencia y cumpleaños — sin importar de qué reunión vengan. Se llamaba
+  // "Somos Luz", que se confundía con el nombre de la iglesia y no decía qué
+  // hacía. La clave interna del rol y su env var NO cambian: renombrarlas
+  // cerraría las sesiones activas y obligaría a reconfigurar Vercel.
+  somosluz: { name: 'Secretaría', badge: 'Operativo', envVar: 'SOMOSLUZ_PASSWORD', ministerio: null },
   amadas: { name: 'Amadas', badge: 'Ministerio', envVar: 'AMADAS_PASSWORD', ministerio: 'mujeres' },
   hombres: { name: 'Hombría al Máximo', badge: 'Ministerio', envVar: 'HOMBRES_PASSWORD', ministerio: 'hombres' },
   discipulado: { name: 'Viernes de Discipulado', badge: 'Ministerio', envVar: 'DISCIPULADO_PASSWORD', ministerio: 'discipulado' },

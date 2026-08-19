@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, Database, Info, BookOpen, Sun } from 'lucide-react';
+import { Shield, Users, Database, Info, BookOpen, ClipboardList } from 'lucide-react';
+import { ROLES } from '@/lib/roles';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -70,7 +71,11 @@ export default function SettingsPage() {
             <div className="p-4 bg-secondary/50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
                 <BookOpen className="w-4 h-4 text-accent" />
-                <p className="text-sm font-medium text-foreground">Pastor · Gerencial</p>
+                {/* Nombre e insignia desde lib/roles.ts: escribirlos a mano
+                    los dejaba desactualizados al renombrar un perfil. */}
+                <p className="text-sm font-medium text-foreground">
+                  {ROLES.pastor.name} · {ROLES.pastor.badge}
+                </p>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Estadísticas, gráficos y reportes</li>
@@ -80,8 +85,10 @@ export default function SettingsPage() {
             </div>
             <div className="p-4 bg-secondary/50 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <Sun className="w-4 h-4 text-primary" />
-                <p className="text-sm font-medium text-foreground">Somos Luz · Operativo</p>
+                <ClipboardList className="w-4 h-4 text-primary" />
+                <p className="text-sm font-medium text-foreground">
+                  {ROLES.somosluz.name} · {ROLES.somosluz.badge}
+                </p>
               </div>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Registrar miembros y visitantes</li>

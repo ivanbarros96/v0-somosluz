@@ -6,45 +6,68 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, Sun, Users2, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, ClipboardList, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
 
 type Profile = UserRole | null;
 
-// Perfiles del equipo (todo lo que no es pastor) con su ícono
-// ⚠️ Agregar acá TODO rol nuevo de lib/roles.ts que no sea Pastor. Si falta,
-// el perfil existe y su contraseña funciona, pero nadie puede elegirlo: no
-// aparece en esta pantalla.
-// El Co-pastor va primero: es rol pastoral, no un ministerio.
-// `satisfies` en vez de anotar el tipo: anotarlo colapsa cada `role` a
-// UserRole y la verificación de abajo dejaría de detectar nada.
-const EQUIPO = [
-  { role: 'copastor', icon: HeartHandshake, desc: 'Seguimiento y cuidado de las personas' },
-  { role: 'oracion', icon: HandHeart, desc: 'Peticiones de oración · trazabilidad' },
-  { role: 'somosluz', icon: Sun, desc: 'Acceso operativo · Registro y asistencia general' },
-  { role: 'amadas', icon: Heart, desc: 'Ministerio de mujeres' },
-  { role: 'hombres', icon: Shield, desc: 'Ministerio de varones' },
-  { role: 'discipulado', icon: GraduationCap, desc: 'Formación espiritual · Adultos' },
-  { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
-  { role: 'kids', icon: Baby, desc: 'Niños · Culto dominical' },
-] satisfies { role: UserRole; icon: React.ElementType; desc: string }[];
+// Los perfiles agrupados, en una sola pantalla.
+//
+// La división no es cosmética: "Equipo" son los que navegan paneles de gestión
+// y "Reuniones" los que solo marcan asistencia de su propia reunión — la misma
+// frontera que aplica soloTomaAsistencia() en lib/roles.ts.
+//
+// Se evita a propósito la palabra "Ministerios": Discipulado es una reunión de
+// formación, no un ministerio, y agruparlo así obligaba a llamarlo lo que no es.
+//
+// ⚠️ Agregar acá TODO rol nuevo de lib/roles.ts. Si falta, el perfil existe y
+// su contraseña funciona, pero nadie puede elegirlo.
+// `satisfies` en vez de anotar el tipo: anotarlo colapsa cada `role` a UserRole
+// y la verificación de abajo dejaría de detectar nada.
+const GRUPOS = [
+  {
+    titulo: 'Equipo',
+    perfiles: [
+      { role: 'pastor', icon: BookOpen, desc: 'Estadísticas y reportes' },
+      { role: 'copastor', icon: HeartHandshake, desc: 'Seguimiento y cuidado de las personas' },
+      { role: 'oracion', icon: HandHeart, desc: 'Peticiones de oración' },
+      { role: 'somosluz', icon: ClipboardList, desc: 'Registro, miembros y asistencia' },
+    ],
+  },
+  {
+    titulo: 'Reuniones',
+    perfiles: [
+      { role: 'kids', icon: Baby, desc: 'Niños · en paralelo al dominical' },
+      { role: 'amadas', icon: Heart, desc: 'Mujeres' },
+      { role: 'hombres', icon: Shield, desc: 'Varones' },
+      { role: 'discipulado', icon: GraduationCap, desc: 'Formación · viernes' },
+      { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20' },
+    ],
+  },
+] satisfies { titulo: string; perfiles: { role: UserRole; icon: React.ElementType; desc: string }[] }[];
 
 // Red de seguridad: si se agrega un rol a lib/roles.ts y se olvida acá, el
 // perfil queda invisible en el login aunque su contraseña funcione —
 // exactamente lo que pasó al crear el Co-pastor. Esto rompe el BUILD en vez de
 // dejar que el error llegue a producción.
-type RolesEnLogin = (typeof EQUIPO)[number]['role'] | 'pastor';
+type RolesEnLogin = (typeof GRUPOS)[number]['perfiles'][number]['role'];
 type FaltanEnLogin = Exclude<UserRole, RolesEnLogin>;
 const _todosLosRolesEstanEnLogin: FaltanEnLogin extends never ? true : never = true;
 void _todosLosRolesEstanEnLogin;
+
+// Lista plana, solo para encontrar el ícono del perfil ya elegido. El tipo va
+// explícito porque cada grupo tiene sus propios roles literales y flatMap no
+// sabe unir esos arrays por su cuenta.
+const PERFILES = GRUPOS.flatMap<{ role: UserRole; icon: React.ElementType; desc: string }>(
+  (g) => g.perfiles,
+);
 
 export default function IntranetLoginPage() {
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
 
   const [selectedProfile, setSelectedProfile] = useState<Profile>(null);
-  const [mostrarEquipo, setMostrarEquipo] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,71 +166,51 @@ export default function IntranetLoginPage() {
           <p className="text-muted-foreground text-sm">Sistema de Gestión Interna</p>
         </div>
 
-        {/* Selector de perfil */}
-        {!selectedProfile && !mostrarEquipo ? (
-          <div className="space-y-3">
-            <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-5">
-              Selecciona tu perfil de acceso
-            </p>
-
-            <button
-              onClick={() => selectProfile('pastor')}
-              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-accent/50 transition-all duration-200 text-left group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center group-hover:bg-accent/20 transition-colors shrink-0">
-                  <BookOpen className="h-5 w-5 text-accent" />
-                </div>
-                <div>
-                  <p className="text-foreground font-semibold">Pastor</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">Acceso gerencial · Estadísticas y reportes</p>
+        {/* Selector de perfil — una sola pantalla, agrupada */}
+        {!selectedProfile ? (
+          <div className="space-y-6">
+            {GRUPOS.map(({ titulo, perfiles }) => (
+              <div key={titulo}>
+                <p className="text-muted-foreground text-xs uppercase tracking-widest mb-3">
+                  {titulo}
+                </p>
+                <div className="space-y-2">
+                  {perfiles.map(({ role, icon: Icon, desc }) => {
+                    // El Pastor conserva su color propio: es el único acceso
+                    // gerencial y se distingue del resto de un vistazo.
+                    const esPastor = role === 'pastor';
+                    return (
+                      <button
+                        key={role}
+                        onClick={() => selectProfile(role)}
+                        className={cn(
+                          'w-full p-4 rounded-xl border bg-card transition-all duration-200 text-left group',
+                          esPastor
+                            ? 'border-border hover:bg-secondary hover:border-accent/50'
+                            : 'border-border hover:bg-secondary hover:border-primary/50',
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              'w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-colors',
+                              esPastor
+                                ? 'bg-accent/10 border-accent/20 group-hover:bg-accent/20'
+                                : 'bg-primary/10 border-primary/20 group-hover:bg-primary/20',
+                            )}
+                          >
+                            <Icon className={cn('h-4 w-4', esPastor ? 'text-accent' : 'text-primary')} />
+                          </div>
+                          <div>
+                            <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
+                            <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </button>
-
-            <button
-              onClick={() => setMostrarEquipo(true)}
-              className="w-full p-5 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                  <Users2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-foreground font-semibold">Equipo y Ministerios</p>
-                  <p className="text-muted-foreground text-xs mt-0.5">Co-pastor · Operativo · Amadas · Hombría · Discipulado · Youth · Kids</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        ) : !selectedProfile && mostrarEquipo ? (
-          <div className="space-y-2">
-            <button
-              onClick={() => setMostrarEquipo(false)}
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-3 transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Volver
-            </button>
-            <p className="text-center text-muted-foreground text-xs uppercase tracking-widest mb-4">
-              ¿Quién toma el servicio hoy?
-            </p>
-            {EQUIPO.map(({ role, icon: Icon, desc }) => (
-              <button
-                key={role}
-                onClick={() => selectProfile(role)}
-                className="w-full p-4 rounded-xl border border-border bg-card hover:bg-secondary hover:border-primary/50 transition-all duration-200 text-left group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                    <Icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
-                    <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
-                  </div>
-                </div>
-              </button>
             ))}
           </div>
         ) : (
@@ -233,9 +236,12 @@ export default function IntranetLoginPage() {
                 selectedProfile === 'pastor' ? 'bg-accent/10' : 'bg-primary/10'
               )}>
                 {(() => {
-                  if (selectedProfile === 'pastor') return <BookOpen className="h-5 w-5 text-accent" />;
-                  const Icon = EQUIPO.find((e) => e.role === selectedProfile)?.icon ?? Sun;
-                  return <Icon className="h-5 w-5 text-primary" />;
+                  const Icon = PERFILES.find((p) => p.role === selectedProfile)?.icon ?? BookOpen;
+                  return (
+                    <Icon
+                      className={cn('h-5 w-5', selectedProfile === 'pastor' ? 'text-accent' : 'text-primary')}
+                    />
+                  );
                 })()}
               </div>
               <div>
