@@ -17,7 +17,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { HandHeart, Clock, Mail, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { getPersonas, type PersonaRow } from '@/lib/datos';
+import { getPersonas, getMiembrosNuevos, type PersonaRow, type MiembroNuevoRow } from '@/lib/datos';
+
+/** Alguien de la congregación, venga de `personas` o de `miembros_nuevos`. */
+interface Seleccion {
+  origen: 'persona' | 'visita';
+  id: number;
+  nombre: string;
+}
 
 type Estado = 'pendiente' | 'orando' | 'contestada';
 type Origen = 'interna' | 'externa';
@@ -295,35 +302,60 @@ function NuevaPeticionDialog({
   onOpenChange: (v: boolean) => void;
   onCreada: () => void;
 }) {
-  // Híbrido: por miembro registrado o por nombre libre. Empieza en "miembro"
-  // porque es lo que da trazabilidad; el nombre libre es el escape.
+  // Híbrido: alguien de la congregación, o un nombre libre para quien no está
+  // registrado. La lista incluye a TODOS —adultos, jóvenes, niños y visitas—
+  // porque se ora por cualquiera, no solo por los miembros adultos.
   const [modo, setModo] = useState<'miembro' | 'libre'>('miembro');
   const [personas, setPersonas] = useState<PersonaRow[]>([]);
+  const [visitas, setVisitas] = useState<MiembroNuevoRow[]>([]);
   const [cargandoPersonas, setCargandoPersonas] = useState(false);
-  const [personaId, setPersonaId] = useState<number | null>(null);
+  // Los visitantes viven en otra tabla, así que no basta con el id: hay que
+  // saber de cuál de las dos salió el seleccionado.
+  const [seleccion, setSeleccion] = useState<Seleccion | null>(null);
   const [nombreLibre, setNombreLibre] = useState('');
   const [peticion, setPeticion] = useState('');
   const [comboAbierto, setComboAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
-  // Carga la lista de miembros la primera vez que se abre el diálogo.
+  // Carga la congregación la primera vez que se abre el diálogo.
   useEffect(() => {
-    if (!open || personas.length > 0) return;
+    if (!open || personas.length > 0 || visitas.length > 0) return;
     setCargandoPersonas(true);
-    getPersonas()
-      .then((ps) => setPersonas(ps))
-      .catch(() => toast.error('No pudimos cargar los miembros'))
+    Promise.all([getPersonas(), getMiembrosNuevos()])
+      .then(([ps, vs]) => { setPersonas(ps); setVisitas(vs); })
+      .catch(() => toast.error('No pudimos cargar la congregación'))
       .finally(() => setCargandoPersonas(false));
-  }, [open, personas.length]);
+  }, [open, personas.length, visitas.length]);
+
+  // Agrupado y ordenado por nombre. Sin esto la lista salía en orden de
+  // registro: 80 nombres mezclados donde no se notaba que hubiera jóvenes y
+  // niños, y parecía que solo estaban los adultos.
+  const grupos = useMemo(() => {
+    const porTipo = (tipo: string) =>
+      personas
+        .filter((p) => p.source_tipo === tipo)
+        .map((p): Seleccion => ({ origen: 'persona', id: Number(p.id), nombre: p.nombre }))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+    return [
+      { heading: 'Adultos', items: porTipo('adulto') },
+      { heading: 'Jóvenes', items: porTipo('joven') },
+      { heading: 'Niños', items: porTipo('nino') },
+      {
+        heading: 'Visitas',
+        items: visitas
+          .map((v): Seleccion => ({ origen: 'visita', id: v.id, nombre: v.nombre }))
+          .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+      },
+    ].filter((g) => g.items.length > 0);
+  }, [personas, visitas]);
 
   function reset() {
     setModo('miembro');
-    setPersonaId(null);
     setNombreLibre('');
     setPeticion('');
+    setSeleccion(null);
   }
-
-  const personaSel = personas.find((p) => Number(p.id) === personaId);
 
   async function guardar() {
     const texto = peticion.trim();
@@ -331,8 +363,8 @@ function NuevaPeticionDialog({
       toast.error('Escribe la petición');
       return;
     }
-    if (modo === 'miembro' && personaId == null) {
-      toast.error('Elige un miembro');
+    if (modo === 'miembro' && !seleccion) {
+      toast.error('Elige a la persona');
       return;
     }
     if (modo === 'libre' && !nombreLibre.trim()) {
@@ -340,16 +372,22 @@ function NuevaPeticionDialog({
       return;
     }
 
+    // Un visitante todavía no tiene ficha en `personas`, así que su petición
+    // se guarda por nombre. Queda legible igual, y sigue estándolo cuando esa
+    // visita pase a ser miembro.
+    const cuerpo =
+      modo === 'libre'
+        ? { nombre: nombreLibre.trim(), peticion: texto }
+        : seleccion!.origen === 'persona'
+          ? { persona_id: seleccion!.id, peticion: texto }
+          : { nombre: seleccion!.nombre, peticion: texto };
+
     setGuardando(true);
     try {
       const res = await fetch('/api/oracion/interna', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          modo === 'miembro'
-            ? { persona_id: personaId, peticion: texto }
-            : { nombre: nombreLibre.trim(), peticion: texto },
-        ),
+        body: JSON.stringify(cuerpo),
       });
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'No pudimos guardar' }));
@@ -377,7 +415,7 @@ function NuevaPeticionDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nueva petición</DialogTitle>
-          <DialogDescription>De un miembro de la iglesia.</DialogDescription>
+          <DialogDescription>De alguien de la iglesia.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -393,7 +431,7 @@ function NuevaPeticionDialog({
                   : 'border-border bg-background text-muted-foreground hover:bg-muted',
               )}
             >
-              Miembro registrado
+              De la congregación
             </button>
             <button
               type="button"
@@ -411,7 +449,7 @@ function NuevaPeticionDialog({
 
           {modo === 'miembro' ? (
             <div className="space-y-1.5">
-              <Label>Miembro</Label>
+              <Label>¿Por quién oramos?</Label>
               <Popover open={comboAbierto} onOpenChange={setComboAbierto}>
                 <PopoverTrigger asChild>
                   <Button
@@ -422,36 +460,41 @@ function NuevaPeticionDialog({
                     disabled={cargandoPersonas}
                   >
                     {cargandoPersonas
-                      ? 'Cargando miembros…'
-                      : personaSel?.nombre ?? 'Elige un miembro'}
+                      ? 'Cargando congregación…'
+                      : seleccion?.nombre ?? 'Elige a la persona'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Buscar miembro…" />
+                    <CommandInput placeholder="Buscar por nombre…" />
                     <CommandList>
                       <CommandEmpty>Sin resultados.</CommandEmpty>
-                      <CommandGroup>
-                        {personas.map((p) => (
-                          <CommandItem
-                            key={p.id}
-                            value={p.nombre}
-                            onSelect={() => {
-                              setPersonaId(Number(p.id));
-                              setComboAbierto(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                personaId === Number(p.id) ? 'opacity-100' : 'opacity-0',
-                              )}
-                            />
-                            {p.nombre}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
+                      {grupos.map((g) => (
+                        <CommandGroup key={g.heading} heading={g.heading}>
+                          {g.items.map((item) => {
+                            const elegido =
+                              seleccion?.origen === item.origen && seleccion?.id === item.id;
+                            return (
+                              <CommandItem
+                                // El id se repite entre las dos tablas, así que
+                                // la clave lleva también el origen.
+                                key={`${item.origen}-${item.id}`}
+                                value={`${item.nombre} ${g.heading}`}
+                                onSelect={() => {
+                                  setSeleccion(item);
+                                  setComboAbierto(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn('mr-2 h-4 w-4', elegido ? 'opacity-100' : 'opacity-0')}
+                                />
+                                {item.nombre}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      ))}
                     </CommandList>
                   </Command>
                 </PopoverContent>
