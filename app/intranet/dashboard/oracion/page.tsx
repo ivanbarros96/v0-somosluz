@@ -464,15 +464,15 @@ function NuevaPeticionDialog({
       return;
     }
 
-    // Un visitante todavía no tiene ficha en `personas`, así que su petición
-    // se guarda por nombre. Queda legible igual, y sigue estándolo cuando esa
-    // visita pase a ser miembro.
+    // Miembros y visitas viven en tablas distintas, así que cada uno va por su
+    // propia columna. Al convertir una visita en miembro, sus peticiones se
+    // mueven solas a la ficha nueva.
     const cuerpo =
       modo === 'libre'
         ? { nombre: nombreLibre.trim(), peticion: texto }
         : seleccion!.origen === 'persona'
           ? { persona_id: seleccion!.id, peticion: texto }
-          : { nombre: seleccion!.nombre, peticion: texto };
+          : { miembro_nuevo_id: seleccion!.id, peticion: texto };
 
     setGuardando(true);
     try {

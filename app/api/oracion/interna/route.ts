@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const personaId = typeof body.persona_id === 'number' ? body.persona_id : null;
+  const visitaId = typeof body.miembro_nuevo_id === 'number' ? body.miembro_nuevo_id : null;
   const nombreLibre = typeof body.nombre === 'string' ? body.nombre.trim() : '';
   const peticion = typeof body.peticion === 'string' ? body.peticion.trim() : '';
 
@@ -27,9 +28,17 @@ export async function POST(req: NextRequest) {
   if (peticion.length > 2000) {
     return NextResponse.json({ error: 'La petición es demasiado larga' }, { status: 400 });
   }
-  if (!personaId && !nombreLibre) {
+  if (!personaId && !visitaId && !nombreLibre) {
     return NextResponse.json(
-      { error: 'Indica un miembro o escribe un nombre' },
+      { error: 'Indica a la persona o escribe un nombre' },
+      { status: 400 },
+    );
+  }
+  // La base tiene un CHECK que lo impide; se rechaza antes para dar un error
+  // claro en vez de un fallo de restricción.
+  if (personaId && visitaId) {
+    return NextResponse.json(
+      { error: 'Una petición pertenece a un miembro o a una visita, no a ambos' },
       { status: 400 },
     );
   }
@@ -50,6 +59,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ese miembro no existe' }, { status: 404 });
     }
     nombre = persona.nombre;
+  } else if (visitaId) {
+    // Las visitas viven en su propia tabla hasta que se las convierte en
+    // miembros. Al convertirlas, sus peticiones se mueven a la ficha nueva
+    // (ver api/miembros-nuevos/[id]/convertir).
+    const { data: visita, error } = await db
+      .from('miembros_nuevos')
+      .select('nombre')
+      .eq('id', visitaId)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!visita) {
+      return NextResponse.json({ error: 'Esa visita no existe' }, { status: 404 });
+    }
+    nombre = visita.nombre;
   }
 
   if (nombre.length > 100) {
@@ -61,6 +84,7 @@ export async function POST(req: NextRequest) {
     peticion,
     origen: 'interna',
     persona_id: personaId,
+    miembro_nuevo_id: visitaId,
     registrado_por: session.role,
   });
   if (error) {

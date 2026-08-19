@@ -74,6 +74,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
   }
 
+  // Paso 2b — las peticiones de oración de esa visita también se mudan. Sin
+  // esto, el borrado del paso 3 las dejaria huerfanas (la FK es ON DELETE SET
+  // NULL), justo el historial que se quiere conservar. Un fallo aca NO
+  // deshace la conversion: la peticion conserva el nombre y sigue siendo
+  // legible, asi que no vale la pena tirar abajo el miembro ya creado.
+  const { error: errOracion } = await db
+    .from('peticiones_oracion')
+    .update({ persona_id: persona.id, miembro_nuevo_id: null })
+    .eq('miembro_nuevo_id', id);
+  if (errOracion) {
+    console.error('[convertir] no se pudieron mover las peticiones de oracion', errOracion);
+  }
+
   // Paso 3 — recién ahora se elimina el registro de visitante. Si esto falla,
   // el historial ya está a salvo en la ficha nueva: queda un visitante
   // duplicado sin asistencias, que se puede borrar a mano. Nunca se pierde
