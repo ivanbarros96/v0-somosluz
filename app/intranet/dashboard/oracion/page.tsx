@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPersonas, getMiembrosNuevos, type PersonaRow, type MiembroNuevoRow } from '@/lib/datos';
+import { useAuth } from '@/lib/auth-context';
 
 /** Alguien de la congregación, venga de `personas` o de `miembros_nuevos`. */
 interface Seleccion {
@@ -67,6 +68,12 @@ const ESTADO_LABEL: Record<Estado, string> = {
 };
 
 export default function OracionPage() {
+  const { user } = useAuth();
+  // El pastor no reingresa su clave para borrar: su sesión ya es la prueba de
+  // identidad, igual que al eliminar un miembro. Solo el perfil Oración pasa
+  // por el diálogo de autorización.
+  const esPastor = user?.role === 'pastor';
+
   const [peticiones, setPeticiones] = useState<Peticion[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<Estado | 'todas'>('todas');
@@ -88,7 +95,7 @@ export default function OracionPage() {
       const res = await fetch(`/api/oracion/${aEliminar.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pwdEliminar }),
+        body: JSON.stringify({ password: esPastor ? undefined : pwdEliminar }),
       });
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'No pudimos eliminar' }));
@@ -331,7 +338,8 @@ export default function OracionPage() {
         onCreada={load}
       />
 
-      {/* Eliminar — pide la clave del pastor */}
+      {/* Eliminar — al pastor no se le pide clave: su sesión ya lo autoriza.
+          Al perfil Oración sí, porque borrar es definitivo y no deja rastro. */}
       <Dialog
         open={!!aEliminar}
         onOpenChange={(v) => { if (!v && !eliminando) { setAEliminar(null); setPwdEliminar(''); setErrorEliminar(''); } }}
@@ -352,20 +360,25 @@ export default function OracionPage() {
             </blockquote>
           )}
 
-          <form
-            onSubmit={(e) => { e.preventDefault(); eliminar(); }}
-            className="space-y-1.5"
-          >
-            <Label htmlFor="pwd-eliminar">Contraseña del pastor</Label>
-            <Input
-              id="pwd-eliminar"
-              type="password"
-              value={pwdEliminar}
-              onChange={(e) => { setPwdEliminar(e.target.value); setErrorEliminar(''); }}
-              autoFocus
-            />
-            {errorEliminar && <p className="text-xs text-destructive">{errorEliminar}</p>}
-          </form>
+          {!esPastor && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); eliminar(); }}
+              className="space-y-1.5"
+            >
+              <Label htmlFor="pwd-eliminar">Contraseña del pastor</Label>
+              <Input
+                id="pwd-eliminar"
+                type="password"
+                value={pwdEliminar}
+                onChange={(e) => { setPwdEliminar(e.target.value); setErrorEliminar(''); }}
+                autoFocus
+              />
+              {errorEliminar && <p className="text-xs text-destructive">{errorEliminar}</p>}
+            </form>
+          )}
+          {esPastor && errorEliminar && (
+            <p className="text-sm text-destructive">{errorEliminar}</p>
+          )}
 
           <DialogFooter className="gap-2">
             <Button
@@ -375,7 +388,11 @@ export default function OracionPage() {
             >
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={eliminar} disabled={eliminando || !pwdEliminar}>
+            <Button
+              variant="destructive"
+              onClick={eliminar}
+              disabled={eliminando || (!esPastor && !pwdEliminar)}
+            >
               {eliminando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando…</> : 'Eliminar'}
             </Button>
           </DialogFooter>
