@@ -98,49 +98,73 @@
    Va acotado a `.marca-intranet` (ver app/intranet/layout.tsx) y no a :root
    para no alterar la landing, que se revisa aparte.
 
-   Dos decisiones que conviene no "corregir" más adelante:
+   ── Cómo aplica la marca sus colores (medido, no supuesto) ──
+   Se muestrearon las piezas de la página RRSS del manual. El patrón es
+   siempre el mismo: UNA superficie sólida de color + texto en el contrario.
+   Nunca cinco colores repartidos por la misma pieza.
 
-   1. El verde de acción es #5B694E, no el #6C7C5B del manual. El del manual
-      con texto crema encima da 3.68:1 de contraste y WCAG AA pide 4.5:1 —
-      queda ilegible para mucha gente. #5B694E es ese mismo verde oscurecido
-      lo justo para llegar a 4.81:1, y es el que ya venía usando el proyecto.
-      El #6C7C5B del manual sí se usa, pero solo donde no lleva texto encima.
+     "Eres bienvenido"          fondo #6E4E37 (mocha, exacto)  + texto crema
+     "La fábrica de guerreros"  fondo #6E4E37 (mocha, exacto)  + texto crema
+     "Estamos en construcción"  fondo #6C7B5A (salvia, exacto) + texto crema
+     "Que no falte el aceite"   fondo #FAF4EF (crema claro)    + texto mocha
 
-   2. #BCA286 (arena) nunca se usa como texto: sobre crema da 1.99:1. Sirve
-      de fondo, borde y separador, que es su papel en el manual.
+   De ahí las tres decisiones de esta paleta:
 
-   El verde bosque #223F2F, que no se usaba en ningún lado, pasa a ser el
-   color del texto: 9.46:1 sobre crema, el contraste más alto de la paleta. */
+   1. **Tres colores, no cinco.** El manual lo pide por escrito ("2-3 colores
+      como máximo"): crema de fondo, mocha en la barra lateral, salvia en las
+      acciones. El resto son neutros derivados.
+
+   2. **El fondo es #F7F3EB, no el #ECE9D8 de la paleta.** Cuando la iglesia
+      usa crema como FONDO, usa uno claro (#FAF4EF): #F7F3EB está a distancia
+      5 de ese, y #ECE9D8 a 29. El crema de la paleta se reserva para el TEXTO
+      sobre superficies oscuras, que es donde lo aplican.
+
+   3. **El texto oscuro es mocha, no bosque.** Es lo que usan en sus piezas de
+      fondo claro. El verde bosque #223F2F no aparece en ninguna, así que se
+      reserva para el modo oscuro.
+
+   ── Accesibilidad: dos ajustes que NO hay que "corregir" ──
+
+   · El verde de acción es #5B694E, no el #6C7C5B del manual. El del manual con
+     texto crema encima da 3.68:1 y WCAG AA pide 4.5:1 — ilegible para mucha
+     gente. #5B694E es ese mismo verde oscurecido lo justo (4.81:1), y es el
+     que el proyecto ya venía usando.
+
+   · #BCA286 (arena) nunca como texto: sobre crema da 1.99:1. Queda de borde y
+     separador, que es su papel en el manual. */
 .marca-intranet {
-  --background: #ECE9D8;
-  --foreground: #223F2F;
-  --card: #F5F3EA;
-  --card-foreground: #223F2F;
-  --popover: #F5F3EA;
-  --popover-foreground: #223F2F;
+  --background: #F7F3EB;
+  --foreground: #4A3729;
+  --card: #FDFBF7;
+  --card-foreground: #4A3729;
+  --popover: #FDFBF7;
+  --popover-foreground: #4A3729;
 
   --primary: #5B694E;
   --primary-foreground: #ECE9D8;
-  --secondary: #DFD8C8;
-  --secondary-foreground: #33402F;
-  --muted: #E3DECF;
-  --muted-foreground: #5C5A4A;
+  --secondary: #EDE6DA;
+  --secondary-foreground: #4A3729;
+  --muted: #EFE9DE;
+  --muted-foreground: #6B6152;
   --accent: #6E4E37;
   --accent-foreground: #ECE9D8;
 
-  --border: #D6CDB9;
-  --input: #E8E2D3;
+  --border: #E0D8C8;
+  --input: #EFEADF;
   --ring: #5B694E;
 
-  /* La barra lateral usaba grises puros, sin nada de la marca. */
-  --sidebar: #F5F3EA;
-  --sidebar-foreground: #223F2F;
-  --sidebar-primary: #5B694E;
-  --sidebar-primary-foreground: #ECE9D8;
-  --sidebar-accent: #E3DECF;
-  --sidebar-accent-foreground: #223F2F;
-  --sidebar-border: #D6CDB9;
-  --sidebar-ring: #5B694E;
+  /* Barra lateral en mocha sólido con texto crema — el mismo par que usan en
+     sus publicaciones. Antes eran grises puros, sin nada de la marca. */
+  --sidebar: #6E4E37;
+  --sidebar-foreground: #ECE9D8;
+  --sidebar-primary: #ECE9D8;
+  --sidebar-primary-foreground: #6E4E37;
+  /* El hover aclara el mocha lo justo para notarse sin perder legibilidad:
+     #8A6A50 se veía bien pero dejaba el texto crema en 4.04:1, bajo el mínimo. */
+  --sidebar-accent: #79553C;
+  --sidebar-accent-foreground: #ECE9D8;
+  --sidebar-border: #85644A;
+  --sidebar-ring: #ECE9D8;
 
   font-family: var(--font-cuerpo), ui-sans-serif, system-ui, sans-serif;
 }
