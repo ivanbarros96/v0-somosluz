@@ -5,8 +5,78 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Users, Database, Info, BookOpen, ClipboardList } from 'lucide-react';
+import { Shield, Users, Database, Info, BookOpen, ClipboardList, HeartHandshake, HandHeart, CalendarDays, Baby } from 'lucide-react';
 import { ROLES } from '@/lib/roles';
+import { cn } from '@/lib/utils';
+
+// Qué puede hacer cada acceso. Nombres e insignias salen de lib/roles.ts:
+// escritos a mano quedaban viejos cada vez que se renombraba un perfil.
+//
+// Las cuatro reuniones de adultos van en un solo bloque porque comparten
+// exactamente los mismos permisos; Kids va aparte porque tiene reglas propias.
+const PERMISOS = [
+  {
+    titulo: `${ROLES.pastor.name} · ${ROLES.pastor.badge}`,
+    icon: BookOpen,
+    destacado: true,
+    puntos: [
+      'Estadísticas, gráficos y reportes',
+      'Ve el seguimiento del Co-pastor, sin registrar',
+      'Finanzas, reservas y configuración',
+      'Ver y administrar miembros (incl. eliminar)',
+    ],
+  },
+  {
+    titulo: `${ROLES.copastor.name} · ${ROLES.copastor.badge}`,
+    icon: HeartHandshake,
+    destacado: false,
+    puntos: [
+      'Seguimiento: registra llamadas y cierra casos',
+      'Ve y registra miembros',
+      'No entra a Finanzas, Reservas ni Configuración',
+    ],
+  },
+  {
+    titulo: `${ROLES.oracion.name} · ${ROLES.oracion.badge}`,
+    icon: HandHeart,
+    destacado: false,
+    puntos: [
+      'Solo entra al panel de peticiones de oración',
+      'Anota peticiones de los miembros y cambia su estado',
+      'No ve el resto de la intranet',
+    ],
+  },
+  {
+    titulo: `${ROLES.somosluz.name} · ${ROLES.somosluz.badge}`,
+    icon: ClipboardList,
+    destacado: false,
+    puntos: [
+      'Registrar miembros y visitantes',
+      'Abrir, tomar y cerrar la asistencia de los cultos',
+      'Cumpleaños',
+      'Eliminar requiere autorización del pastor',
+    ],
+  },
+  {
+    titulo: `${ROLES.amadas.name}, ${ROLES.hombres.name}, ${ROLES.discipulado.name} y ${ROLES.youth.name} · ${ROLES.amadas.badge}`,
+    icon: CalendarDays,
+    destacado: false,
+    puntos: [
+      'Solo toman la asistencia de su propia reunión',
+      'No ven el resto de la intranet',
+    ],
+  },
+  {
+    titulo: `${ROLES.kids.name} · ${ROLES.kids.badge}`,
+    icon: Baby,
+    destacado: false,
+    puntos: [
+      'Toma la asistencia de la clase de niños',
+      'Su culto se abre y se cierra junto con el dominical, no lo maneja ella',
+      'Solo ve la clase abierta y no puede desmarcar adultos',
+    ],
+  },
+];
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -68,34 +138,19 @@ export default function SettingsPage() {
             <CardDescription>Qué puede hacer cada acceso</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="p-4 bg-secondary/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <BookOpen className="w-4 h-4 text-accent" />
-                {/* Nombre e insignia desde lib/roles.ts: escribirlos a mano
-                    los dejaba desactualizados al renombrar un perfil. */}
-                <p className="text-sm font-medium text-foreground">
-                  {ROLES.pastor.name} · {ROLES.pastor.badge}
-                </p>
+            {PERMISOS.map(({ titulo, icon: Icon, destacado, puntos }) => (
+              <div key={titulo} className="p-4 bg-secondary/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className={cn('w-4 h-4', destacado ? 'text-accent' : 'text-primary')} />
+                  <p className="text-sm font-medium text-foreground">{titulo}</p>
+                </div>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  {puntos.map((p) => (
+                    <li key={p}>• {p}</li>
+                  ))}
+                </ul>
               </div>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Estadísticas, gráficos y reportes</li>
-                <li>• Seguimiento de ausencias y retiros</li>
-                <li>• Ver y administrar miembros (incl. eliminar)</li>
-              </ul>
-            </div>
-            <div className="p-4 bg-secondary/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <ClipboardList className="w-4 h-4 text-primary" />
-                <p className="text-sm font-medium text-foreground">
-                  {ROLES.somosluz.name} · {ROLES.somosluz.badge}
-                </p>
-              </div>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Registrar miembros y visitantes</li>
-                <li>• Tomar asistencia de los cultos</li>
-                <li>• Eliminar requiere autorización del pastor</li>
-              </ul>
-            </div>
+            ))}
           </CardContent>
         </Card>
 
