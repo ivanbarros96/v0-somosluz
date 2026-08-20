@@ -89,10 +89,10 @@ export function Media() {
                   Somos Luz · Serie
                 </p>
                 <p className="relative font-script text-6xl leading-none text-[oklch(0.95_0.03_90)] -rotate-2">
-                  No pierdas
+                  {SERIE.portada.linea1}
                 </p>
                 <p className="relative mt-3 font-serif font-bold text-4xl uppercase tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-b from-[oklch(0.95_0.04_90)] to-[oklch(0.72_0.08_80)]">
-                  La Esencia
+                  {SERIE.portada.linea2}
                 </p>
                 <p className="relative mt-8 text-[0.65rem] uppercase tracking-[0.35em] text-[oklch(0.7_0.04_85)]">
                   {SERIE.versiculo}

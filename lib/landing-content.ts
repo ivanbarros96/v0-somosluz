@@ -50,6 +50,13 @@ export const SERIE = {
   descripcion:
     'Hay temporadas que no se fuerzan, se reciben. En esta serie dejamos atrás lo que ya cumplió su propósito para caminar en lo que Dios está haciendo hoy: un tiempo de apertura, de fe para lo que no se ve todavía y de una iglesia que no mira atrás para avanzar. Porque cuando Dios dice "nuevo", no es una repetición — es un camino que antes no existía.',
   versiculo: 'Isaías 43:19',
+  // Las dos líneas de la "portada" tipo cover del IG (components/landing/media.tsx):
+  // línea1 en script/cursiva, línea2 en bold/mayúsculas — el mismo patrón que
+  // usaba "No pierdas" / "La Esencia". Separado de `nombre` a propósito: antes
+  // este texto estaba escrito a mano en el componente y no se actualizó junto
+  // con el nombre de la serie — quedó mostrando la serie vieja en la portada
+  // aunque el resto de la sección ya decía la nueva.
+  portada: { linea1: 'Un Nuevo', linea2: 'Tiempo' },
 } as const;
 
 export const SOBRE_NOSOTROS = {
