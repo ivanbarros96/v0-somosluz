@@ -22,8 +22,14 @@ export const metadata: Metadata = {
     default: 'Somos Luz Iglesia | Iglesia Cristiana en Valparaíso',
     template: '%s | Somos Luz Iglesia',
   },
+  // 152 caracteres a propósito: Google corta alrededor de 155. La versión
+  // anterior tenía 179 y se cortaba a media frase, así que Google la
+  // descartaba y armaba el resumen con texto del cuerpo — terminó usando la
+  // descripción del ministerio juvenil, que hacía parecer que la iglesia era
+  // solo para adolescentes. Esta entra completa y lleva lo que la gente busca:
+  // dónde queda, a qué hora, y que hay espacio para todas las edades.
   description:
-    'Iglesia Cristiana Somos Luz en Valparaíso, Chile. Únete a nuestro culto general los domingos a las 11:30 hrs en Almirante Goñi 251. Una generación que manifiesta el Reino de Dios.',
+    'Iglesia cristiana en Valparaíso. Culto los domingos 11:30 hrs en Almirante Goñi 251, esquina Cochrane. Espacios para niños, jóvenes, hombres y mujeres.',
   keywords: [
     'iglesia', 'iglesia cristiana', 'iglesia en Valparaíso', 'iglesia evangélica Valparaíso',
     'Somos Luz', 'culto dominical', 'discipulado', 'jóvenes cristianos Valparaíso', 'congregación',
