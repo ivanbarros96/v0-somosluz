@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound, UserMinus } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound, UserMinus, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { useAuth } from '@/lib/auth-context';
 import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember, isJovenMember } from '@/lib/types';
 import { ministerioDeRol } from '@/lib/roles';
 import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
-import { getCultos, getAsistencias } from '@/lib/datos';
+import { getCultos, getAsistencias, buscarDirectorio, type DirectorioRow } from '@/lib/datos';
 import { MemberForm } from '@/components/intranet/member-form';
 import { VisitantesPanel } from '@/components/intranet/visitantes-panel';
 import { PendientesPanel } from '@/components/intranet/pendientes-panel';
@@ -35,6 +35,13 @@ const MOTIVOS_BAJA = [
   'Otro',
 ] as const;
 const OTRO_BAJA = 'Otro';
+
+// Buscar sin tildes: "Benjamin" tiene que encontrar a "Benjamín". Escribir el
+// nombre sin acento era una de las formas en que se colaban los duplicados.
+const DIACRITICOS = new RegExp('[\\u0300-\\u036f]', 'g');
+function sinTildes(texto: string) {
+  return texto.normalize('NFD').replace(DIACRITICOS, '').toLowerCase();
+}
 
 function fmt(v: string | number | null | undefined) {
   return v === null || v === undefined || v === '' ? '—' : String(v);
@@ -154,6 +161,15 @@ export function MembersTable() {
   const [editing, setEditing] = useState<Member | null>(null); // ✅ un solo estado
   const [query, setQuery] = useState('');
 
+  // Pestaña activa. Es controlada para poder saltar a "Visitas" desde el aviso
+  // de coincidencias.
+  const [tab, setTab] = useState('todos');
+
+  // Visitas que coinciden con la búsqueda. Viven en otra tabla (miembros_nuevos),
+  // así que no se pueden filtrar sobre la lista local de miembros: se consultan
+  // al servidor contra la vista `directorio_unificado`.
+  const [visitasCoincidentes, setVisitasCoincidentes] = useState<DirectorioRow[]>([]);
+
   // Estado del flujo de eliminación
   const [deleting, setDeleting] = useState<Member | null>(null);
   const [dandoBaja, setDandoBaja] = useState<Member | null>(null);
@@ -179,6 +195,23 @@ export function MembersTable() {
       .catch(() => {});
   }, [ministerio]);
 
+  // Buscar también entre las visitas. Sin esto, escribir el nombre de alguien
+  // que ya vino como visita no daba ningún resultado y quien registraba asumía
+  // que no existía — así nacieron los duplicados entre las dos tablas.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setVisitasCoincidentes([]);
+      return;
+    }
+    const id = setTimeout(() => {
+      buscarDirectorio(q, 'visita')
+        .then(setVisitasCoincidentes)
+        .catch(() => setVisitasCoincidentes([]));
+    }, 250);
+    return () => clearTimeout(id);
+  }, [query]);
+
   const enAudiencia = (m: Member) => {
     if (!ministerio || verTodosMiembros) return true;
     return CULTO_TIPOS[ministerio].elegibilidad({
@@ -190,10 +223,17 @@ export function MembersTable() {
   };
 
   const coincide = (m: Member) => {
-    const q = query.trim().toLowerCase();
+    const q = sinTildes(query.trim());
     if (!q) return true;
-    return [m.nombre, m.telefono, m.email, m.comuna, m.region]
-      .some((v) => (v ?? '').toLowerCase().includes(q));
+    const enTexto = [m.nombre, m.telefono, m.email, m.comuna, m.region]
+      .some((v) => sinTildes(v ?? '').includes(q));
+    // El teléfono se guarda con formato ("+56 977411603"), así que buscar solo
+    // los dígitos no lo encontraba.
+    const soloDigitos = q.replace(/[^0-9]/g, '');
+    const enTelefono =
+      soloDigitos.length >= 3 &&
+      (m.telefono ?? '').replace(/[^0-9]/g, '').includes(soloDigitos);
+    return enTexto || enTelefono;
   };
 
   const todos = useMemo(
@@ -340,9 +380,36 @@ export function MembersTable() {
               </Button>
             )}
           </div>
+
+          {/* El aviso es el puente entre las dos tablas: sin él, buscar a
+              alguien que ya vino como visita no devolvía nada y se terminaba
+              registrando de nuevo como miembro. Convertir conserva su historial
+              de asistencias; registrar de nuevo lo parte en dos fichas. */}
+          {visitasCoincidentes.length > 0 && tab !== 'visitantes' && (
+            <div className="mt-3 flex flex-wrap items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
+              <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p>
+                  También hay <strong>{visitasCoincidentes.length}</strong>{' '}
+                  {visitasCoincidentes.length === 1 ? 'visita' : 'visitas'} con ese nombre:{' '}
+                  <span className="font-medium text-foreground">
+                    {visitasCoincidentes.map((v) => v.nombre).join(', ')}
+                  </span>
+                  .
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Si ya es parte de la iglesia, conviértela en miembro para conservar su
+                  historial — no la registres de nuevo.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setTab('visitantes')}>
+                Ver en Visitas
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="px-0 pt-0">
-          <Tabs defaultValue="todos">
+          <Tabs value={tab} onValueChange={setTab}>
             <div className="px-6 pb-4">
               <TabsList className="grid w-full max-w-3xl grid-cols-6">
                 <TabsTrigger value="todos" className="gap-2">
@@ -360,7 +427,12 @@ export function MembersTable() {
                 {/* Los visitantes viven en otra tabla (miembros_nuevos), por eso
                     su contenido es un componente aparte y no se mezcla con la
                     lista de miembros. */}
-                <TabsTrigger value="visitantes">Visitas</TabsTrigger>
+                <TabsTrigger value="visitantes" className="gap-2">
+                  Visitas
+                  {visitasCoincidentes.length > 0 && (
+                    <Badge variant="secondary">{visitasCoincidentes.length}</Badge>
+                  )}
+                </TabsTrigger>
                 {/* Auto-registros del link público esperando revisión */}
                 <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
               </TabsList>
@@ -513,7 +585,7 @@ export function MembersTable() {
             </TabsContent>
 
             <TabsContent value="visitantes" className="mt-0">
-              <VisitantesPanel />
+              <VisitantesPanel query={query} />
             </TabsContent>
 
             <TabsContent value="pendientes" className="mt-0">

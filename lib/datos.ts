@@ -100,6 +100,35 @@ export function existeMiembroNuevo(nombre: string, excluirId?: number): Promise<
   return pedir<boolean>(`/api/miembros-nuevos?${params}`, 'existe');
 }
 
+// ─── Directorio unificado (miembros + visitas) ───────────────────────────────
+
+export interface DirectorioRow {
+  /** Clave real: 'miembro:20' / 'visita:20'. Los `id` se repiten entre tablas. */
+  uid: string;
+  tipo_registro: 'miembro' | 'visita';
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  email: string | null;
+  source_tipo: string | null;
+}
+
+/**
+ * Busca en miembros Y visitas a la vez, ignorando tildes y formato de teléfono.
+ * `tipo` acota a una de las dos listas.
+ *
+ * Sirve para lo que el buscador de Miembros no podía hacer: ver que alguien ya
+ * existe como visita antes de registrarlo de nuevo como miembro.
+ */
+export function buscarDirectorio(
+  termino: string,
+  tipo?: 'miembro' | 'visita',
+): Promise<DirectorioRow[]> {
+  const params = new URLSearchParams({ buscar: termino });
+  if (tipo) params.set('tipo', tipo);
+  return pedir<DirectorioRow[]>(`/api/directorio?${params}`, 'resultados');
+}
+
 // ─── Cultos ──────────────────────────────────────────────────────────────────
 
 export interface CultoRow {

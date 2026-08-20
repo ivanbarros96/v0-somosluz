@@ -26,6 +26,13 @@ interface VisitanteRow {
 // afecta el destaque visual: no bloquea ni obliga a nada.
 const VISITAS_HABITUAL = 3;
 
+// Mismo criterio que el buscador de Miembros: sin tildes, para que "Benjamin"
+// encuentre a "Benjamín".
+const DIACRITICOS = new RegExp('[\\u0300-\\u036f]', 'g');
+function sinTildes(texto: string) {
+  return texto.normalize('NFD').replace(DIACRITICOS, '').toLowerCase();
+}
+
 function formatFecha(iso: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-CL', {
@@ -33,7 +40,12 @@ function formatFecha(iso: string | null) {
   });
 }
 
-export function VisitantesPanel() {
+interface VisitantesPanelProps {
+  /** Término del buscador de Miembros: la misma caja filtra ambas listas. */
+  query?: string;
+}
+
+export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
   const [visitantes, setVisitantes] = useState<VisitanteRow[]>([]);
   const [cargando, setCargando] = useState(true);
   const [convirtiendo, setConvirtiendo] = useState<VisitanteAConvertir | null>(null);
@@ -74,7 +86,29 @@ export function VisitantesPanel() {
     );
   }
 
-  const habituales = visitantes.filter((v) => v.visitas >= VISITAS_HABITUAL).length;
+  // La caja de búsqueda de Miembros filtra también esta lista: una sola
+  // búsqueda cubre miembros y visitas por igual.
+  const q = sinTildes(query.trim());
+  const digitos = q.replace(/[^0-9]/g, '');
+  const visibles = !q
+    ? visitantes
+    : visitantes.filter(
+        (v) =>
+          sinTildes(v.nombre).includes(q) ||
+          sinTildes(v.email ?? '').includes(q) ||
+          (digitos.length >= 3 &&
+            (v.telefono ?? '').replace(/[^0-9]/g, '').includes(digitos)),
+      );
+
+  if (visibles.length === 0) {
+    return (
+      <p className="py-10 text-center text-muted-foreground text-sm">
+        Ninguna visita coincide con «{query.trim()}».
+      </p>
+    );
+  }
+
+  const habituales = visibles.filter((v) => v.visitas >= VISITAS_HABITUAL).length;
 
   return (
     <>
@@ -102,7 +136,7 @@ export function VisitantesPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visitantes.map((v) => (
+            {visibles.map((v) => (
               <TableRow key={v.id}>
                 <TableCell className="font-medium">{v.nombre}</TableCell>
                 <TableCell className="text-muted-foreground">{v.telefono ?? '—'}</TableCell>
