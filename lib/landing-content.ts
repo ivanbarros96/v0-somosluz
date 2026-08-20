@@ -15,10 +15,16 @@ export const HERO = {
   subtitulo: 'Una generación que manifiesta el Reino de Dios en la tierra.',
 } as const;
 
-// Frases de identidad tomadas del Instagram (bio, captions y highlights)
+// Frases de identidad tomadas del Instagram (bio, captions y highlights).
+// "Un lugar de avivamiento" es su descriptor oficial: abre la biografía y
+// además tiene un post dedicado (14/07/2026) que dice exactamente
+// "Somos Luz Iglesia. Un lugar de avivamiento."
+// "El centro es Jesús" viene del hashtag que usan hoy en sus publicaciones.
 export const FRASES_MARQUEE = [
+  'Un lugar de avivamiento',
   'Identidad y Propósito',
   'Somos Familia',
+  'El centro es Jesús',
   'Fe · Familia · Propósito',
   'Siempre habrá un lugar para ti',
   'Una familia para crecer, servir y caminar juntos',
