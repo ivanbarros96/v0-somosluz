@@ -37,13 +37,19 @@ export const PULL_QUOTE = {
 } as const;
 
 // Serie de predicación actual
+// "Un Nuevo Tiempo" — nombre confirmado por Iván (20/08/2026), sin bajada,
+// versículo ni descripción provistos ("libre a lo que tú desees"). Isaías
+// 43:19 se eligió por encajar con el momento real de la iglesia, no al azar:
+// sus propias publicaciones hablan de "inauguración" y "estamos en
+// construcción" — una congregación en temporada de apertura, no de repetir
+// lo de antes. Si Iván ya tiene su propio versículo o bajada, se reemplaza.
 export const SERIE = {
   etiqueta: 'Serie actual',
-  nombre: 'No Pierdas la Esencia',
-  bajada: 'Sal y luz — lo que eres en Cristo no se negocia.',
+  nombre: 'Un Nuevo Tiempo',
+  bajada: 'Dios abre camino donde antes no lo había.',
   descripcion:
-    'Vivimos rodeados de voces que intentan moldear quiénes somos. En esta serie volvemos a lo esencial: una identidad que nace en la presencia de Dios, un primer amor que no se apaga y una luz que no se esconde. Porque cuando la sal conserva su sabor, transforma todo lo que toca.',
-  versiculo: 'Mateo 5:13',
+    'Hay temporadas que no se fuerzan, se reciben. En esta serie dejamos atrás lo que ya cumplió su propósito para caminar en lo que Dios está haciendo hoy: un tiempo de apertura, de fe para lo que no se ve todavía y de una iglesia que no mira atrás para avanzar. Porque cuando Dios dice "nuevo", no es una repetición — es un camino que antes no existía.',
+  versiculo: 'Isaías 43:19',
 } as const;
 
 export const SOBRE_NOSOTROS = {
