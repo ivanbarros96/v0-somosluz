@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await db
     .from('miembros_nuevos')
-    .select('id, nombre, telefono')
+    .select('id, nombre, telefono, email')
     .order('nombre');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
