@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
+import { useConteoPendiente } from '@/hooks/use-conteo-pendiente';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -165,6 +166,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   // perfil Oración.
   const oracionPendientes = usePeticionesPendientes(isPastor || esOracion);
 
+  // Registros del formulario público esperando aprobación. Los ve quien puede
+  // aprobarlos: Secretaría (que administra el padrón) y el Co-pastor. El
+  // Pastor no tiene Miembros con pestaña de pendientes en su menú.
+  const registrosPendientes = useConteoPendiente(
+    '/api/personas/pendientes/count',
+    !esMinisterio && !esOracion && !isPastor,
+  );
+
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\)\s*/, '');
     document.title = oracionPendientes > 0 ? `(${oracionPendientes}) ${base}` : base;
@@ -241,7 +250,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
             )}
             <ul className="space-y-1">
           {grupo.items.map((item) => {
-            const pendientes = item.href === '/intranet/dashboard/oracion' ? oracionPendientes : 0;
+            // Dos avisos distintos, el mismo badge: peticiones de oración sin
+            // revisar y auto-registros esperando aprobación. Antes había que
+            // entrar a la pestaña Pendientes para enterarse de que alguien se
+            // había registrado.
+            const pendientes =
+              item.href === '/intranet/dashboard/oracion' ? oracionPendientes
+              : item.href === '/intranet/dashboard/members' ? registrosPendientes
+              : 0;
             return (
               <li key={item.href}>
                 <button
@@ -260,7 +276,11 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                   {pendientes > 0 ? (
                     <span
                       className="ml-auto min-w-5 h-5 px-1.5 inline-flex items-center justify-center text-[11px] font-semibold rounded-full bg-orange-500 text-white leading-none"
-                      aria-label={`${pendientes} peticiones sin revisar`}
+                      aria-label={
+                        item.href === '/intranet/dashboard/members'
+                          ? `${pendientes} registros esperando aprobación`
+                          : `${pendientes} peticiones sin revisar`
+                      }
                     >
                       {pendientes > 9 ? '9+' : pendientes}
                     </span>

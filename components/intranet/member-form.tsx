@@ -10,10 +10,31 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { buscarPersonas, existePersona, existeMiembroNuevo } from '@/lib/datos';
+import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
+import {
+  buscarPersonas, existePersona, existeMiembroNuevo, buscarDirectorio,
+  type DirectorioRow,
+} from '@/lib/datos';
 import { ministerioDeRol } from '@/lib/roles';
 import { PAISES, REGIONES } from '@/lib/chile';
+
+// Palabras del nombre, sin tildes y en minúscula, ignorando partículas cortas
+// ("de", "la"). Comparar por palabras y no por texto completo es lo que permite
+// ver que "Nicol ortiz" y "Nicol Yaritza Ortiz Garcia" son probablemente la
+// misma persona: comparten dos palabras aunque el texto entero no coincida.
+const DIACRITICOS = new RegExp('[\\u0300-\\u036f]', 'g');
+function palabrasDe(nombre: string): string[] {
+  return nombre
+    .normalize('NFD')
+    .replace(DIACRITICOS, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((p) => p.length >= 3);
+}
+
+function soloDigitos(valor: string | null | undefined) {
+  return (valor ?? '').replace(/[^0-9]/g, '');
+}
 
 // La categoría real la elige quien registra (la pestaña), no un cálculo por
 // edad — evita el caso de un joven de 18 que participa en Discipulado y no en
@@ -235,6 +256,13 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
+
+  // Fichas parecidas encontradas al guardar. Es un AVISO, no un bloqueo: dos
+  // personas pueden llamarse igual, así que la decisión queda en quien registra.
+  const [posiblesDuplicados, setPosiblesDuplicados] = useState<DirectorioRow[]>([]);
+  // En ref y no en estado: el botón "Registrar de todos modos" vuelve a llamar a
+  // handleSubmit en el acto, y un setState no se vería a tiempo.
+  const omitirAviso = useRef(false);
 
   // Autocomplete apoderado. Precargado también de forma perezosa (mismo
   // motivo que `form`): Niño es el único modo con apoderado en este
@@ -477,18 +505,23 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
   const mostrarAvisoEdadYouth = modo === 'joven' && edadPreview !== null
     && (edadPreview < EDAD_YOUTH_MIN || edadPreview > EDAD_YOUTH_MAX);
 
+  // Cambiar de categoría limpia el apoderado (solo aplica a Niño) pero conserva
+  // el resto de lo tipeado, porque `form` es un único estado compartido entre
+  // pestañas. La usan tanto los tabs como los atajos de los avisos de edad.
+  const cambiarModo = (nuevo: Modo) => {
+    setModo(nuevo);
+    setError(''); setOk(false);
+    setApoderadoQuery('');
+    setApoderadoSeleccionado(null);
+    setApoderadoResultados([]);
+    setApoderadoDropdownOpen(false);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
       {!isEditing && modosPermitidos.length > 1 && (
-        <Tabs value={modo} onValueChange={(v) => {
-          setModo(v as Modo);
-          setError(''); setOk(false);
-          setApoderadoQuery('');
-          setApoderadoSeleccionado(null);
-          setApoderadoResultados([]);
-          setApoderadoDropdownOpen(false);
-        }}>
+        <Tabs value={modo} onValueChange={(v) => cambiarModo(v as Modo)}>
           <TabsList className="w-full">
             {modosPermitidos.map((m) => (
               <TabsTrigger key={m} value={m} className="flex-1">{TAB_LABELS[m]}</TabsTrigger>
@@ -547,19 +580,61 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
               {mostrarAvisoEdadNino && (
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    Esta persona tendría {edadPreview} años según la fecha ingresada.
-                    ¿Seguro que corresponde al grupo Niño y no a Youth?
-                  </span>
+                  <div className="space-y-2">
+                    <span className="block">
+                      Esta persona tendría {edadPreview} años según la fecha ingresada.
+                      ¿Seguro que corresponde al grupo Niño y no a Youth?
+                    </span>
+                    {/* Los niños crecen y en algún momento pasan a Youth. Sin este
+                        botón había que cerrar, cambiar de pestaña y volver a
+                        escribir todo. Cambiar de modo conserva lo ya tipeado
+                        porque `form` es un solo estado compartido entre pestañas. */}
+                    {modosPermitidos.includes('joven') && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                        onClick={() => cambiarModo('joven')}
+                      >
+                        <ArrowRight className="mr-1 h-3 w-3" />
+                        Cambiar a Youth
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
               {mostrarAvisoEdadYouth && (
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <span>
-                    Esta persona tendría {edadPreview} años según la fecha ingresada — fuera del
-                    rango habitual de Youth (15–20). Puedes registrarla igual si corresponde.
-                  </span>
+                  <div className="space-y-2">
+                    <span className="block">
+                      Esta persona tendría {edadPreview} años según la fecha ingresada — fuera del
+                      rango habitual de Youth (15–20). Puedes registrarla igual si corresponde.
+                    </span>
+                    {/* El atajo se ofrece según por qué lado se salió del rango:
+                        más chico va a Niño, más grande va a Adulto. */}
+                    {edadPreview !== null && edadPreview < EDAD_YOUTH_MIN && modosPermitidos.includes('nino') && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                        onClick={() => cambiarModo('nino')}
+                      >
+                        <ArrowRight className="mr-1 h-3 w-3" />
+                        Cambiar a Niño
+                      </Button>
+                    )}
+                    {edadPreview !== null && edadPreview > EDAD_YOUTH_MAX && modosPermitidos.includes('adulto') && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                        onClick={() => cambiarModo('adulto')}
+                      >
+                        <ArrowRight className="mr-1 h-3 w-3" />
+                        Cambiar a Adulto
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
