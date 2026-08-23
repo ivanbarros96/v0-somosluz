@@ -224,11 +224,13 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
                   {formatFecha(v.ultimaVisita)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {/* Mismas acciones que en Miembros, menos "Dar de baja": una
-                      baja registra un retiro contra `personas`, y una visita no
-                      tiene ficha ahí. La salida natural de una visita es
-                      convertirse en miembro o eliminarse. */}
-                  <div className="flex justify-end gap-1">
+                  {/* Las cuatro acciones NO pesan igual, así que no se ven
+                      igual: convertir es lo que uno QUIERE que pase con una
+                      visita, y por eso conserva su botón con texto. Ver, editar
+                      y eliminar son correcciones puntuales y van como iconos.
+                      No existe "Dar de baja": esa registra un retiro contra
+                      `personas` y una visita no tiene ficha ahí. */}
+                  <div className="flex items-center justify-end gap-1">
                     <Button variant="ghost" size="icon" onClick={() => setViendo(v)} title="Ver ficha">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -238,21 +240,23 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      title="Convertir en miembro (conserva su historial)"
-                      onClick={() => setConvirtiendo({
-                        id: v.id, nombre: v.nombre, telefono: v.telefono, email: v.email,
-                      })}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       className="text-destructive"
                       title="Eliminar definitivamente"
                       onClick={() => { setEliminando(v); setPwd(''); setErrorAccion(''); }}
                     >
                       <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-1"
+                      title="Conserva todo su historial de asistencia"
+                      onClick={() => setConvirtiendo({
+                        id: v.id, nombre: v.nombre, telefono: v.telefono, email: v.email,
+                      })}
+                    >
+                      <UserPlus className="mr-1 h-4 w-4" />
+                      Convertir en miembro
                     </Button>
                   </div>
                 </TableCell>
