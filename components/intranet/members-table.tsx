@@ -47,6 +47,30 @@ function fmt(v: string | number | null | undefined) {
   return v === null || v === undefined || v === '' ? '—' : String(v);
 }
 
+/**
+ * Teléfono por el que se llega a esta persona, en la vista "Todos", donde
+ * conviven los tres tipos.
+ *
+ * El del apoderado se usa SOLO para niños: ellos no tienen teléfono propio y
+ * el del apoderado es el correcto. Jóvenes y adultos deben tener el suyo, así
+ * que si falta se muestra vacío a propósito — mostrar el del apoderado taparía
+ * un dato que hay que completar. Hoy hay 7 jóvenes en esa situación.
+ */
+function Contacto({ member }: { member: Member }) {
+  if (member.telefono) return <>{member.telefono}</>;
+
+  const delApoderado = member.tipo === 'nino' ? member.telefono_apoderado : null;
+  if (!delApoderado) return <>—</>;
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <UserRound className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+      <span>{delApoderado}</span>
+      <span className="sr-only">(del apoderado)</span>
+    </span>
+  );
+}
+
 function MemberAvatar({ member }: { member: Member }) {
   const cls =
     member.tipo === 'adulto' ? 'bg-primary text-primary-foreground'
@@ -445,14 +469,13 @@ export function MembersTable() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Edad</TableHead>
-                    <TableHead>Sexo</TableHead>
-                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Contacto</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {todos.length === 0
-                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin miembros registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin miembros registrados.</TableCell></TableRow>
                     : todos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -463,8 +486,7 @@ export function MembersTable() {
                         </TableCell>
                         <TableCell><TypeBadge tipo={m.tipo} /></TableCell>
                         <TableCell>{fmt('edad' in m ? m.edad : null)}</TableCell>
-                        <TableCell>{fmt(m.sexo)}</TableCell>
-                        <TableCell>{fmt(m.telefono)}</TableCell>
+                        <TableCell><Contacto member={m} /></TableCell>
                         <TableCell><Actions m={m} /></TableCell>
                       </TableRow>
                     ))}
@@ -478,17 +500,15 @@ export function MembersTable() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Edad</TableHead>
-                    <TableHead>Sexo</TableHead>
                     <TableHead>Teléfono</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Región / Comuna</TableHead>
+                    <TableHead>Comuna</TableHead>
                     <TableHead>Bautizado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {adultos.length === 0
-                    ? <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Sin adultos registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin adultos registrados.</TableCell></TableRow>
                     : adultos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -498,10 +518,8 @@ export function MembersTable() {
                           </div>
                         </TableCell>
                         <TableCell>{fmt(m.edad)}</TableCell>
-                        <TableCell>{fmt(m.sexo)}</TableCell>
                         <TableCell>{fmt(m.telefono)}</TableCell>
-                        <TableCell>{fmt(m.email)}</TableCell>
-                        <TableCell>{fmt(m.region)}{m.comuna ? ` / ${m.comuna}` : ''}</TableCell>
+                        <TableCell>{fmt(m.comuna)}</TableCell>
                         <TableCell>
                           {m.bautizado === 'si'
                             ? <span className="text-green-600 font-medium">Sí</span>
@@ -522,15 +540,17 @@ export function MembersTable() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Edad</TableHead>
-                    <TableHead>Sexo</TableHead>
-                    <TableHead>Apoderado</TableHead>
-                    <TableHead>Tel. apoderado</TableHead>
+                    {/* Telefono PROPIO, no el del apoderado: a esta edad ya
+                        deben tener el suyo. Los vacios son datos por completar,
+                        y taparlos con el del apoderado los volveria invisibles. */}
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Bautizado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {jovenes.length === 0
-                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin jóvenes registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin jóvenes registrados.</TableCell></TableRow>
                     : jovenes.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -540,9 +560,10 @@ export function MembersTable() {
                           </div>
                         </TableCell>
                         <TableCell>{fmt(m.edad)}</TableCell>
-                        <TableCell>{fmt(m.sexo)}</TableCell>
-                        <TableCell>{fmt(m.nombre_apoderado)}</TableCell>
-                        <TableCell>{fmt(m.telefono_apoderado)}</TableCell>
+                        <TableCell>{fmt(m.telefono)}</TableCell>
+                        <TableCell>
+                          {m.bautizado === 'si' ? 'Sí' : m.bautizado === 'no' ? 'No' : '—'}
+                        </TableCell>
                         <TableCell><Actions m={m} /></TableCell>
                       </TableRow>
                     ))}
@@ -556,7 +577,6 @@ export function MembersTable() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Edad</TableHead>
-                    <TableHead>Sexo</TableHead>
                     <TableHead>Apoderado</TableHead>
                     <TableHead>Tel. apoderado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -564,7 +584,7 @@ export function MembersTable() {
                 </TableHeader>
                 <TableBody>
                   {ninos.length === 0
-                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin niños registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin niños registrados.</TableCell></TableRow>
                     : ninos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -574,7 +594,6 @@ export function MembersTable() {
                           </div>
                         </TableCell>
                         <TableCell>{fmt(m.edad)}</TableCell>
-                        <TableCell>{fmt(m.sexo)}</TableCell>
                         <TableCell>{fmt(m.nombre_apoderado)}</TableCell>
                         <TableCell>{fmt(m.telefono_apoderado)}</TableCell>
                         <TableCell><Actions m={m} /></TableCell>
