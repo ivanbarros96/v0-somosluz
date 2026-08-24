@@ -13,7 +13,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion } from '@/lib/roles';
+import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion, puedeAutorizarFichas } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -166,12 +166,12 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   // perfil Oración.
   const oracionPendientes = usePeticionesPendientes(isPastor || esOracion);
 
-  // Registros del formulario público esperando aprobación. Los ve quien puede
-  // aprobarlos: Secretaría (que administra el padrón) y el Co-pastor. El
-  // Pastor no tiene Miembros con pestaña de pendientes en su menú.
+  // Fichas esperando autorización. Se pide con la MISMA regla que aplica el
+  // servidor (puedeAutorizarFichas): si el badge apareciera para alguien que
+  // no puede aprobar, lo estaría mandando a una acción que se le rechaza.
   const registrosPendientes = useConteoPendiente(
     '/api/personas/pendientes/count',
-    !esMinisterio && !esOracion && !isPastor,
+    !!user && puedeAutorizarFichas(user.role),
   );
 
   useEffect(() => {

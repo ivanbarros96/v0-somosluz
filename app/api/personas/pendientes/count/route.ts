@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
-import { esRolKids } from '@/lib/roles';
+import { puedeAutorizarFichas } from '@/lib/roles';
 
 // Lee cookie de sesión => siempre dinámico, nunca cacheado.
 export const dynamic = 'force-dynamic';
@@ -15,8 +15,10 @@ export const dynamic = 'force-dynamic';
 // día.
 export async function GET(req: NextRequest) {
   const session = getSession(req);
-  // Kids solo toma asistencia; no aprueba registros.
-  if (!session || esRolKids(session.role)) {
+  // Misma regla que autorizar: el aviso solo tiene sentido para quien puede
+  // actuar sobre él. Mostrarle el badge a alguien que no puede aprobar sería
+  // pedirle que haga algo que el sistema le va a rechazar.
+  if (!session || !puedeAutorizarFichas(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 

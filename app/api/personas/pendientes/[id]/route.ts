@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { soloTomaAsistencia } from '@/lib/roles';
+import { puedeAutorizarFichas } from '@/lib/roles';
 
 // Aprobar o rechazar una ficha llegada por el formulario público.
 //
@@ -15,10 +15,13 @@ function guardia(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
-  // Los perfiles que solo toman asistencia (ministerios y Kids) no administran
-  // fichas.
-  if (soloTomaAsistencia(session.role)) {
-    return NextResponse.json({ error: 'Tu perfil no revisa registros' }, { status: 403 });
+  // Autorizar una ficha es lo que la hace entrar al padrón, así que la lista
+  // es corta y explícita: Secretaría (encargada habitual) y Pastor.
+  //
+  // Antes la regla era "cualquiera que no sea un ministerio", y con eso el
+  // perfil Oración quedaba habilitado sin motivo — no administra fichas.
+  if (!puedeAutorizarFichas(session.role)) {
+    return NextResponse.json({ error: 'Tu perfil no autoriza registros' }, { status: 403 });
   }
   return null;
 }

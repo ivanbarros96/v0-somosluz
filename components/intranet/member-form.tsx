@@ -15,7 +15,7 @@ import {
   buscarPersonas, existePersona, existeMiembroNuevo, buscarDirectorio,
   type DirectorioRow,
 } from '@/lib/datos';
-import { ministerioDeRol } from '@/lib/roles';
+import { ministerioDeRol, registraSinAprobacion } from '@/lib/roles';
 import { PAISES, REGIONES } from '@/lib/chile';
 
 // Palabras del nombre, sin tildes y en minúscula, ignorando partículas cortas
@@ -924,9 +924,22 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
         </div>
       )}
       {ok && !isEditing && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-          ✓ {modo === 'nuevo' ? 'Visitante registrado en miembros nuevos' : 'Miembro registrado exitosamente'}
-        </div>
+        modo !== 'nuevo' && !registraSinAprobacion(user?.role ?? '') ? (
+          // Quien no autoriza fichas deja la suya esperando el visto bueno de
+          // Secretaría. Decirle "registrado" sin más seria mentirle: todavia no
+          // aparece en los listados ni en la asistencia del domingo.
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Ficha enviada. Queda <strong>esperando autorización de Secretaría</strong> antes de
+              aparecer en los listados.
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+            ✓ {modo === 'nuevo' ? 'Visitante registrado en miembros nuevos' : 'Miembro registrado exitosamente'}
+          </div>
+        )
       )}
 
       <div className="flex gap-3">

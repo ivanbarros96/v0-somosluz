@@ -69,6 +69,26 @@ export function soloTomaAsistencia(role: string): boolean {
   return ministerioDeRol(role) !== null || esRolKids(role);
 }
 
+// Quién da el visto bueno a una ficha nueva antes de que entre al padrón.
+//
+// Secretaría es la encargada habitual —mantiene los datos de las personas— y
+// el Pastor puede hacerlo también si hace falta. Nadie más: antes bastaba con
+// "no ser un ministerio", y eso dejaba entrar por descuido al perfil Oración,
+// que no administra fichas.
+//
+// Toda ficha nueva nace pendiente (ver POST /api/personas), venga del
+// formulario público o de la intranet. Ese paso es lo que evita que la misma
+// persona entre dos veces por caminos distintos.
+export function puedeAutorizarFichas(role: string): boolean {
+  return role === 'somosluz' || role === 'pastor';
+}
+
+// Perfiles cuyos registros entran directo, sin esperar autorización. Solo
+// Secretaría: no tiene sentido que se apruebe a sí misma.
+export function registraSinAprobacion(role: string): boolean {
+  return role === 'somosluz';
+}
+
 export function esRolCopastor(role: string): boolean {
   return role === 'copastor';
 }

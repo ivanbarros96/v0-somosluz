@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { ministerioDeRol, esRolKids } from '@/lib/roles';
+import { ministerioDeRol, esRolKids, registraSinAprobacion } from '@/lib/roles';
 
 // GET /api/personas — lectura de personas. Requiere sesión.
 //
@@ -131,10 +131,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Tu perfil solo puede registrar Adulto o Niño' }, { status: 403 });
   }
 
-  const { error } = await getSupabaseAdmin().from('personas').insert(row);
+  // Toda ficha nueva nace PENDIENTE de autorización, salvo las que registra
+  // Secretaría (que es justamente quien autoriza — no se aprueba a sí misma).
+  //
+  // Antes solo el formulario público quedaba pendiente y lo que registraban
+  // los ministerios entraba directo al padrón. Ese era el hueco por donde se
+  // colaban los duplicados: la misma persona podía entrar por dos caminos sin
+  // que nadie los cruzara. Ahora hay un solo punto de control.
+  //
+  // Las VISITAS no pasan por acá: viven en `miembros_nuevos` y su autorización
+  // ocurre recién al convertirlas en miembro.
+  const fila = registraSinAprobacion(session.role)
+    ? row
+    : { ...row, pendiente_revision: true, origen: 'intranet' };
+
+  const { error } = await getSupabaseAdmin().from('personas').insert(fila);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Se avisa a la pantalla si quedó esperando, para que el mensaje de éxito
+  // no diga "registrado" cuando en realidad todavía no aparece en el padrón.
+  return NextResponse.json({
+    ok: true,
+    pendiente: !registraSinAprobacion(session.role),
+  });
 }
