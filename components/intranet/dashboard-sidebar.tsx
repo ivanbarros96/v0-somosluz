@@ -13,7 +13,7 @@ import {
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion, puedeAutorizarFichas } from '@/lib/roles';
+import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion, esRolKids, puedeAutorizarFichas } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -120,10 +120,27 @@ const SOMOSLUZ_NAV: NavGrupo[] = [
   },
 ];
 
-// Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) y Kids: solo
-// toman asistencia. El resto de la intranet está bloqueado también a nivel de
-// ruta en dashboard/layout.tsx, no solo oculto aquí.
+// Ministerios de adultos y jóvenes (Amadas, Hombría al Máximo, Discipulado,
+// Youth): toman asistencia y registran a la gente que llega a SU reunión.
+// Lo que registran queda esperando autorización de Secretaría (ver
+// registraSinAprobacion en lib/roles.ts), así que pueden dar de alta sin que
+// nadie entre al padrón sin revisión.
+// No ven el resto de la intranet: bloqueado también por ruta en
+// dashboard/layout.tsx, no solo oculto acá.
 const MINISTERIO_NAV: NavGrupo[] = [
+  {
+    titulo: null,
+    items: [
+      { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+      { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus, addedAt: '2026-08-21' },
+    ],
+  },
+];
+
+// Kids es la excepción entre los ministerios: NO registra. Su clase corre en
+// paralelo al dominical y los niños ya vienen dados de alta; darle el alta a
+// ella multiplicaría las fichas repetidas de un mismo niño.
+const KIDS_NAV: NavGrupo[] = [
   {
     titulo: null,
     items: [{ href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList }],
@@ -150,6 +167,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const isPastor = user?.role === 'pastor';
   const esCopastor = !!user && esRolCopastor(user.role);
   const esOracion = !!user && esRolOracion(user.role);
+  const esKids = !!user && esRolKids(user.role);
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
   const navGrupos = isPastor
     ? PASTOR_NAV
@@ -157,9 +175,11 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       ? COPASTOR_NAV
       : esOracion
         ? ORACION_NAV
-        : esMinisterio
-          ? MINISTERIO_NAV
-          : SOMOSLUZ_NAV;
+        : esKids
+          ? KIDS_NAV
+          : esMinisterio
+            ? MINISTERIO_NAV
+            : SOMOSLUZ_NAV;
 
   // Peticiones de oración sin revisar. Alimenta el badge y el título de
   // pestaña. Lo ven quienes gestionan el panel de oración: pastor y el

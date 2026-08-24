@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
-import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer, esRolOracion } from '@/lib/roles';
+import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer, esRolOracion, esRolKids } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
 
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
 const RUTA_ORACION = '/intranet/dashboard/oracion';
+const RUTA_REGISTRO = '/intranet/dashboard/registro';
 
 export default function DashboardLayout({
   children,
@@ -20,11 +21,22 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) y Kids solo
-  // pueden tomar asistencia — el resto de la intranet queda fuera de su alcance
-  // aunque escriban la URL a mano, no solo oculto en el menú.
+  // Los ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) toman
+  // asistencia y registran a quien llega a su reunión — lo que registran queda
+  // esperando autorización de Secretaría, así que el padrón sigue controlado.
+  //
+  // Kids es la excepción: solo asistencia. Su clase corre en paralelo al
+  // dominical con niños que ya están dados de alta.
+  //
+  // El resto de la intranet queda fuera de su alcance aunque escriban la URL a
+  // mano, no solo oculto en el menú.
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
-  const rutaPermitida = !esMinisterio || pathname.startsWith(RUTA_ASISTENCIA);
+  const esKids = !!user && esRolKids(user.role);
+  const rutasDeMinisterio = esKids
+    ? [RUTA_ASISTENCIA]
+    : [RUTA_ASISTENCIA, RUTA_REGISTRO];
+  const rutaPermitida =
+    !esMinisterio || rutasDeMinisterio.some((r) => pathname.startsWith(r));
 
   // El Co-pastor sí navega la intranet, pero Finanzas, Reservas y
   // Configuración quedan fuera de su alcance aunque escriba la URL a mano.
