@@ -6,6 +6,7 @@ import { getPersonas } from '@/lib/datos';
 import { useMembers } from '@/lib/members-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Check, X, Link2, UserRoundPlus, AlertTriangle, Eye } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -199,7 +200,7 @@ export function PendientesPanel() {
           para el seguimiento. Por eso los vacíos se marcan en ámbar en vez de
           mostrar un guión discreto. */}
       <Dialog open={!!viendo} onOpenChange={(o) => { if (!o) setViendo(null); }}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{viendo?.nombre}</DialogTitle>
             <DialogDescription>
@@ -209,27 +210,50 @@ export function PendientesPanel() {
 
           {viendo && (() => {
             const esNino = viendo.source_tipo === 'nino';
-            const campos: [string, string | null, boolean][] = [
-              // [etiqueta, valor, es importante que esté]
+
+            // Las mismas secciones y en el mismo orden que el formulario de
+            // registro (member-form): quien revisa lee la ficha con la misma
+            // estructura con que se llenó, no en una grilla suelta que obliga
+            // a buscar cada dato.
+            type Campo = [etiqueta: string, valor: string | null, importante: boolean];
+
+            const personales: Campo[] = [
+              ['Nombre', viendo.nombre, true],
+              ['Sexo', viendo.sexo, true],
               ['Fecha de nacimiento', viendo.fecha_nacimiento, true],
               ['Edad', viendo.edad != null ? `${viendo.edad} años` : null, true],
-              ['Sexo', viendo.sexo, true],
-              ['Teléfono', viendo.telefono, !esNino],
+            ];
+            // A un niño no se le pide contacto propio: el suyo es el apoderado.
+            const contacto: Campo[] = esNino ? [] : [
+              ['Teléfono', viendo.telefono, true],
               ['WhatsApp', viendo.whatsapp, false],
               ['Email', viendo.email, false],
               ['Región', viendo.region, false],
               ['Comuna', viendo.comuna, false],
               ['Dirección', viendo.direccion, false],
-              ['Apoderado', viendo.nombre_apoderado, esNino],
-              ['Tel. apoderado', viendo.telefono_apoderado, esNino],
+            ];
+            const apoderado: Campo[] = esNino ? [
+              ['Nombre del apoderado', viendo.nombre_apoderado, true],
+              ['Teléfono del apoderado', viendo.telefono_apoderado, true],
+            ] : [];
+            // A los niños no se les pregunta por su camino de fe.
+            const fe: Campo[] = esNino ? [] : [
               ['Bautizado', viendo.bautizado === 'si' ? 'Sí' : viendo.bautizado === 'no' ? 'No' : null, false],
               ['Primera iglesia', viendo.primera_iglesia === true ? 'Sí' : viendo.primera_iglesia === false ? 'No' : null, false],
               ['Tiempo en el evangelio', viendo.tiempo_conversion, false],
             ];
-            const faltan = campos.filter(([, v, importante]) => importante && !v);
+
+            const secciones: [string, Campo[]][] = [
+              [esNino ? 'Datos del Niño' : 'Datos Personales', personales],
+              ['Contacto', contacto],
+              ['Apoderado', apoderado],
+              ['Fe y Comunidad', fe],
+            ];
+            const faltan = [...personales, ...contacto, ...apoderado, ...fe]
+              .filter(([, v, importante]) => importante && !v);
 
             return (
-              <>
+              <div className="space-y-4">
                 {faltan.length > 0 && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -240,17 +264,30 @@ export function PendientesPanel() {
                     </span>
                   </div>
                 )}
-                <dl className="grid gap-2 sm:grid-cols-2">
-                  {campos.map(([label, valor, importante]) => (
-                    <div key={label} className="rounded-lg border p-2.5">
-                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-                      <dd className={valor ? 'text-sm' : `text-sm ${importante ? 'text-amber-700' : 'text-muted-foreground'}`}>
-                        {valor ?? (importante ? 'Falta' : '—')}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </>
+
+                {secciones.filter(([, campos]) => campos.length > 0).map(([titulo, campos]) => (
+                  <Card key={titulo}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
+                        {titulo}
+                      </CardTitle>
+                    </CardHeader>
+                    {/* Dos columnas en pantalla grande: es una ficha de LECTURA,
+                        no de edición, y en una sola columna obligaba a scrollear
+                        toda la pantalla para revisar 13 campos antes de aprobar. */}
+                    <CardContent className="grid gap-3 sm:grid-cols-2">
+                      {campos.map(([label, valor, importante]) => (
+                        <div key={label} className="space-y-1">
+                          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                          <p className={valor ? 'text-sm' : `text-sm ${importante ? 'font-medium text-amber-700' : 'text-muted-foreground'}`}>
+                            {valor ?? (importante ? 'Falta' : '—')}
+                          </p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             );
           })()}
 
