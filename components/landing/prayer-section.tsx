@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { HandHeart } from 'lucide-react';
+import { PAISES } from '@/lib/chile';
 
 const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function PrayerSection() {
-  const [form, setForm] = useState({ nombre: '', email: '', peticion: '', telefono: '', sitioWeb: '' });
+  const [form, setForm] = useState({ nombre: '', email: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
@@ -20,14 +21,20 @@ export function PrayerSection() {
       const res = await fetch('/api/oracion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        // El telefono viaja ya armado con su codigo de pais, igual que en el
+        // registro de miembros: asi todos quedan guardados en el mismo formato
+        // y el enlace a WhatsApp del panel funciona siempre.
+        body: JSON.stringify({
+          ...form,
+          telefono: form.telefono.trim() ? `${form.codTel} ${form.telefono.trim()}` : '',
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'No pudimos enviar tu petición');
       }
       setEnviado(true);
-      setForm({ nombre: '', email: '', peticion: '', telefono: '', sitioWeb: '' });
+      setForm({ nombre: '', email: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No pudimos enviar tu petición. Intenta de nuevo.');
     } finally {
@@ -96,17 +103,34 @@ export function PrayerSection() {
                 <label htmlFor="oracion-telefono" className="block text-sm font-medium mb-2">
                   Teléfono <span className="text-muted-foreground font-normal">(opcional)</span>
                 </label>
-                <input
-                  id="oracion-telefono"
-                  type="tel"
-                  name="telefono"
-                  autoComplete="tel"
-                  maxLength={30}
-                  value={form.telefono}
-                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                  className={inputCls}
-                  placeholder="+56 9 ..."
-                />
+                {/* Codigo de pais aparte, mismo patron que el registro de
+                    miembros. Con un campo libre cada quien escribia el prefijo a
+                    su manera (o lo omitia), y el enlace a WhatsApp del panel
+                    necesita el numero COMPLETO para funcionar. */}
+                <div className="flex gap-2">
+                  <select
+                    aria-label="Código de país"
+                    value={form.codTel}
+                    onChange={(e) => setForm({ ...form, codTel: e.target.value })}
+                    className={`${inputCls} w-28 shrink-0`}
+                  >
+                    {PAISES.map((p) => (
+                      <option key={p.code} value={p.code}>{p.flag} {p.code}</option>
+                    ))}
+                  </select>
+                  <input
+                    id="oracion-telefono"
+                    type="tel"
+                    name="telefono"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    maxLength={20}
+                    value={form.telefono}
+                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                    className={inputCls}
+                    placeholder="9 1234 5678"
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="oracion-email" className="block text-sm font-medium mb-2">
