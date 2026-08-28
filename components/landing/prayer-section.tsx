@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { HandHeart } from 'lucide-react';
 import { PAISES } from '@/lib/chile';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 
 const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
@@ -103,21 +104,37 @@ export function PrayerSection() {
                 <label htmlFor="oracion-telefono" className="block text-sm font-medium mb-2">
                   Teléfono <span className="text-muted-foreground font-normal">(opcional)</span>
                 </label>
-                {/* Codigo de pais aparte, mismo patron que el registro de
-                    miembros. Con un campo libre cada quien escribia el prefijo a
-                    su manera (o lo omitia), y el enlace a WhatsApp del panel
-                    necesita el numero COMPLETO para funcionar. */}
+                {/* Mismo componente que el registro de miembros, no un <select>
+                    nativo: en Windows el select del sistema NO dibuja los emojis
+                    de bandera (los degrada a las letras "CL") y ademas ignoraba
+                    el ancho, empujando el campo del numero fuera de la tarjeta.
+                    El Select de shadcn renderiza HTML, asi que la bandera se ve
+                    y el layout se respeta. */}
                 <div className="flex gap-2">
-                  <select
-                    aria-label="Código de país"
+                  <Select
                     value={form.codTel}
-                    onChange={(e) => setForm({ ...form, codTel: e.target.value })}
-                    className={`${inputCls} w-28 shrink-0`}
+                    onValueChange={(v) => setForm({ ...form, codTel: v })}
                   >
-                    {PAISES.map((p) => (
-                      <option key={p.code} value={p.code}>{p.flag} {p.code}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label="Código de país"
+                      className="w-24 shrink-0 h-[46px] rounded-lg border-input bg-background"
+                    >
+                      {/* Se pinta el codigo directamente en vez de <SelectValue>:
+                          ese componente repite TODO el contenido del item
+                          (codigo + nombre del pais) y quedaba cortado como
+                          "+56 C". Aca solo importa el codigo; el nombre existe
+                          para elegir bien dentro de la lista. */}
+                      <span className="tabular-nums">{form.codTel}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAISES.map((p) => (
+                        <SelectItem key={p.code} value={p.code}>
+                          <span className="tabular-nums">{p.code}</span>
+                          <span className="ml-2 text-muted-foreground">{p.nombre}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <input
                     id="oracion-telefono"
                     type="tel"
@@ -127,7 +144,7 @@ export function PrayerSection() {
                     maxLength={20}
                     value={form.telefono}
                     onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                    className={inputCls}
+                    className={`${inputCls} min-w-0 flex-1`}
                     placeholder="9 1234 5678"
                   />
                 </div>

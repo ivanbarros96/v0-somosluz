@@ -3,17 +3,21 @@
 // un componente cliente y no los exportaba: la página pública habría tenido que
 // duplicar las 16 regiones con todas sus comunas.
 
+// `flag` sigue existiendo, pero NO se muestra sola: Windows no trae glifos de
+// bandera y degrada 🇨🇱 a dos letras diminutas ("ᴄʟ"), que es justo lo que se
+// veía mal en el selector. Se acompaña del nombre del país, que se lee siempre
+// y en cualquier sistema; donde sí hay banderas, suman.
 export const PAISES = [
-  { flag: '🇨🇱', code: '+56' },
-  { flag: '🇻🇪', code: '+58' },
-  { flag: '🇵🇪', code: '+51' },
-  { flag: '🇨🇴', code: '+57' },
-  { flag: '🇧🇴', code: '+591' },
-  { flag: '🇭🇹', code: '+509' },
-  { flag: '🇦🇷', code: '+54' },
-  { flag: '🇧🇷', code: '+55' },
-  { flag: '🇪🇨', code: '+593' },
-  { flag: '🇩🇴', code: '+1' },
+  { flag: '🇨🇱', code: '+56', nombre: 'Chile' },
+  { flag: '🇻🇪', code: '+58', nombre: 'Venezuela' },
+  { flag: '🇵🇪', code: '+51', nombre: 'Perú' },
+  { flag: '🇨🇴', code: '+57', nombre: 'Colombia' },
+  { flag: '🇧🇴', code: '+591', nombre: 'Bolivia' },
+  { flag: '🇭🇹', code: '+509', nombre: 'Haití' },
+  { flag: '🇦🇷', code: '+54', nombre: 'Argentina' },
+  { flag: '🇧🇷', code: '+55', nombre: 'Brasil' },
+  { flag: '🇪🇨', code: '+593', nombre: 'Ecuador' },
+  { flag: '🇩🇴', code: '+1', nombre: 'Rep. Dominicana' },
 ];
 
 export const REGIONES: Record<string, string[]> = {
