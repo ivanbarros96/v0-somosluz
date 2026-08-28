@@ -14,7 +14,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2 } from 'lucide-react';
+import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ interface Peticion {
   id: string;
   nombre: string;
   email: string | null;
+  telefono: string | null;
   peticion: string;
   estado: Estado;
   origen: Origen;
@@ -261,6 +262,20 @@ export default function OracionPage() {
                         <Clock className="h-3 w-3" />
                         {formatDistanceToNow(parseISO(p.created_at), { addSuffix: true, locale: es })}
                       </span>
+                      {/* El telefono va primero: el equipo prefiere llamar o
+                          escribir por WhatsApp antes que mandar un correo. */}
+                      {p.telefono && (
+                        <a
+                          href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-primary hover:underline"
+                          title="Escribir por WhatsApp"
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          {p.telefono}
+                        </a>
+                      )}
                       {p.email && (
                         <a
                           href={`mailto:${p.email}`}

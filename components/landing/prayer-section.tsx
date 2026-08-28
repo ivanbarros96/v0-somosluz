@@ -9,7 +9,7 @@ const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function PrayerSection() {
-  const [form, setForm] = useState({ nombre: '', email: '', peticion: '', telefono: '' });
+  const [form, setForm] = useState({ nombre: '', email: '', peticion: '', telefono: '', sitioWeb: '' });
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
@@ -27,7 +27,7 @@ export function PrayerSection() {
         throw new Error(data.error || 'No pudimos enviar tu petición');
       }
       setEnviado(true);
-      setForm({ nombre: '', email: '', peticion: '', telefono: '' });
+      setForm({ nombre: '', email: '', peticion: '', telefono: '', sitioWeb: '' });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No pudimos enviar tu petición. Intenta de nuevo.');
     } finally {
@@ -88,6 +88,26 @@ export function PrayerSection() {
                   placeholder="Tu nombre…"
                 />
               </div>
+              {/* El telefono va ANTES del email: el equipo respondio que prefiere
+                  llamar o escribir por WhatsApp antes que mandar un correo, por
+                  ser un medio mas cercano (reunion 24/08/2026). El orden de los
+                  campos comunica cual esperan que se complete. */}
+              <div>
+                <label htmlFor="oracion-telefono" className="block text-sm font-medium mb-2">
+                  Teléfono <span className="text-muted-foreground font-normal">(opcional)</span>
+                </label>
+                <input
+                  id="oracion-telefono"
+                  type="tel"
+                  name="telefono"
+                  autoComplete="tel"
+                  maxLength={30}
+                  value={form.telefono}
+                  onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                  className={inputCls}
+                  placeholder="+56 9 ..."
+                />
+              </div>
               <div>
                 <label htmlFor="oracion-email" className="block text-sm font-medium mb-2">
                   Email <span className="text-muted-foreground font-normal">(opcional)</span>
@@ -104,14 +124,18 @@ export function PrayerSection() {
                   placeholder="tu@email.com"
                 />
               </div>
-              {/* Honeypot antispam: invisible para humanos, los bots lo rellenan */}
+              {/* Honeypot antispam: invisible para humanos, los bots lo rellenan.
+                  Se llamaba `telefono`, pero ese nombre ahora es un campo REAL
+                  y visible: de no renombrarlo, cada persona que escribiera su
+                  numero habria visto "enviado" mientras el servidor descartaba
+                  su peticion por creerla un bot. */}
               <input
                 type="text"
-                name="telefono"
+                name="sitio_web"
                 tabIndex={-1}
                 autoComplete="off"
-                value={form.telefono}
-                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                value={form.sitioWeb}
+                onChange={(e) => setForm({ ...form, sitioWeb: e.target.value })}
                 className="hidden"
                 aria-hidden="true"
               />
