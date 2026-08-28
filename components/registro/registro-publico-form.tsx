@@ -412,7 +412,8 @@ export function RegistroPublicoForm() {
                 <div className="space-y-1.5">
                   <Label>¿Es tu primera vez en una iglesia cristiana?</Label>
                   <div className="flex gap-2">
-                    {([['si', 'Sí, primera vez'], ['no', 'No, ya venía antes']] as const).map(([valor, texto]) => (
+                    {/* Solo "Sí" y "No" — mismo criterio que la intranet (reunión 24/08/2026). */}
+                    {([['si', 'Sí'], ['no', 'No']] as const).map(([valor, texto]) => (
                       <button
                         key={valor}
                         type="button"

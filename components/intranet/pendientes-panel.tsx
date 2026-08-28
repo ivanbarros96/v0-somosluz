@@ -6,7 +6,10 @@ import { getPersonas } from '@/lib/datos';
 import { useMembers } from '@/lib/members-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, Link2, UserRoundPlus, AlertTriangle } from 'lucide-react';
+import { Loader2, Check, X, Link2, UserRoundPlus, AlertTriangle, Eye } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Pendiente {
   id: number;
@@ -19,6 +22,18 @@ interface Pendiente {
   comuna: string | null;
   nombre_apoderado: string | null;
   created_at: string | null;
+  // Andreytha (reunión 24/08/2026) pedía revisar la ficha ANTES de aprobar:
+  // "no sé si le falta algún dato, o si está la fecha de nacimiento completa".
+  // El resumen de la fila no alcanza, así que la ficha completa trae también
+  // estos campos. El endpoint ya los devolvía; solo no se estaban leyendo.
+  fecha_nacimiento: string | null;
+  whatsapp: string | null;
+  region: string | null;
+  direccion: string | null;
+  bautizado: string | null;
+  tiempo_conversion: string | null;
+  primera_iglesia: boolean | null;
+  telefono_apoderado: string | null;
 }
 
 const ETIQUETA: Record<string, string> = { adulto: 'Adulto', joven: 'Youth', nino: 'Niño' };
@@ -34,6 +49,7 @@ export function PendientesPanel() {
   const [cargando, setCargando] = useState(true);
   const [trabajando, setTrabajando] = useState<number | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [viendo, setViendo] = useState<Pendiente | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -146,6 +162,16 @@ export function PendientesPanel() {
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
                     size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0"
+                    title="Ver la ficha completa antes de aprobar"
+                    aria-label={`Ver la ficha de ${p.nombre}`}
+                    onClick={() => setViendo(p)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="border-destructive/30 text-destructive hover:bg-destructive/10"
                     disabled={trabajando === p.id}
@@ -166,6 +192,88 @@ export function PendientesPanel() {
           })}
         </ul>
       )}
+
+      {/* Ficha completa. El objetivo no es solo "ver los datos" sino detectar
+          los que FALTAN antes de aprobar: un miembro sin fecha de nacimiento
+          nunca aparece en cumpleaños, y sin teléfono no se le puede llamar
+          para el seguimiento. Por eso los vacíos se marcan en ámbar en vez de
+          mostrar un guión discreto. */}
+      <Dialog open={!!viendo} onOpenChange={(o) => { if (!o) setViendo(null); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viendo?.nombre}</DialogTitle>
+            <DialogDescription>
+              Se registró por el link público · {ETIQUETA[viendo?.source_tipo ?? ''] ?? viendo?.source_tipo}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viendo && (() => {
+            const esNino = viendo.source_tipo === 'nino';
+            const campos: [string, string | null, boolean][] = [
+              // [etiqueta, valor, es importante que esté]
+              ['Fecha de nacimiento', viendo.fecha_nacimiento, true],
+              ['Edad', viendo.edad != null ? `${viendo.edad} años` : null, true],
+              ['Sexo', viendo.sexo, true],
+              ['Teléfono', viendo.telefono, !esNino],
+              ['WhatsApp', viendo.whatsapp, false],
+              ['Email', viendo.email, false],
+              ['Región', viendo.region, false],
+              ['Comuna', viendo.comuna, false],
+              ['Dirección', viendo.direccion, false],
+              ['Apoderado', viendo.nombre_apoderado, esNino],
+              ['Tel. apoderado', viendo.telefono_apoderado, esNino],
+              ['Bautizado', viendo.bautizado === 'si' ? 'Sí' : viendo.bautizado === 'no' ? 'No' : null, false],
+              ['Primera iglesia', viendo.primera_iglesia === true ? 'Sí' : viendo.primera_iglesia === false ? 'No' : null, false],
+              ['Tiempo en el evangelio', viendo.tiempo_conversion, false],
+            ];
+            const faltan = campos.filter(([, v, importante]) => importante && !v);
+
+            return (
+              <>
+                {faltan.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      Falta{faltan.length > 1 ? 'n' : ''}{' '}
+                      <strong>{faltan.map(([l]) => l.toLowerCase()).join(', ')}</strong>.
+                      Puedes aprobar igual y completarlo después desde Miembros.
+                    </span>
+                  </div>
+                )}
+                <dl className="grid gap-2 sm:grid-cols-2">
+                  {campos.map(([label, valor, importante]) => (
+                    <div key={label} className="rounded-lg border p-2.5">
+                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+                      <dd className={valor ? 'text-sm' : `text-sm ${importante ? 'text-amber-700' : 'text-muted-foreground'}`}>
+                        {valor ?? (importante ? 'Falta' : '—')}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            );
+          })()}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="border-destructive/30 text-destructive hover:bg-destructive/10"
+              disabled={trabajando === viendo?.id}
+              onClick={() => { if (viendo) { const p = viendo; setViendo(null); resolver(p, 'rechazar'); } }}
+            >
+              <X className="mr-1 h-4 w-4" />
+              Descartar
+            </Button>
+            <Button
+              disabled={trabajando === viendo?.id}
+              onClick={() => { if (viendo) { const p = viendo; setViendo(null); resolver(p, 'aprobar'); } }}
+            >
+              <Check className="mr-1 h-4 w-4" />
+              Aprobar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

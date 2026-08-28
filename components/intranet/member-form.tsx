@@ -670,7 +670,10 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
               <div className="space-y-1.5">
                 <Label>¿Es su primera vez en una iglesia cristiana?</Label>
                 <div className="flex gap-2">
-                  {([['si', 'Sí, es la primera vez'], ['no', 'No, ya venía antes']] as const).map(([valor, texto]) => (
+                  {/* Solo "Sí" y "No", sin coletilla: pedido de Johnny en la reunión del
+                      24/08/2026. La pregunta ya es clara por sí sola y el texto extra
+                      hacía dudar de qué se estaba respondiendo. */}
+                  {([['si', 'Sí'], ['no', 'No']] as const).map(([valor, texto]) => (
                     <button
                       key={valor}
                       type="button"
