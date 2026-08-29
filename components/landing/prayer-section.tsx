@@ -11,7 +11,7 @@ const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function PrayerSection() {
-  const [form, setForm] = useState({ nombre: '', email: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
+  const [form, setForm] = useState({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
@@ -35,7 +35,7 @@ export function PrayerSection() {
         throw new Error(data.error || 'No pudimos enviar tu petición');
       }
       setEnviado(true);
-      setForm({ nombre: '', email: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
+      setForm({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No pudimos enviar tu petición. Intenta de nuevo.');
     } finally {
@@ -102,7 +102,7 @@ export function PrayerSection() {
                   campos comunica cual esperan que se complete. */}
               <div>
                 <label htmlFor="oracion-telefono" className="block text-sm font-medium mb-2">
-                  Teléfono <span className="text-muted-foreground font-normal">(opcional)</span>
+                  Teléfono
                 </label>
                 {/* Mismo componente que el registro de miembros, no un <select>
                     nativo: en Windows el select del sistema NO dibuja los emojis
@@ -130,7 +130,14 @@ export function PrayerSection() {
                       {PAISES.map((p) => (
                         <SelectItem key={p.code} value={p.code}>
                           <span className="tabular-nums">{p.code}</span>
-                          <span className="ml-2 text-muted-foreground">{p.nombre}</span>
+                          {/* Opacity, no text-muted-foreground: ese color queda
+                              fijo sin importar el fondo. Al pasar el mouse o
+                              navegar con teclado el item se resalta con
+                              focus:bg-accent (oscuro), y el texto muted quedaba
+                              casi del mismo tono que ese fondo — ilegible. La
+                              opacidad se aplica sobre el color heredado
+                              (currentColor), que sí cambia con el foco. */}
+                          <span className="ml-2 opacity-70">{p.nombre}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -141,6 +148,7 @@ export function PrayerSection() {
                     name="telefono"
                     autoComplete="tel"
                     inputMode="tel"
+                    required
                     maxLength={20}
                     value={form.telefono}
                     onChange={(e) => setForm({ ...form, telefono: e.target.value })}
@@ -149,22 +157,10 @@ export function PrayerSection() {
                   />
                 </div>
               </div>
-              <div>
-                <label htmlFor="oracion-email" className="block text-sm font-medium mb-2">
-                  Email <span className="text-muted-foreground font-normal">(opcional)</span>
-                </label>
-                <input
-                  id="oracion-email"
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  maxLength={200}
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className={inputCls}
-                  placeholder="tu@email.com"
-                />
-              </div>
+              {/* Sin campo de email: el equipo prioriza el teléfono como
+                  medio de contacto (reunión 24/08/2026) y pidió sacarlo del
+                  formulario. La columna `email` de la tabla sigue existiendo
+                  por si se necesita más adelante — solo se dejó de pedir. */}
               {/* Honeypot antispam: invisible para humanos, los bots lo rellenan.
                   Se llamaba `telefono`, pero ese nombre ahora es un campo REAL
                   y visible: de no renombrarlo, cada persona que escribiera su

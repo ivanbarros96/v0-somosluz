@@ -110,8 +110,12 @@ export async function POST(req: NextRequest) {
   const e = typeof email === 'string' ? email.trim() : '';
   const tel = typeof telefono === 'string' ? telefono.trim() : '';
 
-  if (!n || !p) {
-    return NextResponse.json({ error: 'Nombre y petición son obligatorios' }, { status: 400 });
+  // El teléfono pasó a ser obligatorio (reunión 24/08/2026): el equipo lo
+  // prioriza sobre el email para contactar a quien pide oración. Se valida
+  // también acá, no solo en el formulario — el campo `required` del HTML no
+  // protege nada si alguien llama al endpoint directo.
+  if (!n || !p || !tel) {
+    return NextResponse.json({ error: 'Nombre, teléfono y petición son obligatorios' }, { status: 400 });
   }
   if (n.length > 100 || p.length > 2000 || e.length > 200 || tel.length > 30) {
     return NextResponse.json({ error: 'Datos demasiado largos' }, { status: 400 });
