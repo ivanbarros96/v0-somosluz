@@ -11,9 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard, Users, ClipboardList, UserX, Settings,
   LogOut, UserPlus, X, BookOpen, Sun, Activity, HeartHandshake, HandHeart, Wallet, PiggyBank, Cake, Grid3x3,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion, esRolKids, puedeAutorizarFichas } from '@/lib/roles';
+import { ROLES, esRolValido, soloTomaAsistencia, esRolCopastor, esRolOracion, esRolKids, puedeAutorizarFichas, puedeAutorizarAgenda } from '@/lib/roles';
 
 interface NavItem {
   href: string;
@@ -43,10 +44,25 @@ interface NavGrupo {
   items: NavItem[];
 }
 
+// La Agenda la ven TODOS los roles sin excepción (decisión de Iván,
+// 29/08/2026): su gracia es justamente que cada ministerio vea las fechas de
+// los demás para no chocar. Por eso el mismo ítem se repite en los seis menús
+// en vez de vivir en uno solo. Lo que cambia por rol es quién CONFIRMA una
+// fecha (ver puedeAutorizarAgenda), no quién la mira.
+const ITEM_AGENDA: NavItem = {
+  href: '/intranet/dashboard/agenda',
+  label: 'Agenda',
+  icon: CalendarDays,
+  addedAt: '2026-08-29',
+};
+
 const PASTOR_NAV: NavGrupo[] = [
   {
     titulo: null,
-    items: [{ href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard }],
+    items: [
+      { href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard },
+      ITEM_AGENDA,
+    ],
   },
   {
     titulo: 'Congregación',
@@ -79,7 +95,10 @@ const PASTOR_NAV: NavGrupo[] = [
 const COPASTOR_NAV: NavGrupo[] = [
   {
     titulo: null,
-    items: [{ href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard }],
+    items: [
+      { href: '/intranet/dashboard', label: 'Panel Principal', icon: LayoutDashboard },
+      ITEM_AGENDA,
+    ],
   },
   {
     titulo: 'Cuidado pastoral',
@@ -116,6 +135,7 @@ const SOMOSLUZ_NAV: NavGrupo[] = [
       { href: '/intranet/dashboard/members', label: 'Miembros', icon: Users },
       { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
       { href: '/intranet/dashboard/cumpleanos', label: 'Cumpleaños', icon: Cake, addedAt: '2026-08-05' },
+      ITEM_AGENDA,
     ],
   },
 ];
@@ -133,6 +153,7 @@ const MINISTERIO_NAV: NavGrupo[] = [
     items: [
       { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
       { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus, addedAt: '2026-08-21' },
+      ITEM_AGENDA,
     ],
   },
 ];
@@ -143,7 +164,10 @@ const MINISTERIO_NAV: NavGrupo[] = [
 const KIDS_NAV: NavGrupo[] = [
   {
     titulo: null,
-    items: [{ href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList }],
+    items: [
+      { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
+      ITEM_AGENDA,
+    ],
   },
 ];
 
@@ -151,7 +175,10 @@ const KIDS_NAV: NavGrupo[] = [
 const ORACION_NAV: NavGrupo[] = [
   {
     titulo: null,
-    items: [{ href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart }],
+    items: [
+      { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart },
+      ITEM_AGENDA,
+    ],
   },
 ];
 
@@ -192,6 +219,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const registrosPendientes = useConteoPendiente(
     '/api/personas/pendientes/count',
     !!user && puedeAutorizarFichas(user.role),
+  );
+
+  // Fechas propuestas esperando confirmación. Mismo criterio: se pide sólo si
+  // el rol puede confirmarlas, para no mostrar un aviso sobre el que no se
+  // puede actuar. Todos ven la Agenda, pero sólo tres roles la resuelven.
+  const agendaPendientes = useConteoPendiente(
+    '/api/agenda/pendientes/count',
+    !!user && puedeAutorizarAgenda(user.role),
   );
 
   useEffect(() => {
@@ -270,13 +305,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
             )}
             <ul className="space-y-1">
           {grupo.items.map((item) => {
-            // Dos avisos distintos, el mismo badge: peticiones de oración sin
-            // revisar y auto-registros esperando aprobación. Antes había que
-            // entrar a la pestaña Pendientes para enterarse de que alguien se
-            // había registrado.
+            // Tres avisos distintos, el mismo badge: peticiones de oración sin
+            // revisar, auto-registros esperando aprobación y fechas propuestas
+            // en la agenda. Antes había que entrar a la pestaña Pendientes para
+            // enterarse de que alguien se había registrado.
             const pendientes =
               item.href === '/intranet/dashboard/oracion' ? oracionPendientes
               : item.href === '/intranet/dashboard/members' ? registrosPendientes
+              : item.href === '/intranet/dashboard/agenda' ? agendaPendientes
               : 0;
             return (
               <li key={item.href}>
@@ -299,7 +335,9 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                       aria-label={
                         item.href === '/intranet/dashboard/members'
                           ? `${pendientes} registros esperando aprobación`
-                          : `${pendientes} peticiones sin revisar`
+                          : item.href === '/intranet/dashboard/agenda'
+                            ? `${pendientes} fechas esperando confirmación`
+                            : `${pendientes} peticiones sin revisar`
                       }
                     >
                       {pendientes > 9 ? '9+' : pendientes}

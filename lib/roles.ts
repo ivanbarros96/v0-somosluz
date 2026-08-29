@@ -93,6 +93,19 @@ export function esRolCopastor(role: string): boolean {
   return role === 'copastor';
 }
 
+// Agenda compartida: quién confirma o rechaza una fecha propuesta.
+//
+// Secretaría, Pastor y Co-pastor (decisión de Iván, 29/08/2026). Es un grupo
+// más amplio que el de las fichas —ahí el Co-pastor no entra— porque coordinar
+// fechas es trabajo de agenda, no de padrón.
+//
+// Proponer, en cambio, lo puede hacer cualquier rol: ese es justamente el
+// punto de la agenda, que cada ministerio avise lo suyo. Por eso no hay una
+// función `puedeProponerEnAgenda`: sería `() => true`.
+export function puedeAutorizarAgenda(role: string): boolean {
+  return role === 'somosluz' || role === 'pastor' || role === 'copastor';
+}
+
 // Oración entra solo a su panel (/intranet/dashboard/oracion). Se bloquea
 // también a nivel de ruta en dashboard/layout.tsx, no solo ocultando el menú.
 export function esRolOracion(role: string): boolean {
