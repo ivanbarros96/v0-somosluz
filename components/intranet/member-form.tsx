@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FlagIcon } from '@/components/ui/flag-icon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
@@ -821,11 +822,18 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                 <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
                   <SelectTrigger className="w-28">
                     <SelectValue>
-                      {(() => { const p = PAISES.find((p) => p.code === form.codTel); return p ? `${p.flag} ${p.code}` : undefined; })()}
+                      <span className="flex items-center gap-1.5">
+                        <FlagIcon iso={PAISES.find((p) => p.code === form.codTel)?.iso ?? ''} className="h-3.5 w-5 rounded-[2px] shrink-0" />
+                        {form.codTel}
+                      </span>
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
+                    {PAISES.map((p) => (
+                      <SelectItem key={p.code} value={p.code}>
+                        <FlagIcon iso={p.iso} className="h-3.5 w-5 rounded-[2px] shrink-0" /> {p.code}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Input
@@ -856,11 +864,18 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                     <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
                       <SelectTrigger className="w-28">
                         <SelectValue>
-                          {(() => { const p = PAISES.find((p) => p.code === form.codWa); return p ? `${p.flag} ${p.code}` : undefined; })()}
+                          <span className="flex items-center gap-1.5">
+                            <FlagIcon iso={PAISES.find((p) => p.code === form.codWa)?.iso ?? ''} className="h-3.5 w-5 rounded-[2px] shrink-0" />
+                            {form.codWa}
+                          </span>
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {PAISES.map((p) => <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>)}
+                        {PAISES.map((p) => (
+                          <SelectItem key={p.code} value={p.code}>
+                            <FlagIcon iso={p.iso} className="h-3.5 w-5 rounded-[2px] shrink-0" /> {p.code}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <Input

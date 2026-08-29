@@ -3,21 +3,21 @@
 // un componente cliente y no los exportaba: la página pública habría tenido que
 // duplicar las 16 regiones con todas sus comunas.
 
-// `flag` sigue existiendo, pero NO se muestra sola: Windows no trae glifos de
-// bandera y degrada 🇨🇱 a dos letras diminutas ("ᴄʟ"), que es justo lo que se
-// veía mal en el selector. Se acompaña del nombre del país, que se lee siempre
-// y en cualquier sistema; donde sí hay banderas, suman.
+// `flag` (el emoji) queda solo como referencia/fallback textual — NO se
+// muestra: Windows no trae glifos de bandera y degrada 🇨🇱 a dos letras
+// diminutas ("ᴄʟ"). Lo que se dibuja es `iso`, vía <FlagIcon> (SVG propio,
+// ver components/ui/flag-icon.tsx), que se ve igual en cualquier sistema.
 export const PAISES = [
-  { flag: '🇨🇱', code: '+56', nombre: 'Chile' },
-  { flag: '🇻🇪', code: '+58', nombre: 'Venezuela' },
-  { flag: '🇵🇪', code: '+51', nombre: 'Perú' },
-  { flag: '🇨🇴', code: '+57', nombre: 'Colombia' },
-  { flag: '🇧🇴', code: '+591', nombre: 'Bolivia' },
-  { flag: '🇭🇹', code: '+509', nombre: 'Haití' },
-  { flag: '🇦🇷', code: '+54', nombre: 'Argentina' },
-  { flag: '🇧🇷', code: '+55', nombre: 'Brasil' },
-  { flag: '🇪🇨', code: '+593', nombre: 'Ecuador' },
-  { flag: '🇩🇴', code: '+1', nombre: 'Rep. Dominicana' },
+  { flag: '🇨🇱', iso: 'CL', code: '+56', nombre: 'Chile' },
+  { flag: '🇻🇪', iso: 'VE', code: '+58', nombre: 'Venezuela' },
+  { flag: '🇵🇪', iso: 'PE', code: '+51', nombre: 'Perú' },
+  { flag: '🇨🇴', iso: 'CO', code: '+57', nombre: 'Colombia' },
+  { flag: '🇧🇴', iso: 'BO', code: '+591', nombre: 'Bolivia' },
+  { flag: '🇭🇹', iso: 'HT', code: '+509', nombre: 'Haití' },
+  { flag: '🇦🇷', iso: 'AR', code: '+54', nombre: 'Argentina' },
+  { flag: '🇧🇷', iso: 'BR', code: '+55', nombre: 'Brasil' },
+  { flag: '🇪🇨', iso: 'EC', code: '+593', nombre: 'Ecuador' },
+  { flag: '🇩🇴', iso: 'DO', code: '+1', nombre: 'Rep. Dominicana' },
 ];
 
 export const REGIONES: Record<string, string[]> = {

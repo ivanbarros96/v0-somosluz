@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { FlagIcon } from '@/components/ui/flag-icon';
 import { CheckCircle2, Loader2, Plus, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PAISES, REGIONES } from '@/lib/chile';
 
@@ -306,10 +307,19 @@ export function RegistroPublicoForm() {
                 <Label htmlFor="telefono">Teléfono</Label>
                 <div className="flex gap-2">
                   <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
-                    <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-28">
+                      <SelectValue>
+                        <span className="flex items-center gap-1.5">
+                          <FlagIcon iso={PAISES.find((p) => p.code === form.codTel)?.iso ?? ''} className="h-3.5 w-5 rounded-[2px] shrink-0" />
+                          {form.codTel}
+                        </span>
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       {PAISES.map((p) => (
-                        <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>
+                        <SelectItem key={p.code} value={p.code}>
+                          <FlagIcon iso={p.iso} className="h-3.5 w-5 rounded-[2px] shrink-0" /> {p.code}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -339,10 +349,19 @@ export function RegistroPublicoForm() {
                     <Label htmlFor="whatsapp">WhatsApp</Label>
                     <div className="flex gap-2">
                       <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
-                        <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-28">
+                          <SelectValue>
+                            <span className="flex items-center gap-1.5">
+                              <FlagIcon iso={PAISES.find((p) => p.code === form.codWa)?.iso ?? ''} className="h-3.5 w-5 rounded-[2px] shrink-0" />
+                              {form.codWa}
+                            </span>
+                          </SelectValue>
+                        </SelectTrigger>
                         <SelectContent>
                           {PAISES.map((p) => (
-                            <SelectItem key={p.code} value={p.code}>{p.flag} {p.code}</SelectItem>
+                            <SelectItem key={p.code} value={p.code}>
+                              <FlagIcon iso={p.iso} className="h-3.5 w-5 rounded-[2px] shrink-0" /> {p.code}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

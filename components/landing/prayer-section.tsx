@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { HandHeart } from 'lucide-react';
 import { PAISES } from '@/lib/chile';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { FlagIcon } from '@/components/ui/flag-icon';
 
 const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
@@ -105,11 +106,14 @@ export function PrayerSection() {
                   Teléfono
                 </label>
                 {/* Mismo componente que el registro de miembros, no un <select>
-                    nativo: en Windows el select del sistema NO dibuja los emojis
-                    de bandera (los degrada a las letras "CL") y ademas ignoraba
-                    el ancho, empujando el campo del numero fuera de la tarjeta.
-                    El Select de shadcn renderiza HTML, asi que la bandera se ve
-                    y el layout se respeta. */}
+                    nativo: el select del sistema ignoraba el ancho fijado por
+                    CSS y empujaba el campo del numero fuera de la tarjeta. El
+                    Select de shadcn renderiza HTML, asi que el layout se
+                    respeta.
+                    La bandera es un SVG propio (FlagIcon), no el emoji: en
+                    Windows los emojis de bandera se degradan a texto ("CL")
+                    porque el sistema no trae ese glifo. Un SVG se ve igual en
+                    cualquier sistema operativo. */}
                 <div className="flex gap-2">
                   <Select
                     value={form.codTel}
@@ -119,16 +123,16 @@ export function PrayerSection() {
                       aria-label="Código de país"
                       className="w-24 shrink-0 h-[46px] rounded-lg border-input bg-background"
                     >
-                      {/* Se pinta el codigo directamente en vez de <SelectValue>:
-                          ese componente repite TODO el contenido del item
-                          (codigo + nombre del pais) y quedaba cortado como
-                          "+56 C". Aca solo importa el codigo; el nombre existe
-                          para elegir bien dentro de la lista. */}
+                      {/* Se pinta a mano en vez de <SelectValue>: ese
+                          componente repite TODO el contenido del item
+                          (bandera + codigo + nombre) y quedaba cortado. */}
+                      <FlagIcon iso={PAISES.find((p) => p.code === form.codTel)?.iso ?? ''} className="h-3.5 w-5 rounded-[2px] shrink-0" />
                       <span className="tabular-nums">{form.codTel}</span>
                     </SelectTrigger>
                     <SelectContent>
                       {PAISES.map((p) => (
                         <SelectItem key={p.code} value={p.code}>
+                          <FlagIcon iso={p.iso} className="h-3.5 w-5 rounded-[2px] shrink-0" />
                           <span className="tabular-nums">{p.code}</span>
                           {/* Opacity, no text-muted-foreground: ese color queda
                               fijo sin importar el fondo. Al pasar el mouse o
@@ -137,7 +141,7 @@ export function PrayerSection() {
                               casi del mismo tono que ese fondo — ilegible. La
                               opacidad se aplica sobre el color heredado
                               (currentColor), que sí cambia con el foco. */}
-                          <span className="ml-2 opacity-70">{p.nombre}</span>
+                          <span className="ml-1 opacity-70">{p.nombre}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
