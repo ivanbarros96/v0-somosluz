@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
-  CalendarDays, Loader2, Check, X, Clock, Pencil, Trash2, CalendarClock, Mail, ExternalLink,
+  CalendarDays, Loader2, Check, X, Clock, Pencil, Trash2, CalendarClock, Mail,
 } from 'lucide-react';
 
 type Estado = 'propuesta' | 'confirmada' | 'rechazada';
@@ -360,15 +360,6 @@ export default function AgendaPage() {
             )}
           </p>
         </div>
-        {/* Pedir una fecha se hace SIEMPRE por el formulario abierto, incluso
-            teniendo cuenta: es una sola vía para todos, porque varios líderes
-            de ministerio no tienen acceso a la intranet. */}
-        <Button variant="outline" asChild>
-          <a href="/intranet/solicitar-fecha" target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4 mr-1.5" />
-            Pedir una fecha
-          </a>
-        </Button>
       </div>
 
       <div className="flex gap-2 flex-wrap">
