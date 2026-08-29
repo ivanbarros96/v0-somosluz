@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server';
+import { createHmac } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { notificarPropuestaNueva } from '@/lib/agenda-avisos';
@@ -6,11 +7,34 @@ import { notificarPropuestaNueva } from '@/lib/agenda-avisos';
 // Lee cookie de sesión => siempre dinámico, nunca cacheado.
 export const dynamic = 'force-dynamic';
 
-// GET /api/agenda — todos los eventos de la agenda compartida.
+// Cuántas solicitudes acepta un mismo origen por día.
 //
-// Sin filtro por rol: la gracia de esta pantalla es justamente que todos vean
-// las fechas de todos, para no chocar entre ministerios. Lo que sí cambia por
-// rol es quién puede confirmar (ver PATCH en [id]).
+// Es el límite "por navegador" que pidió Iván. No se implementa en el
+// navegador —localStorage se borra con un clic y no frena nada— sino contando
+// del lado del servidor cuántas entraron hoy desde el mismo origen.
+const MAX_POR_DIA = 5;
+
+/**
+ * Huella del origen de la petición. Se guarda el HMAC, nunca la IP.
+ *
+ * Alcanza para contar cuántas solicitudes mandó el mismo origen hoy, pero no
+ * deja un registro de direcciones reales en la base. Se firma con AUTH_SECRET
+ * para que el hash no se pueda reconstruir probando IPs.
+ */
+function huellaOrigen(req: NextRequest): string | null {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip')?.trim() ||
+    '';
+  const secret = process.env.AUTH_SECRET;
+  if (!ip || !secret) return null; // En local no hay IP: no se limita nada.
+  return createHmac('sha256', secret).update(ip).digest('hex');
+}
+
+// GET /api/agenda — todos los eventos. Esto SÍ pide sesión.
+//
+// El formulario para pedir una fecha es abierto, pero la agenda armada no:
+// muestra qué hace cada ministerio y quién lo pidió.
 export async function GET(req: NextRequest) {
   if (!getSession(req)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -19,7 +43,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await getSupabaseAdmin()
     .from('agenda_eventos')
     .select(
-      'id, titulo, fecha, hora, ministerio, nota, solicitante_id, solicitante_nombre, estado, creado_por, resuelto_por, resuelto_at, motivo_rechazo, created_at',
+      'id, titulo, fecha, hora, ministerio, nota, solicitante_nombre, solicitante_email, estado, creado_por, resuelto_por, resuelto_at, motivo_rechazo, created_at',
     )
     .order('fecha', { ascending: true })
     .order('hora', { ascending: true, nullsFirst: true });
@@ -31,30 +55,42 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ eventos: data ?? [] });
 }
 
-// POST /api/agenda — proponer una fecha.
+// POST /api/agenda — pedir una fecha. Endpoint PÚBLICO, sin sesión.
 //
-// Cualquier rol con sesión puede proponer, incluidos los ministerios: es el
-// punto de la agenda. Todo nace como 'propuesta' y espera confirmación de
-// Secretaría, Pastor o Co-pastor — nadie confirma su propia fecha de entrada,
-// ni siquiera quien tiene permiso para confirmar, así queda el registro de
-// que alguien la revisó.
+// Va sin login a propósito (decisión de Iván, 29/08/2026): varios líderes de
+// ministerio no tienen cuenta en la intranet, y eran justamente los que
+// necesitaban coordinar fechas. Es la ÚNICA vía para pedir una fecha —
+// también la usan los que sí tienen cuenta, así hay un solo flujo.
+//
+// Al ser abierto lleva tres defensas: honeypot, tope diario por origen y
+// validación de largos. Confirmar sigue siendo privado (ver [id]/route.ts).
 export async function POST(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const body = await req.json().catch(() => ({}));
+
+  // Honeypot: invisible para las personas, los bots lo rellenan. Se responde
+  // ok para no darle pistas al bot de que fue descartado.
+  //
+  // Se llama `sitio_web` y NO `telefono`, que es el error que ya cometimos en
+  // el formulario de oración: ahí el honeypot ocupaba el nombre de un campo
+  // real y toda petición con teléfono se descartaba en silencio.
+  if (typeof body.sitio_web === 'string' && body.sitio_web.length > 0) {
+    return NextResponse.json({ ok: true });
   }
 
-  const body = await req.json().catch(() => ({}));
   const titulo = typeof body.titulo === 'string' ? body.titulo.trim() : '';
   const fecha = typeof body.fecha === 'string' ? body.fecha.trim() : '';
   const hora = typeof body.hora === 'string' && body.hora.trim() ? body.hora.trim() : null;
   const ministerio =
     typeof body.ministerio === 'string' && body.ministerio.trim() ? body.ministerio.trim() : null;
   const nota = typeof body.nota === 'string' && body.nota.trim() ? body.nota.trim() : null;
-  const solicitanteId = typeof body.solicitante_id === 'number' ? body.solicitante_id : null;
+  const nombre = typeof body.solicitante_nombre === 'string' ? body.solicitante_nombre.trim() : '';
+  const email = typeof body.solicitante_email === 'string' ? body.solicitante_email.trim() : '';
 
-  if (!titulo || !fecha) {
-    return NextResponse.json({ error: 'El título y la fecha son obligatorios' }, { status: 400 });
+  if (!titulo || !fecha || !nombre || !email) {
+    return NextResponse.json(
+      { error: 'Tu nombre, tu correo, el título y la fecha son obligatorios' },
+      { status: 400 },
+    );
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 });
@@ -62,33 +98,42 @@ export async function POST(req: NextRequest) {
   if (hora && !/^\d{2}:\d{2}$/.test(hora)) {
     return NextResponse.json({ error: 'Hora inválida' }, { status: 400 });
   }
-  if (titulo.length > 120) {
-    return NextResponse.json({ error: 'El título es demasiado largo' }, { status: 400 });
+  // Validación deliberadamente laxa: sólo descarta lo que claramente no es un
+  // correo. Una expresión estricta rechaza direcciones válidas y raras.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: 'Ese correo no se ve válido' }, { status: 400 });
+  }
+  if (titulo.length > 120 || nombre.length > 100 || email.length > 200) {
+    return NextResponse.json({ error: 'Datos demasiado largos' }, { status: 400 });
   }
   if (nota && nota.length > 500) {
     return NextResponse.json({ error: 'La nota es demasiado larga' }, { status: 400 });
   }
-  if (!solicitanteId) {
-    return NextResponse.json({ error: 'Indica quién solicita el evento' }, { status: 400 });
-  }
 
   const db = getSupabaseAdmin();
+  const ipHash = huellaOrigen(req);
 
-  // El nombre y el correo se resuelven ACÁ y no se reciben del cliente: si
-  // llegaran en el body, cualquiera podría mandar el aviso a un correo
-  // arbitrario haciéndolo pasar por un miembro.
-  const { data: persona, error: errPersona } = await db
-    .from('personas')
-    .select('nombre, email')
-    .eq('id', solicitanteId)
-    .maybeSingle();
+  if (ipHash) {
+    // Ventana móvil de 24 horas, no "desde medianoche": así no se libera el
+    // cupo entero de golpe a las 00:00.
+    const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await db
+      .from('agenda_eventos')
+      .select('id', { count: 'exact', head: true })
+      .eq('ip_hash', ipHash)
+      .gte('created_at', desde);
 
-  if (errPersona) {
-    return NextResponse.json({ error: errPersona.message }, { status: 500 });
+    if ((count ?? 0) >= MAX_POR_DIA) {
+      return NextResponse.json(
+        { error: 'Ya enviaste varias solicitudes hoy. Inténtalo mañana o avísale a Secretaría.' },
+        { status: 429 },
+      );
+    }
   }
-  if (!persona) {
-    return NextResponse.json({ error: 'Esa persona no existe' }, { status: 404 });
-  }
+
+  // Si la petición trae sesión se deja registrado el rol; si no, 'publico'.
+  // Sirve para saber de dónde entró, sin cambiar en nada el permiso.
+  const session = getSession(req);
 
   const { data: creado, error } = await db
     .from('agenda_eventos')
@@ -98,26 +143,27 @@ export async function POST(req: NextRequest) {
       hora,
       ministerio,
       nota,
-      solicitante_id: solicitanteId,
-      solicitante_nombre: persona.nombre,
-      creado_por: session.role,
+      solicitante_nombre: nombre,
+      solicitante_email: email,
+      creado_por: session?.role ?? 'publico',
+      ip_hash: ipHash,
     })
     .select('id, titulo, fecha, hora, solicitante_nombre')
     .single();
 
   if (error) {
-    return NextResponse.json({ error: 'No pudimos guardar el evento' }, { status: 500 });
+    return NextResponse.json({ error: 'No pudimos guardar tu solicitud' }, { status: 500 });
   }
 
-  // Se avisa DESPUÉS de responder: no le agrega espera a quien propuso, y si
-  // el correo falla el evento ya quedó guardado igual.
+  // Se avisa DESPUÉS de responder: no le agrega espera a quien pidió la fecha,
+  // y si el correo falla la solicitud ya quedó guardada igual.
   after(() =>
     notificarPropuestaNueva({
       titulo: creado.titulo,
       fecha: creado.fecha,
       hora: creado.hora,
       solicitante: creado.solicitante_nombre,
-      propuestoPor: session.role,
+      propuestoPor: session?.role ?? 'publico',
     }),
   );
 

@@ -45,6 +45,9 @@ export function fechaLegible(iso: string): string {
 }
 
 function nombreRol(role: string): string {
+  // 'publico' es el caso normal, no un error: pedir una fecha es abierto y la
+  // mayoría de las solicitudes entran sin sesión.
+  if (role === 'publico') return 'Un líder';
   return esRolValido(role) ? ROLES[role].name : role;
 }
 
@@ -148,8 +151,9 @@ export async function notificarResolucion(e: {
   const resend = getResend();
   if (!resend) return;
 
-  // Sólo 4 de cada 5 adultos tienen correo cargado. Sin correo simplemente no
-  // se avisa: la resolución igual quedó guardada y se ve en la pantalla.
+  // El correo es obligatorio en el formulario, así que normalmente está. Se
+  // valida igual: una solicitud vieja o cargada a mano podría no tenerlo, y
+  // ahí simplemente no se avisa — la resolución ya quedó guardada y visible.
   const destino = (e.emailSolicitante ?? '').trim();
   if (!destino) return;
 

@@ -346,6 +346,25 @@ export default function IntranetLoginPage() {
           </div>
         )}
 
+        {/* Salida para los líderes SIN cuenta. Varios ministerios los tienen y
+            son justamente los que necesitan coordinar fechas, así que pedir una
+            no puede depender de tener acceso. Sólo se muestra en la pantalla
+            inicial: una vez que alguien eligió su perfil, ya va a entrar. */}
+        {!selectedProfile && (
+          <div className="mt-8 pt-6 border-t border-border text-center">
+            <p className="text-sm text-muted-foreground">
+              ¿Eres líder y no tienes acceso?
+            </p>
+            <a
+              href="/intranet/solicitar-fecha"
+              className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Pide una fecha en la agenda
+            </a>
+          </div>
+        )}
+
         <div className="text-center mt-8">
           <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition">
             ← Volver al sitio principal

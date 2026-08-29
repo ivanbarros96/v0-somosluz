@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       motivo_rechazo: motivo,
     })
     .eq('id', id)
-    .select('titulo, fecha, hora, solicitante_id, solicitante_nombre')
+    .select('titulo, fecha, hora, solicitante_nombre, solicitante_email')
     .maybeSingle();
 
   if (error) {
@@ -79,28 +79,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Ese evento no existe' }, { status: 404 });
   }
 
-  // El correo del solicitante se busca acá, no se recibe del cliente.
-  after(async () => {
-    let email: string | null = null;
-    if (evento.solicitante_id) {
-      const { data: persona } = await db
-        .from('personas')
-        .select('email')
-        .eq('id', evento.solicitante_id)
-        .maybeSingle();
-      email = persona?.email ?? null;
-    }
-    await notificarResolucion({
+  // El correo sale de la propia solicitud: lo escribió quien la mandó desde el
+  // formulario público. No se busca en `personas` porque quien pide una fecha
+  // no tiene por qué estar en el padrón.
+  after(() =>
+    notificarResolucion({
       titulo: evento.titulo,
       fecha: evento.fecha,
       hora: evento.hora,
       solicitante: evento.solicitante_nombre,
-      emailSolicitante: email,
+      emailSolicitante: evento.solicitante_email,
       confirmada,
       motivo,
       resueltoPor: session.role,
-    });
-  });
+    }),
+  );
 
   return NextResponse.json({ ok: true });
 }

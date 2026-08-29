@@ -5,7 +5,6 @@ import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { puedeAutorizarAgenda } from '@/lib/roles';
 import { CULTO_TIPOS, CULTO_TIPO_KEYS } from '@/lib/cultos-tipos';
-import { getPersonas, type PersonaRow } from '@/lib/datos';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,13 +17,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
-  CalendarDays, Loader2, Plus, Check, X, ChevronsUpDown, Clock, Pencil, Trash2, CalendarClock,
+  CalendarDays, Loader2, Check, X, Clock, Pencil, Trash2, CalendarClock, Mail, ExternalLink,
 } from 'lucide-react';
 
 type Estado = 'propuesta' | 'confirmada' | 'rechazada';
@@ -36,8 +31,8 @@ interface Evento {
   hora: string | null;        // 'HH:MM:SS'
   ministerio: string | null;
   nota: string | null;
-  solicitante_id: number | null;
   solicitante_nombre: string;
+  solicitante_email: string | null;
   estado: Estado;
   creado_por: string;
   resuelto_por: string | null;
@@ -140,8 +135,17 @@ function FilaEvento({
             )}
           </p>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
             Lo solicita <span className="text-foreground">{e.solicitante_nombre}</span>
+            {e.solicitante_email && (
+              <a
+                href={`mailto:${e.solicitante_email}`}
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <Mail className="h-3 w-3" />
+                {e.solicitante_email}
+              </a>
+            )}
           </p>
 
           {e.nota && <p className="text-xs text-muted-foreground pt-0.5">{e.nota}</p>}
@@ -187,87 +191,7 @@ function FilaEvento({
   );
 }
 
-// ── Selector de la persona que solicita ─────────────────────────────────────
-
-function SelectorPersona({
-  personas, valor, onChange, cargando,
-}: {
-  personas: PersonaRow[];
-  valor: { id: number; nombre: string } | null;
-  onChange: (v: { id: number; nombre: string }) => void;
-  cargando: boolean;
-}) {
-  const [abierto, setAbierto] = useState(false);
-
-  const grupos = useMemo(() => {
-    const porTipo = (tipo: string) =>
-      personas
-        .filter((p) => p.source_tipo === tipo)
-        .map((p) => ({ id: Number(p.id), nombre: p.nombre }))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-
-    return [
-      { heading: 'Adultos', items: porTipo('adulto') },
-      { heading: 'Youth', items: porTipo('joven') },
-      { heading: 'Niños', items: porTipo('nino') },
-    ].filter((g) => g.items.length > 0);
-  }, [personas]);
-
-  return (
-    <Popover open={abierto} onOpenChange={setAbierto}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={abierto}
-          className="w-full justify-between font-normal"
-          disabled={cargando}
-        >
-          {cargando ? (
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-            </span>
-          ) : (
-            <span className={cn(!valor && 'text-muted-foreground')}>
-              {valor?.nombre ?? 'Busca a la persona…'}
-            </span>
-          )}
-          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Escribe un nombre…" />
-          <CommandList>
-            <CommandEmpty>Sin resultados.</CommandEmpty>
-            {grupos.map((g) => (
-              <CommandGroup key={g.heading} heading={g.heading}>
-                {g.items.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={p.nombre}
-                    onSelect={() => { onChange(p); setAbierto(false); }}
-                  >
-                    <Check
-                      className={cn('mr-2 h-4 w-4', valor?.id === p.id ? 'opacity-100' : 'opacity-0')}
-                    />
-                    {p.nombre}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 // ── Pantalla ────────────────────────────────────────────────────────────────
-
-const FORM_VACIO = {
-  titulo: '', fecha: '', hora: '', ministerio: 'ninguno', nota: '',
-};
 
 export default function AgendaPage() {
   const { user } = useAuth();
@@ -278,15 +202,10 @@ export default function AgendaPage() {
   const [filtro, setFiltro] = useState<Estado | 'todas'>('todas');
   const [ocupado, setOcupado] = useState(false);
 
-  // Diálogo de crear / editar
-  const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  // Sólo edición: pedir una fecha se hace desde el formulario público, no acá.
   const [editando, setEditando] = useState<Evento | null>(null);
-  const [form, setForm] = useState(FORM_VACIO);
-  const [solicitante, setSolicitante] = useState<{ id: number; nombre: string } | null>(null);
-  const [personas, setPersonas] = useState<PersonaRow[]>([]);
-  const [cargandoPersonas, setCargandoPersonas] = useState(false);
+  const [form, setForm] = useState({ titulo: '', fecha: '', hora: '', ministerio: 'ninguno', nota: '' });
 
-  // Diálogo de rechazo
   const [rechazando, setRechazando] = useState<Evento | null>(null);
   const [motivo, setMotivo] = useState('');
 
@@ -304,17 +223,6 @@ export default function AgendaPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
-
-  // La congregación se carga la primera vez que se abre el diálogo, no al
-  // entrar a la pantalla: la mayoría entra sólo a mirar fechas.
-  useEffect(() => {
-    if (!dialogoAbierto || personas.length > 0) return;
-    setCargandoPersonas(true);
-    getPersonas()
-      .then(setPersonas)
-      .catch(() => toast.error('No pudimos cargar la congregación'))
-      .finally(() => setCargandoPersonas(false));
-  }, [dialogoAbierto, personas.length]);
 
   const hoy = hoyEnChile();
 
@@ -341,13 +249,6 @@ export default function AgendaPage() {
 
   const pendientes = eventos.filter((e) => e.estado === 'propuesta').length;
 
-  function abrirNuevo() {
-    setEditando(null);
-    setForm({ ...FORM_VACIO, fecha: hoy });
-    setSolicitante(null);
-    setDialogoAbierto(true);
-  }
-
   function abrirEdicion(e: Evento) {
     setEditando(e);
     setForm({
@@ -357,51 +258,35 @@ export default function AgendaPage() {
       ministerio: e.ministerio ?? 'ninguno',
       nota: e.nota ?? '',
     });
-    setSolicitante(
-      e.solicitante_id ? { id: e.solicitante_id, nombre: e.solicitante_nombre } : null,
-    );
-    setDialogoAbierto(true);
   }
 
-  async function guardar() {
+  async function guardarEdicion() {
+    if (!editando) return;
     if (!form.titulo.trim() || !form.fecha) {
       toast.error('El título y la fecha son obligatorios.');
-      return;
-    }
-    if (!editando && !solicitante) {
-      toast.error('Indica quién solicita el evento.');
       return;
     }
 
     setOcupado(true);
     try {
-      const cuerpo = {
-        titulo: form.titulo.trim(),
-        fecha: form.fecha,
-        hora: form.hora || null,
-        ministerio: form.ministerio === 'ninguno' ? null : form.ministerio,
-        nota: form.nota.trim() || null,
-      };
-
-      const res = editando
-        ? await fetch(`/api/agenda/${editando.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accion: 'editar', ...cuerpo }),
-          })
-        : await fetch('/api/agenda', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...cuerpo, solicitante_id: solicitante!.id }),
-          });
-
+      const res = await fetch(`/api/agenda/${editando.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'editar',
+          titulo: form.titulo.trim(),
+          fecha: form.fecha,
+          hora: form.hora || null,
+          ministerio: form.ministerio === 'ninguno' ? null : form.ministerio,
+          nota: form.nota.trim() || null,
+        }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'No pudimos guardar');
       }
-
-      toast.success(editando ? 'Evento actualizado.' : 'Fecha propuesta. Queda esperando confirmación.');
-      setDialogoAbierto(false);
+      toast.success('Evento actualizado.');
+      setEditando(null);
       await cargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No pudimos guardar.');
@@ -419,7 +304,11 @@ export default function AgendaPage() {
         body: JSON.stringify({ accion, motivo: motivoTexto ?? null }),
       });
       if (!res.ok) throw new Error();
-      toast.success(accion === 'confirmar' ? 'Fecha confirmada.' : 'Fecha rechazada.');
+      toast.success(
+        accion === 'confirmar'
+          ? `Fecha confirmada. Le avisamos a ${e.solicitante_nombre}.`
+          : `Fecha rechazada. Le avisamos a ${e.solicitante_nombre}.`,
+      );
       setRechazando(null);
       setMotivo('');
       await cargar();
@@ -471,9 +360,14 @@ export default function AgendaPage() {
             )}
           </p>
         </div>
-        <Button onClick={abrirNuevo}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Proponer fecha
+        {/* Pedir una fecha se hace SIEMPRE por el formulario abierto, incluso
+            teniendo cuenta: es una sola vía para todos, porque varios líderes
+            de ministerio no tienen acceso a la intranet. */}
+        <Button variant="outline" asChild>
+          <a href="/intranet/solicitar-fecha" target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="h-4 w-4 mr-1.5" />
+            Pedir una fecha
+          </a>
         </Button>
       </div>
 
@@ -535,15 +429,14 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* Crear / editar */}
-      <Dialog open={dialogoAbierto} onOpenChange={setDialogoAbierto}>
+      {/* Edición — sólo para quienes confirman */}
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editando ? 'Editar evento' : 'Proponer una fecha'}</DialogTitle>
+            <DialogTitle>Editar evento</DialogTitle>
             <DialogDescription>
-              {editando
-                ? 'Corrige los datos del evento.'
-                : 'Queda tentativa hasta que Secretaría, el Pastor o el Co-pastor la confirmen.'}
+              Corrige los datos. Quien lo solicitó no se puede cambiar: es el registro de quién
+              pidió la fecha y de ahí sale el correo de la respuesta.
             </DialogDescription>
           </DialogHeader>
 
@@ -555,7 +448,6 @@ export default function AgendaPage() {
                 value={form.titulo}
                 maxLength={120}
                 onChange={(ev) => setForm({ ...form, titulo: ev.target.value })}
-                placeholder="Ej: Vigilia de jóvenes"
               />
             </div>
 
@@ -600,20 +492,6 @@ export default function AgendaPage() {
               </Select>
             </div>
 
-            {/* Al editar no se cambia el solicitante: es el registro de quién
-                pidió el evento, y de ahí sale el correo de la respuesta. */}
-            {!editando && (
-              <div className="space-y-1.5">
-                <Label>¿Quién lo solicita?</Label>
-                <SelectorPersona
-                  personas={personas}
-                  valor={solicitante}
-                  onChange={setSolicitante}
-                  cargando={cargandoPersonas}
-                />
-              </div>
-            )}
-
             <div className="space-y-1.5">
               <Label htmlFor="ag-nota">
                 Nota <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
@@ -623,18 +501,17 @@ export default function AgendaPage() {
                 value={form.nota}
                 maxLength={500}
                 onChange={(ev) => setForm({ ...form, nota: ev.target.value })}
-                placeholder="Cualquier detalle que ayude a decidir…"
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogoAbierto(false)} disabled={ocupado}>
+            <Button variant="outline" onClick={() => setEditando(null)} disabled={ocupado}>
               Cancelar
             </Button>
-            <Button onClick={guardar} disabled={ocupado}>
+            <Button onClick={guardarEdicion} disabled={ocupado}>
               {ocupado && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
-              {editando ? 'Guardar' : 'Proponer'}
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -646,8 +523,7 @@ export default function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Rechazar la fecha</DialogTitle>
             <DialogDescription>
-              Se le avisa por correo a {rechazando?.solicitante_nombre} con el motivo, si tiene
-              correo cargado en su ficha.
+              Se le avisa por correo a {rechazando?.solicitante_nombre} con el motivo.
             </DialogDescription>
           </DialogHeader>
 
