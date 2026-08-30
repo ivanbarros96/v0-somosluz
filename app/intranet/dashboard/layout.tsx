@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
+import { NotificationBell } from '@/components/intranet/notification-bell';
 import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer, esRolOracion, esRolKids } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
 
@@ -50,6 +51,9 @@ export default function DashboardLayout({
   // ahí, aunque escriba la URL a mano.
   const esOracion = !!user && esRolOracion(user.role);
   const rutaPermitidaOracion = !esOracion || pathname.startsWith(RUTA_ORACION);
+
+  // Secretaría es el perfil piloto del centro de notificaciones (campana).
+  const esSecretaria = user?.role === 'somosluz';
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -109,7 +113,16 @@ export default function DashboardLayout({
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <span className="font-semibold text-foreground text-sm">Somos Luz</span>
+          {esSecretaria && <div className="ml-auto -mr-1"><NotificationBell /></div>}
         </header>
+
+        {/* Topbar de escritorio con la campana de notificaciones. Piloto para
+            Secretaría; el resto de los perfiles conserva su layout sin barra. */}
+        {esSecretaria && (
+          <header className="hidden md:flex items-center justify-end px-8 py-2 border-b border-border bg-card">
+            <NotificationBell />
+          </header>
+        )}
 
         <main className="flex-1 p-4 md:p-8 overflow-auto">
           {children}
