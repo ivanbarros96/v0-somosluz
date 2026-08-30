@@ -541,33 +541,118 @@ function PastorDashboard() {
 
 // ─── Somos Luz Dashboard ─────────────────────────────────────────────────────
 
+// Dashboard de Secretaría. Su trabajo es el PADRÓN: registrar, aprobar y
+// mantener los datos de la gente. Por eso sus gráficas son sobre el padrón
+// —cómo crece, cómo se compone— y no sobre asistencia o finanzas, que son de
+// otros perfiles. Reutiliza los mismos componentes de gráfica del Pastor.
 function SomosluzDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ total: 0, recientes: 0 });
+  const [total, setTotal] = useState(0);
+  const [recientes, setRecientes] = useState(0);
+  const [pendientes, setPendientes] = useState(0);
+  const [porTipo, setPorTipo] = useState({ adultos: 0, jovenes: 0, ninos: 0 });
+  const [crecimiento, setCrecimiento] = useState<CrecimientoMes[]>([]);
+  const [sexo, setSexo] = useState<SexoData>({ femenino: 0, masculino: 0, sin_dato: 0 });
+  const [edad, setEdad] = useState<EdadRango[]>([]);
+  const [edadSinDato, setEdadSinDato] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPersonas()
-      .then((data) => {
-        const total = data.length;
+    async function cargar() {
+      try {
+        const [personas, rPend] = await Promise.all([
+          getPersonas(),
+          fetch('/api/personas/pendientes/count', { cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : { count: 0 }))
+            .catch(() => ({ count: 0 })),
+        ]);
+
+        const t = personas.length;
+        setTotal(t);
+        setPendientes(typeof rPend.count === 'number' ? rPend.count : 0);
+
         const hace3m = subMonths(new Date(), 3).toISOString();
-        const recientes = data.filter((p) => p.created_at && p.created_at >= hace3m).length;
-        setStats({ total, recientes });
-      })
-      .catch(() => setStats({ total: 0, recientes: 0 }))
-      .finally(() => setLoading(false));
+        setRecientes(personas.filter((p) => p.created_at && p.created_at >= hace3m).length);
+
+        setPorTipo({
+          adultos: personas.filter((p) => p.source_tipo === 'adulto').length,
+          jovenes: personas.filter((p) => p.source_tipo === 'joven').length,
+          ninos: personas.filter((p) => p.source_tipo === 'nino').length,
+        });
+
+        // Sexo
+        const sx = (v: unknown) => String(v ?? '').trim().toLowerCase();
+        const femenino = personas.filter((p) => sx(p.sexo) === 'femenino').length;
+        const masculino = personas.filter((p) => sx(p.sexo) === 'masculino').length;
+        setSexo({ femenino, masculino, sin_dato: t - femenino - masculino });
+
+        // Edad
+        const RANGOS = [
+          { rango: '0-12', min: 0, max: 12 },
+          { rango: '13-17', min: 13, max: 17 },
+          { rango: '18-30', min: 18, max: 30 },
+          { rango: '31-50', min: 31, max: 50 },
+          { rango: '51+', min: 51, max: 200 },
+        ];
+        const conEdad = personas.filter(
+          (p): p is typeof p & { edad: number } => typeof p.edad === 'number' && p.edad >= 0,
+        );
+        setEdad(RANGOS.map((r) => ({
+          rango: r.rango,
+          total: conEdad.filter((p) => p.edad >= r.min && p.edad <= r.max).length,
+        })));
+        setEdadSinDato(t - conEdad.length);
+
+        // Crecimiento acumulado por mes (mismo cálculo que el home del Pastor).
+        const now = new Date();
+        const fechas = personas.map((p) => p.created_at).filter(Boolean).sort() as string[];
+        const inicio = fechas.length ? startOfMonth(parseISO(fechas[0])) : startOfMonth(subMonths(now, 5));
+        let nMeses = differenceInMonths(startOfMonth(now), inicio) + 1;
+        if (nMeses < 1) nMeses = 1;
+        if (nMeses > 12) nMeses = 12;
+        const meses: CrecimientoMes[] = [];
+        let acumulado = 0;
+        for (let i = nMeses - 1; i >= 0; i--) {
+          const mes = subMonths(now, i);
+          const ini = startOfMonth(mes).toISOString();
+          const fin = endOfMonth(mes).toISOString();
+          const nuevos = personas.filter((p) => p.created_at && p.created_at >= ini && p.created_at <= fin).length;
+          acumulado += nuevos;
+          meses.push({ mes: capMes(mes), nuevos, acumulado });
+        }
+        setCrecimiento(meses);
+      } catch {
+        // Deja los ceros; la UI muestra el estado vacío de cada gráfica.
+      } finally {
+        setLoading(false);
+      }
+    }
+    cargar();
   }, []);
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-64 bg-muted animate-pulse rounded-md" />
-        <div className="grid grid-cols-2 gap-3">
-          {[...Array(2)].map((_, i) => <div key={i} className="h-28 bg-muted animate-pulse rounded-lg" />)}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />)}
         </div>
+        <div className="h-72 bg-muted animate-pulse rounded-lg" />
       </div>
     );
   }
+
+  const KPI = ({ label, valor, icon: Icon, acento }: { label: string; valor: number; icon: React.ElementType; acento?: boolean }) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-5">
+        <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        <Icon className={`h-4 w-4 shrink-0 ${acento ? 'text-primary' : 'text-muted-foreground'}`} />
+      </CardHeader>
+      <CardContent className="p-3 pt-0 md:p-5 md:pt-0">
+        <div className={`text-2xl font-bold ${acento ? 'text-primary' : 'text-foreground'}`}>{valor}</div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -576,29 +661,36 @@ function SomosluzDashboard() {
           Bienvenido, {user?.name}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Panel operativo · Somos Luz Iglesia
+          Panel operativo · el estado del padrón de la iglesia
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+        <KPI label="Total Miembros" valor={total} icon={Users} />
+        <KPI label="Nuevos (3 meses)" valor={recientes} icon={UserPlus} acento />
+        <KPI label="Por aprobar" valor={pendientes} icon={ClipboardList} acento={pendientes > 0} />
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Miembros</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-5">
+            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Composición</CardTitle>
+            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold text-foreground">{stats.total}</div>
+          <CardContent className="p-3 pt-0 md:p-5 md:pt-0">
+            <div className="flex items-baseline gap-2 text-sm">
+              <span><span className="text-lg font-bold text-foreground">{porTipo.adultos}</span> <span className="text-muted-foreground">ad.</span></span>
+              <span><span className="text-lg font-bold text-foreground">{porTipo.jovenes}</span> <span className="text-muted-foreground">jóv.</span></span>
+              <span><span className="text-lg font-bold text-foreground">{porTipo.ninos}</span> <span className="text-muted-foreground">niños</span></span>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Nuevos (3 meses)</CardTitle>
-            <UserPlus className="h-4 w-4 text-primary shrink-0" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
-            <div className="text-xl md:text-2xl font-bold text-primary">{stats.recientes}</div>
-          </CardContent>
-        </Card>
+      </div>
+
+      {/* Los componentes de gráfica ya traen su propia tarjeta y título; se
+          renderizan directos, sin envolverlos en otra Card. */}
+      <CrecimientoChart data={crecimiento} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <SexoChart data={sexo} />
+        <EdadChart data={edad} sinDato={edadSinDato} />
       </div>
 
       <Card>
