@@ -154,6 +154,18 @@ export default function OracionPage() {
     [peticiones],
   );
 
+  // Resumen del estado de las peticiones: es el "tablero" del perfil Oración.
+  // De un vistazo ve cuántas esperan, cuántas están en oración y cuántas se
+  // contestaron. Cada número es además un atajo al filtro.
+  const resumen = useMemo(
+    () => ({
+      pendiente: peticiones.filter((p) => p.estado === 'pendiente').length,
+      orando: peticiones.filter((p) => p.estado === 'orando').length,
+      contestada: peticiones.filter((p) => p.estado === 'contestada').length,
+    }),
+    [peticiones],
+  );
+
   const visibles = useMemo(
     () =>
       peticiones.filter(
@@ -184,6 +196,34 @@ export default function OracionPage() {
           Nueva petición
         </Button>
       </div>
+
+      {/* Tablero: el estado de las peticiones de un vistazo. Cada tarjeta lleva
+          a su filtro. Es lo relevante para este perfil — no gráficas de
+          asistencia ni padrón, que son de otros. */}
+      {!loading && (
+        <div className="grid grid-cols-3 gap-3 mb-5">
+          {([
+            { estado: 'pendiente' as const, label: 'En espera', valor: resumen.pendiente, clase: 'text-orange-600 dark:text-orange-400', ring: 'hover:border-orange-500/40' },
+            { estado: 'orando' as const, label: 'Orando', valor: resumen.orando, clase: 'text-primary', ring: 'hover:border-primary/40' },
+            { estado: 'contestada' as const, label: 'Contestadas', valor: resumen.contestada, clase: 'text-green-600 dark:text-green-500', ring: 'hover:border-green-500/40' },
+          ]).map((s) => (
+            <button
+              key={s.estado}
+              type="button"
+              onClick={() => setFiltro(s.estado)}
+              aria-pressed={filtro === s.estado}
+              className={cn(
+                'text-left rounded-xl border bg-card p-3 md:p-4 transition',
+                s.ring,
+                filtro === s.estado ? 'border-primary ring-1 ring-primary/30' : 'border-border',
+              )}
+            >
+              <div className="text-xs md:text-sm text-muted-foreground">{s.label}</div>
+              <div className={cn('text-2xl md:text-3xl font-bold mt-1', s.clase)}>{s.valor}</div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filtros de estado */}
       <div className="flex flex-wrap gap-2 mb-3">
