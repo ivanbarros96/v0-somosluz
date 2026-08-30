@@ -346,27 +346,24 @@ export default function IntranetLoginPage() {
           </div>
         )}
 
-        {/* Salida para los líderes SIN cuenta. Varios ministerios los tienen y
-            son justamente los que necesitan coordinar fechas, así que ni ver el
-            calendario ni pedir una fecha pueden depender de tener acceso. Sólo
-            se muestra en la pantalla inicial: una vez que alguien eligió su
-            perfil, ya va a entrar. */}
+        {/* Entrada al calendario abierto. Va sin preguntar nada: el enlace se
+            explica solo y sirve igual a quien tiene cuenta y a quien no —
+            varios líderes de ministerio están en ese segundo caso.
+            Sólo en la pantalla inicial: una vez elegido el perfil, ya va a
+            entrar y el enlace estorbaría. */}
         {!selectedProfile && (
           <div className="mt-8 pt-6 border-t border-border text-center">
-            <p className="text-sm text-muted-foreground">
-              ¿Eres líder y no tienes acceso?
-            </p>
             <a
               href="/intranet/calendario"
-              className="inline-flex items-center gap-1.5 mt-1.5 text-sm font-medium text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
             >
               <CalendarDays className="h-4 w-4" />
-              Ver el calendario o pedir una fecha
+              Calendario de la iglesia
             </a>
           </div>
         )}
 
-        <div className="text-center mt-8">
+        <div className="text-center mt-6">
           <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition">
             ← Volver al sitio principal
           </a>
