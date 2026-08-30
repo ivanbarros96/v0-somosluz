@@ -15,13 +15,19 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-// Notifica al pastor por correo. Fallback seguro: cualquier fallo se registra
-// y se ignora; jamás debe afectar el guardado de la petición.
+// Notifica por correo a quien atiende las peticiones. Fallback seguro:
+// cualquier fallo se registra y se ignora; jamás debe afectar el guardado de
+// la petición.
 async function notificarPastor(nombre: string, email: string, peticion: string) {
   const resend = getResend();
   if (!resend) return; // Sin RESEND_API_KEY no se envía (no rompe nada).
 
-  const destino = process.env.ORACION_NOTIFY_TO || 'ivan.dariobc96@gmail.com';
+  // Destinatario por defecto: Nicole, que atiende las peticiones desde el
+  // 29/08/2026 (antes llegaban a Iván).
+  //
+  // ⚠️ Esto es sólo el valor de RESPALDO. Si ORACION_NOTIFY_TO está definida en
+  // Vercel, manda esa y este cambio no se nota: hay que cambiarla allá también.
+  const destino = process.env.ORACION_NOTIFY_TO || 'torressepulvedanicole@gmail.com';
   // En modo prueba de Resend el remitente debe ser onboarding@resend.dev.
   // Con el dominio verificado, cambiar a algo como oracion@somosluziglesia.cl.
   const remitente = process.env.ORACION_NOTIFY_FROM || 'Somos Luz <onboarding@resend.dev>';

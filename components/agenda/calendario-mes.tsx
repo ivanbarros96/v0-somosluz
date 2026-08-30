@@ -9,11 +9,11 @@
 // como medianoche UTC y en Chile (UTC-4) se dibuja el día anterior. Ese error
 // ya nos pasó en la vista de cumpleaños.
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CULTO_TIPO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Clock, CalendarOff } from 'lucide-react';
 
 export type EstadoEvento = 'propuesta' | 'confirmada' | 'rechazada';
 
@@ -32,7 +32,19 @@ export const MESES = [
 ];
 
 // Empieza en lunes, como se lee un calendario en Chile.
-const DIAS_CORTOS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+//
+// Martes y miércoles van con dos letras: con una sola aparecían dos columnas
+// "M" seguidas y no se distinguían. El nombre completo va en el title/aria para
+// quien use lector de pantalla.
+const DIAS = [
+  { corto: 'L', largo: 'lunes' },
+  { corto: 'Ma', largo: 'martes' },
+  { corto: 'Mi', largo: 'miércoles' },
+  { corto: 'J', largo: 'jueves' },
+  { corto: 'V', largo: 'viernes' },
+  { corto: 'S', largo: 'sábado' },
+  { corto: 'D', largo: 'domingo' },
+];
 
 /** Hoy en Chile, como 'YYYY-MM-DD'. */
 export function hoyEnChile(): string {
@@ -91,26 +103,52 @@ export function correrMes(mesISO: string, delta: number): string {
   return `${nuevoAnio}-${String(nuevoMes).padStart(2, '0')}`;
 }
 
-// Estilo del chip de cada evento. La propuesta se ve claramente distinta de lo
-// confirmado: es la diferencia entre "esto va a pasar" y "esto todavía no".
+// Estilo del chip de cada evento.
+//
+// El TEXTO va en color de primer plano, no en el color del estado: el título en
+// salvia sobre crema daba 3.57:1, bajo el mínimo de 4.5:1 que pide WCAG — y a
+// 10px eso se nota. El estado se comunica con el fondo y el borde, que no
+// necesitan pasar contraste de texto.
+//
+// Y no se distingue SÓLO por color: la propuesta va con borde punteado, así se
+// sigue leyendo sin necesidad de distinguir colores.
 const CHIP: Record<EstadoEvento, string> = {
-  confirmada: 'bg-primary/15 text-primary border-primary/30',
-  propuesta: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/40 border-dashed',
+  confirmada: 'bg-primary/15 text-foreground border-primary/40',
+  propuesta: 'bg-orange-500/10 text-foreground border-orange-500/60 border-dashed',
   rechazada: 'bg-muted text-muted-foreground border-border line-through',
+};
+
+const PUNTO: Record<EstadoEvento, string> = {
+  confirmada: 'bg-primary',
+  propuesta: 'bg-orange-500',
+  rechazada: 'bg-muted-foreground/40',
 };
 
 export function CalendarioMes({
   mes,
   eventos,
   onCambiarMes,
-  onElegirEvento,
 }: {
   mes: string;                                  // 'YYYY-MM'
   eventos: EventoCalendario[];
   onCambiarMes: (mesNuevo: string) => void;
-  onElegirEvento?: (e: EventoCalendario) => void;
 }) {
   const hoy = hoyEnChile();
+  const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
+
+  // Al cambiar de mes se cierra el detalle: quedaba abierto mostrando un día
+  // que ya no está a la vista.
+  useEffect(() => { setDiaAbierto(null); }, [mes]);
+
+  // Eventos indexados por día, para no recorrer la lista en cada celda.
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, EventoCalendario[]>();
+    for (const e of eventos) {
+      if (!mapa.has(e.fecha)) mapa.set(e.fecha, []);
+      mapa.get(e.fecha)!.push(e);
+    }
+    return mapa;
+  }, [eventos]);
 
   // Celdas de la cuadrícula: los huecos del principio van como null.
   const celdas = useMemo(() => {
@@ -131,43 +169,71 @@ export function CalendarioMes({
     return salida;
   }, [mes]);
 
-  // Eventos indexados por día, para no recorrer la lista en cada celda.
-  const porDia = useMemo(() => {
-    const mapa = new Map<string, EventoCalendario[]>();
-    for (const e of eventos) {
-      if (!mapa.has(e.fecha)) mapa.set(e.fecha, []);
-      mapa.get(e.fecha)!.push(e);
-    }
-    return mapa;
-  }, [eventos]);
+  const delMes = useMemo(
+    () => eventos.filter((e) => e.fecha.startsWith(mes)),
+    [eventos, mes],
+  );
+
+  const eventosDelDia = diaAbierto ? (porDia.get(diaAbierto) ?? []) : [];
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between gap-2 px-2 sm:px-3 py-2.5 border-b border-border">
         <Button
           variant="ghost" size="icon"
           onClick={() => onCambiarMes(correrMes(mes, -1))}
           aria-label="Mes anterior"
+          className="h-11 w-11 shrink-0"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-sm sm:text-base font-semibold text-foreground">{tituloMes(mes)}</h2>
-        <Button
-          variant="ghost" size="icon"
-          onClick={() => onCambiarMes(correrMes(mes, 1))}
-          aria-label="Mes siguiente"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+
+        <div className="text-center min-w-0">
+          <h2 className="text-sm sm:text-base font-semibold text-foreground truncate">
+            {tituloMes(mes)}
+          </h2>
+          {/* Cuántos eventos hay en el mes que se está viendo: sin esto había
+              que barrer la cuadrícula con la vista para saber si valía la pena
+              mirarla. */}
+          <p className="text-[11px] text-muted-foreground">
+            {delMes.length === 0
+              ? 'Sin eventos'
+              : `${delMes.length} ${delMes.length === 1 ? 'evento' : 'eventos'}`}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Volver a hoy: navegando meses es fácil perderse y no había camino
+              de vuelta. Sólo aparece cuando hace falta. */}
+          {mes !== mesDeHoy() && (
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => onCambiarMes(mesDeHoy())}
+              className="h-11 px-2 text-xs"
+            >
+              Hoy
+            </Button>
+          )}
+          <Button
+            variant="ghost" size="icon"
+            onClick={() => onCambiarMes(correrMes(mes, 1))}
+            aria-label="Mes siguiente"
+            className="h-11 w-11"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-7 border-b border-border bg-muted/40">
-        {DIAS_CORTOS.map((d, i) => (
+        {DIAS.map((d) => (
           <div
-            key={i}
+            key={d.largo}
+            title={d.largo}
             className="py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
           >
-            {d}
+            <span aria-hidden="true">{d.corto}</span>
+            <span className="sr-only">{d.largo}</span>
           </div>
         ))}
       </div>
@@ -175,18 +241,45 @@ export function CalendarioMes({
       <div className="grid grid-cols-7">
         {celdas.map((dia, i) => {
           if (!dia) {
-            return <div key={`hueco-${i}`} className="min-h-16 sm:min-h-24 border-b border-r border-border/60 bg-muted/20" />;
+            return (
+              <div
+                key={`hueco-${i}`}
+                className="min-h-14 sm:min-h-24 border-b border-r border-border/60 bg-muted/20"
+              />
+            );
           }
+
           const delDia = porDia.get(dia) ?? [];
           const esHoy = dia === hoy;
+          const abierto = dia === diaAbierto;
           const numero = Number(dia.slice(-2));
+          const tiene = delDia.length > 0;
+
+          // Sólo los días CON eventos son interactivos: así el recorrido con
+          // teclado pasa por lo que importa en vez de por 30 celdas vacías.
+          const Celda = tiene ? 'button' : 'div';
 
           return (
-            <div
+            <Celda
               key={dia}
+              {...(tiene
+                ? {
+                    type: 'button' as const,
+                    onClick: () => setDiaAbierto(abierto ? null : dia),
+                    'aria-expanded': abierto,
+                    'aria-label': `${fechaLegible(dia)}, ${delDia.length} ${delDia.length === 1 ? 'evento' : 'eventos'}`,
+                  }
+                : { 'aria-hidden': false })}
               className={cn(
-                'min-h-16 sm:min-h-24 border-b border-r border-border/60 p-1 sm:p-1.5 space-y-1',
+                'min-h-14 sm:min-h-24 border-b border-r border-border/60 p-1 sm:p-1.5 space-y-1 text-left w-full',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                 esHoy && 'bg-primary/5',
+                // El día elegido se marca con un aro, NO rellenando la celda de
+                // color oscuro: ese relleno quedaba debajo de los chips y les
+                // arruinaba la legibilidad. El aro señala igual de claro y deja
+                // el contenido sobre su fondo claro de siempre.
+                abierto && 'bg-primary/10 ring-2 ring-inset ring-primary',
+                tiene && 'cursor-pointer transition-colors hover:bg-accent/40',
               )}
             >
               <div
@@ -199,51 +292,106 @@ export function CalendarioMes({
               </div>
 
               {/* En el celular la cuadrícula no da para leer títulos: se marca
-                  el día con un punto y el detalle se lee en la lista de abajo,
-                  que ahí es la vista principal. */}
-              <div className="sm:hidden flex flex-wrap gap-0.5">
-                {delDia.slice(0, 3).map((e) => (
+                  el día con un punto y al tocarlo se abre el detalle abajo. */}
+              <div className="sm:hidden flex flex-wrap gap-0.5" aria-hidden="true">
+                {delDia.slice(0, 4).map((e) => (
                   <span
                     key={e.id}
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      (e.estado ?? 'confirmada') === 'propuesta' ? 'bg-orange-500' : 'bg-primary',
-                    )}
+                    className={cn('h-1.5 w-1.5 rounded-full', PUNTO[e.estado ?? 'confirmada'])}
                   />
                 ))}
               </div>
 
-              <div className="hidden sm:block space-y-1">
-                {delDia.slice(0, 3).map((e) => {
-                  const estado = e.estado ?? 'confirmada';
+              <div className="hidden sm:block space-y-1" aria-hidden="true">
+                {delDia.slice(0, 2).map((e) => {
                   const hora = soloHora(e.hora);
                   return (
-                    <button
+                    <div
                       key={e.id}
-                      type="button"
-                      onClick={() => onElegirEvento?.(e)}
-                      title={`${e.titulo}${hora ? ` · ${hora}` : ''}`}
                       className={cn(
-                        'w-full text-left truncate rounded border px-1 py-0.5 text-[10px] leading-tight',
-                        CHIP[estado],
-                        onElegirEvento && 'hover:opacity-80 cursor-pointer',
+                        'truncate rounded border px-1 py-0.5 text-[10px] leading-tight',
+                        CHIP[e.estado ?? 'confirmada'],
                       )}
                     >
                       {hora && <span className="tabular-nums opacity-70">{hora} </span>}
                       {e.titulo}
-                    </button>
+                    </div>
                   );
                 })}
-                {delDia.length > 3 && (
+                {delDia.length > 2 && (
                   <p className="text-[10px] text-muted-foreground pl-1">
-                    +{delDia.length - 3} más
+                    +{delDia.length - 2} más
                   </p>
                 )}
               </div>
-            </div>
+            </Celda>
           );
         })}
       </div>
+
+      {/* Detalle del día elegido. Va acá abajo y no en un globo flotante: en el
+          celular un globo sobre una cuadrícula de 7 columnas queda ilegible. */}
+      {diaAbierto && (
+        <div className="border-t border-border bg-muted/30">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              {fechaLegible(diaAbierto, true)}
+            </h3>
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => setDiaAbierto(null)}
+              aria-label="Cerrar el detalle del día"
+              className="h-9 w-9"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <ul className="px-4 pb-3 pt-1 space-y-2">
+            {eventosDelDia.map((e) => {
+              const hora = soloHora(e.hora);
+              const min = etiquetaMinisterio(e.ministerio);
+              const estado = e.estado ?? 'confirmada';
+              return (
+                <li key={e.id} className="flex items-start gap-2">
+                  <span
+                    className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', PUNTO[estado])}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground">
+                      {e.titulo}
+                      {estado === 'propuesta' && (
+                        <span className="ml-1.5 text-[11px] font-medium text-orange-600 dark:text-orange-400">
+                          · por confirmar
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      {hora && (
+                        <>
+                          <Clock className="h-3 w-3 shrink-0" />
+                          <span className="tabular-nums">{hora} hrs</span>
+                        </>
+                      )}
+                      {min && <>{hora && <span aria-hidden>·</span>}{min}</>}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Mes vacío: en vez de dejar una cuadrícula muda, se dice qué pasa. */}
+      {delMes.length === 0 && !diaAbierto && (
+        <div className="border-t border-border px-4 py-5 text-center">
+          <CalendarOff className="h-6 w-6 text-muted-foreground/40 mx-auto mb-1.5" />
+          <p className="text-xs text-muted-foreground">
+            No hay nada agendado en {tituloMes(mes).toLowerCase()}.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
