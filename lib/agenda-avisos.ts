@@ -1,12 +1,20 @@
-// ⚠️ SOLO servidor. Avisos por correo de la agenda compartida.
+// ⚠️ SOLO servidor. Aviso por correo de la agenda compartida.
 //
-// Dos avisos, en los dos sentidos (decisión de Iván, 29/08/2026):
-//   1. Alguien propone una fecha  → se avisa a quienes pueden confirmarla.
-//   2. Se confirma o se rechaza   → se avisa a quien la solicitó.
+// UN solo aviso: cuando se confirma o se rechaza una fecha, se le avisa a
+// quien la pidió.
 //
-// Fallback seguro en todo: cualquier fallo de correo se registra y se ignora.
-// Un aviso que no sale JAMÁS debe impedir que el evento se guarde o se
-// confirme — el mismo criterio que ya usa el aviso de peticiones de oración.
+// A quienes confirman NO se les manda correo: se enteran por el contador
+// naranja del menú, igual que con las fichas de miembros esperando
+// autorización. Ese patrón ya está incorporado en el equipo y no necesita un
+// correo encima.
+//
+// El aviso de vuelta sí hace falta, y por una razón concreta: quien pide una
+// fecha puede ser un líder SIN cuenta en la intranet. No tiene dónde entrar a
+// mirar si se la aprobaron, así que el correo es su única forma de enterarse.
+//
+// Fallback seguro: cualquier fallo de correo se registra y se ignora. Un aviso
+// que no sale JAMÁS debe impedir que la fecha se confirme — el mismo criterio
+// que ya usa el aviso de peticiones de oración.
 
 import { getResend } from './resend';
 import { ROLES, esRolValido } from './roles';
@@ -51,15 +59,6 @@ function nombreRol(role: string): string {
   return esRolValido(role) ? ROLES[role].name : role;
 }
 
-/** Correos de quienes confirman. Coma-separados en la variable de entorno. */
-function destinatariosAprobadores(): string[] {
-  const raw = process.env.AGENDA_NOTIFY_TO || '';
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function remitente(): string {
   // En modo prueba de Resend el remitente debe ser onboarding@resend.dev.
   // Con el dominio verificado, cambiar a algo como agenda@somosluziglesia.cl.
@@ -93,51 +92,7 @@ function ficha(e: { titulo: string; fecha: string; hora: string | null; solicita
   </div>`;
 }
 
-interface EventoAviso {
-  titulo: string;
-  fecha: string;
-  hora: string | null;
-  solicitante: string;
-  propuestoPor: string;
-}
-
-/** Aviso 1: hay una fecha nueva esperando confirmación. */
-export async function notificarPropuestaNueva(e: EventoAviso): Promise<void> {
-  const resend = getResend();
-  if (!resend) return; // Sin RESEND_API_KEY no se envía (no rompe nada).
-
-  const destinos = destinatariosAprobadores();
-  if (destinos.length === 0) {
-    // Sin AGENDA_NOTIFY_TO configurada no hay a quién avisar. No es un error:
-    // la agenda funciona igual, el badge del menú ya marca lo pendiente.
-    return;
-  }
-
-  const cuerpo = `
-    <p style="font-size:15px;color:#2b2521;line-height:1.6;margin:0 0 16px">
-      <strong>${escapeHtml(nombreRol(e.propuestoPor))}</strong> propuso una fecha nueva en la agenda.
-      Queda tentativa hasta que alguien la confirme.
-    </p>
-    ${ficha(e)}
-    <a href="https://somosluziglesia.cl/intranet/dashboard/agenda"
-       style="display:inline-block;background:${SALVIA};color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600;font-size:14px">
-      Revisar en la agenda
-    </a>`;
-
-  try {
-    await resend.emails.send({
-      from: remitente(),
-      to: destinos,
-      subject: `📅 Fecha por confirmar: ${e.titulo} (${fechaLegible(e.fecha)})`,
-      text: `${nombreRol(e.propuestoPor)} propuso una fecha en la agenda.\n\n${e.titulo}\n${fechaLegible(e.fecha)}${e.hora ? ` · ${e.hora.slice(0, 5)} hrs` : ''}\nLo solicita: ${e.solicitante}\n\nConfirmar o rechazar: https://somosluziglesia.cl/intranet/dashboard/agenda`,
-      html: envoltorio('Una fecha espera confirmación', cuerpo),
-    });
-  } catch (err) {
-    console.error('[agenda] fallo al avisar de la propuesta', err);
-  }
-}
-
-/** Aviso 2: la fecha que alguien pidió quedó confirmada o rechazada. */
+/** La fecha que alguien pidió quedó confirmada o rechazada. */
 export async function notificarResolucion(e: {
   titulo: string;
   fecha: string;

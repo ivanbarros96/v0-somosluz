@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse, after } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
-import { notificarPropuestaNueva } from '@/lib/agenda-avisos';
 
 // Lee cookie de sesión => siempre dinámico, nunca cacheado.
 export const dynamic = 'force-dynamic';
@@ -148,24 +147,21 @@ export async function POST(req: NextRequest) {
       creado_por: session?.role ?? 'publico',
       ip_hash: ipHash,
     })
-    .select('id, titulo, fecha, hora, solicitante_nombre')
+    .select('id')
     .single();
 
   if (error) {
     return NextResponse.json({ error: 'No pudimos guardar tu solicitud' }, { status: 500 });
   }
 
-  // Se avisa DESPUÉS de responder: no le agrega espera a quien pidió la fecha,
-  // y si el correo falla la solicitud ya quedó guardada igual.
-  after(() =>
-    notificarPropuestaNueva({
-      titulo: creado.titulo,
-      fecha: creado.fecha,
-      hora: creado.hora,
-      solicitante: creado.solicitante_nombre,
-      propuestoPor: session?.role ?? 'publico',
-    }),
-  );
+  // No se manda correo a quienes confirman: se enteran por el contador naranja
+  // del menú, igual que con las fichas de miembros esperando autorización. Es
+  // el patrón que el equipo ya tiene incorporado, y agregarle un correo encima
+  // sería ruido — entran a la agenda cuando pueden.
+  //
+  // El correo SÍ existe en el otro sentido (ver PATCH en [id]/route.ts): a
+  // quien pidió la fecha hay que avisarle, porque puede ser un líder sin
+  // cuenta y no tiene dónde ir a mirar si le aprobaron.
 
   return NextResponse.json({ ok: true, id: creado.id });
 }
