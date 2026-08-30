@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { puedeAutorizarAgenda } from '@/lib/roles';
-import { CULTO_TIPOS, CULTO_TIPO_KEYS } from '@/lib/cultos-tipos';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import {
   CalendarioMes, hoyEnChile, mesDeHoy, fechaLegible, soloHora, etiquetaMinisterio,
+  MINISTERIOS_AGENDA, MINISTERIO_AGENDA_KEYS,
   type EstadoEvento,
 } from '@/components/agenda/calendario-mes';
 import { cn } from '@/lib/utils';
@@ -433,8 +433,8 @@ export default function AgendaPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ninguno">Sin ministerio</SelectItem>
-                  {CULTO_TIPO_KEYS.map((t) => (
-                    <SelectItem key={t} value={t}>{CULTO_TIPOS[t].label}</SelectItem>
+                  {MINISTERIO_AGENDA_KEYS.map((t) => (
+                    <SelectItem key={t} value={t}>{MINISTERIOS_AGENDA[t]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

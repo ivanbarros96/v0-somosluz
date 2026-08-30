@@ -11,7 +11,7 @@
 
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { CULTO_TIPOS } from '@/lib/cultos-tipos';
+import { CULTO_TIPO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -50,9 +50,25 @@ export function fechaLegible(iso: string, conAnio = false): string {
 
 export const soloHora = (h: string | null) => (h ? h.slice(0, 5) : null);
 
+// Nombres cortos, SOLO para la agenda. `CULTO_TIPOS[t].label` ("Viernes de
+// Discipulado", "Generación Youth") es el nombre largo que usan Asistencia,
+// Miembros y Cumpleaños — no se toca, para no cambiarlo también ahí. Acá, en
+// un chip de calendario y en un desplegable angosto, el nombre corto se lee
+// mejor y es el mismo que ya usa el login (ver `corto` en intranet/page.tsx).
+export const MINISTERIOS_AGENDA: Record<CultoTipo, string> = {
+  general: 'General',
+  hombres: 'Hombría',
+  mujeres: 'Amadas',
+  discipulado: 'Discipulado',
+  youth: 'Youth',
+  kids: 'Kids',
+};
+
+export const MINISTERIO_AGENDA_KEYS = CULTO_TIPO_KEYS;
+
 export function etiquetaMinisterio(m: string | null): string | null {
   if (!m) return null;
-  return m in CULTO_TIPOS ? CULTO_TIPOS[m as keyof typeof CULTO_TIPOS].label : m;
+  return m in MINISTERIOS_AGENDA ? MINISTERIOS_AGENDA[m as CultoTipo] : m;
 }
 
 /** 'YYYY-MM' del mes actual en Chile. */

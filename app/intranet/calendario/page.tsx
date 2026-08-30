@@ -23,9 +23,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { CULTO_TIPOS, CULTO_TIPO_KEYS } from '@/lib/cultos-tipos';
 import {
   CalendarioMes, hoyEnChile, mesDeHoy, fechaLegible, soloHora, etiquetaMinisterio,
+  MINISTERIOS_AGENDA, MINISTERIO_AGENDA_KEYS,
   type EventoCalendario,
 } from '@/components/agenda/calendario-mes';
 import { CalendarCheck, Loader2, ChevronLeft, Plus, Clock, CalendarDays } from 'lucide-react';
@@ -294,8 +294,8 @@ export default function CalendarioPublicoPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ninguno">Sin ministerio</SelectItem>
-                      {CULTO_TIPO_KEYS.map((t) => (
-                        <SelectItem key={t} value={t}>{CULTO_TIPOS[t].label}</SelectItem>
+                      {MINISTERIO_AGENDA_KEYS.map((t) => (
+                        <SelectItem key={t} value={t}>{MINISTERIOS_AGENDA[t]}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
