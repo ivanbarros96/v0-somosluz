@@ -3,9 +3,10 @@
 // Agenda dentro del panel. Muestra el MISMO calendario que la pantalla pública
 // (componente compartido) y, debajo, las solicitudes.
 //
-// Acá NO se pide una fecha: eso se hace desde /intranet/calendario, que es
-// abierto porque varios líderes de ministerio no tienen cuenta. Adentro sólo se
-// mira y se resuelve.
+// Este panel es SOLO para los tres perfiles que aprueban (Secretaría, Pastor,
+// Co-pastor). Acá NO se pide una fecha ni se edita: sólo se ve el detalle y se
+// aprueba o rechaza. Pedir una fecha se hace desde /intranet/calendario, que es
+// abierto porque varios líderes de ministerio no tienen cuenta.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -14,23 +15,18 @@ import { puedeAutorizarAgenda } from '@/lib/roles';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
   CalendarioMes, hoyEnChile, mesDeHoy, fechaLegible, soloHora, etiquetaMinisterio,
-  MINISTERIOS_AGENDA, MINISTERIO_AGENDA_KEYS,
   type EstadoEvento,
 } from '@/components/agenda/calendario-mes';
 import { cn } from '@/lib/utils';
 import {
-  CalendarDays, Loader2, Check, X, Clock, Pencil, Trash2, CalendarClock, Mail,
+  CalendarDays, Loader2, Check, X, Clock, Eye, CalendarClock, Mail, User,
 } from 'lucide-react';
 
 interface Evento {
@@ -67,22 +63,24 @@ const FILTROS: { valor: EstadoEvento | 'todas'; label: string }[] = [
   { valor: 'todas', label: 'Todas' },
 ];
 
+// Fila compacta: lo justo para reconocer la solicitud de un vistazo. Todo el
+// resto (quién la pidió, su correo, la nota) vive detrás del ojito, para que la
+// lista de pendientes se recorra rápido sin ruido.
 function FilaEvento({
-  e, puedeAutorizar, onConfirmar, onRechazar, onEditar, onBorrar, ocupado,
+  e, puedeAutorizar, onVer, onConfirmar, onRechazar, ocupado,
 }: {
   e: Evento;
   puedeAutorizar: boolean;
+  onVer: (e: Evento) => void;
   onConfirmar: (e: Evento) => void;
   onRechazar: (e: Evento) => void;
-  onEditar: (e: Evento) => void;
-  onBorrar: (e: Evento) => void;
   ocupado: boolean;
 }) {
   const hora = soloHora(e.hora);
   const ministerio = etiquetaMinisterio(e.ministerio);
 
   return (
-    <div className="px-4 md:px-5 py-4 space-y-3">
+    <div className="px-4 md:px-5 py-3.5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -108,39 +106,16 @@ function FilaEvento({
               </>
             )}
           </p>
-
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
-            Lo solicita <span className="text-foreground">{e.solicitante_nombre}</span>
-            {e.solicitante_email && (
-              <a
-                href={`mailto:${e.solicitante_email}`}
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <Mail className="h-3 w-3" />
-                {e.solicitante_email}
-              </a>
-            )}
-          </p>
-
-          {e.nota && <p className="text-xs text-muted-foreground pt-0.5">{e.nota}</p>}
-
-          {e.estado === 'rechazada' && e.motivo_rechazo && (
-            <p className="text-xs text-muted-foreground pt-0.5">
-              <span className="font-medium text-foreground">Motivo:</span> {e.motivo_rechazo}
-            </p>
-          )}
         </div>
 
-        {puedeAutorizar && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="icon" title="Editar" onClick={() => onEditar(e)} disabled={ocupado}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Borrar" onClick={() => onBorrar(e)} disabled={ocupado}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        )}
+        <Button
+          variant="ghost" size="icon" title="Ver detalle"
+          aria-label={`Ver el detalle de ${e.titulo}`}
+          onClick={() => onVer(e)} disabled={ocupado}
+          className="shrink-0"
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
       </div>
 
       {puedeAutorizar && e.estado === 'propuesta' && (
@@ -169,9 +144,10 @@ export default function AgendaPage() {
   const [filtro, setFiltro] = useState<EstadoEvento | 'todas'>('propuesta');
   const [ocupado, setOcupado] = useState(false);
 
-  const [editando, setEditando] = useState<Evento | null>(null);
-  const [form, setForm] = useState({ titulo: '', fecha: '', hora: '', ministerio: 'ninguno', nota: '' });
-
+  // Detalle (el ojito) y rechazo con motivo. No hay edición ni borrado: la
+  // solicitud llega tal cual la escribió quien la mandó y sólo se aprueba o
+  // rechaza (decisión de Iván, 30/08/2026).
+  const [viendo, setViendo] = useState<Evento | null>(null);
   const [rechazando, setRechazando] = useState<Evento | null>(null);
   const [motivo, setMotivo] = useState('');
 
@@ -211,51 +187,6 @@ export default function AgendaPage() {
 
   const pendientes = eventos.filter((e) => e.estado === 'propuesta').length;
 
-  function abrirEdicion(e: Evento) {
-    setEditando(e);
-    setForm({
-      titulo: e.titulo,
-      fecha: e.fecha,
-      hora: soloHora(e.hora) ?? '',
-      ministerio: e.ministerio ?? 'ninguno',
-      nota: e.nota ?? '',
-    });
-  }
-
-  async function guardarEdicion() {
-    if (!editando) return;
-    if (!form.titulo.trim() || !form.fecha) {
-      toast.error('El título y la fecha son obligatorios.');
-      return;
-    }
-    setOcupado(true);
-    try {
-      const res = await fetch(`/api/agenda/${editando.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accion: 'editar',
-          titulo: form.titulo.trim(),
-          fecha: form.fecha,
-          hora: form.hora || null,
-          ministerio: form.ministerio === 'ninguno' ? null : form.ministerio,
-          nota: form.nota.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'No pudimos guardar');
-      }
-      toast.success('Evento actualizado.');
-      setEditando(null);
-      await cargar();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No pudimos guardar.');
-    } finally {
-      setOcupado(false);
-    }
-  }
-
   async function resolver(e: Evento, accion: 'confirmar' | 'rechazar', motivoTexto?: string) {
     setOcupado(true);
     try {
@@ -271,6 +202,7 @@ export default function AgendaPage() {
           : `Rechazada. Le avisamos por correo a ${e.solicitante_nombre}.`,
       );
       setRechazando(null);
+      setViendo(null);
       setMotivo('');
       await cargar();
     } catch {
@@ -280,29 +212,16 @@ export default function AgendaPage() {
     }
   }
 
-  async function borrar(e: Evento) {
-    if (!confirm(`¿Borrar "${e.titulo}"? No se puede deshacer.`)) return;
-    setOcupado(true);
-    try {
-      const res = await fetch(`/api/agenda/${e.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      toast.success('Evento borrado.');
-      await cargar();
-    } catch {
-      toast.error('No pudimos borrar el evento.');
-    } finally {
-      setOcupado(false);
-    }
-  }
-
   const propsFila = {
     puedeAutorizar,
+    onVer: (e: Evento) => setViendo(e),
     onConfirmar: (e: Evento) => resolver(e, 'confirmar'),
     onRechazar: (e: Evento) => { setRechazando(e); setMotivo(''); },
-    onEditar: abrirEdicion,
-    onBorrar: borrar,
     ocupado,
   };
+
+  const vHora = viendo ? soloHora(viendo.hora) : null;
+  const vMin = viendo ? etiquetaMinisterio(viendo.ministerio) : null;
 
   return (
     <div className="space-y-6">
@@ -381,91 +300,93 @@ export default function AgendaPage() {
         </>
       )}
 
-      {/* Edición — sólo para quienes confirman */}
-      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+      {/* Detalle de una solicitud (el ojito). Sólo lectura. */}
+      <Dialog open={!!viendo} onOpenChange={(o) => !o && setViendo(null)}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Editar evento</DialogTitle>
-            <DialogDescription>
-              Quien lo solicitó no se puede cambiar: de ahí sale el correo de la respuesta.
-            </DialogDescription>
-          </DialogHeader>
+          {viendo && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 flex-wrap">
+                  {viendo.titulo}
+                  <Badge variant="outline" className={cn('text-[10px]', ESTADO_STYLE[viendo.estado])}>
+                    {ESTADO_LABEL[viendo.estado]}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Detalle de la solicitud de fecha
+                </DialogDescription>
+              </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="ag-titulo">Título</Label>
-              <Input
-                id="ag-titulo"
-                value={form.titulo}
-                maxLength={120}
-                onChange={(ev) => setForm({ ...form, titulo: ev.target.value })}
-              />
-            </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarDays className="h-4 w-4 shrink-0" />
+                  <span className="text-foreground">{fechaLegible(viendo.fecha, true)}</span>
+                  {vHora && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <Clock className="h-4 w-4 shrink-0" />
+                      <span className="text-foreground tabular-nums">{vHora} hrs</span>
+                    </>
+                  )}
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="ag-fecha">Fecha</Label>
-                <Input
-                  id="ag-fecha"
-                  type="date"
-                  value={form.fecha}
-                  onChange={(ev) => setForm({ ...form, fecha: ev.target.value })}
-                />
+                {vMin && (
+                  <div className="text-muted-foreground">
+                    Ministerio: <span className="text-foreground">{vMin}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <User className="h-4 w-4 shrink-0" />
+                  Lo solicita <span className="text-foreground">{viendo.solicitante_nombre}</span>
+                </div>
+
+                {viendo.solicitante_email && (
+                  <a
+                    href={`mailto:${viendo.solicitante_email}`}
+                    className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                  >
+                    <Mail className="h-4 w-4 shrink-0" />
+                    {viendo.solicitante_email}
+                  </a>
+                )}
+
+                {viendo.nota && (
+                  <div className="rounded-lg bg-muted/50 p-3 text-foreground whitespace-pre-wrap">
+                    {viendo.nota}
+                  </div>
+                )}
+
+                {viendo.estado === 'rechazada' && viendo.motivo_rechazo && (
+                  <div className="rounded-lg border border-border p-3">
+                    <span className="font-medium text-foreground">Motivo del rechazo:</span>{' '}
+                    <span className="text-muted-foreground">{viendo.motivo_rechazo}</span>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ag-hora">
-                  Hora <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-                </Label>
-                <Input
-                  id="ag-hora"
-                  type="time"
-                  value={form.hora}
-                  onChange={(ev) => setForm({ ...form, hora: ev.target.value })}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label>
-                Ministerio <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-              </Label>
-              <Select value={form.ministerio} onValueChange={(v) => setForm({ ...form, ministerio: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ninguno">Sin ministerio</SelectItem>
-                  {MINISTERIO_AGENDA_KEYS.map((t) => (
-                    <SelectItem key={t} value={t}>{MINISTERIOS_AGENDA[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="ag-nota">
-                Nota <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
-              </Label>
-              <Textarea
-                id="ag-nota"
-                value={form.nota}
-                maxLength={500}
-                onChange={(ev) => setForm({ ...form, nota: ev.target.value })}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditando(null)} disabled={ocupado}>
-              Cancelar
-            </Button>
-            <Button onClick={guardarEdicion} disabled={ocupado}>
-              {ocupado && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
-              Guardar
-            </Button>
-          </DialogFooter>
+              {puedeAutorizar && viendo.estado === 'propuesta' && (
+                <DialogFooter className="gap-2 sm:gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setRechazando(viendo); setMotivo(''); }}
+                    disabled={ocupado}
+                  >
+                    <X className="h-4 w-4 mr-1.5" />
+                    Rechazar
+                  </Button>
+                  <Button onClick={() => resolver(viendo, 'confirmar')} disabled={ocupado}>
+                    {ocupado ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />}
+                    Confirmar
+                  </Button>
+                </DialogFooter>
+              )}
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Rechazo */}
+      {/* Rechazo con motivo */}
       <Dialog open={!!rechazando} onOpenChange={(o) => !o && setRechazando(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

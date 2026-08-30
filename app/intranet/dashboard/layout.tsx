@@ -10,10 +10,9 @@ import { Menu, X } from 'lucide-react';
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
 const RUTA_ORACION = '/intranet/dashboard/oracion';
 const RUTA_REGISTRO = '/intranet/dashboard/registro';
-// La agenda compartida la abre CUALQUIER rol, incluidos los que tienen el
-// resto de la intranet bloqueado: es el único lugar donde se cruzan las fechas
-// de todos los ministerios, y sirve justamente porque nadie queda afuera.
-const RUTA_AGENDA = '/intranet/dashboard/agenda';
+// El módulo Agenda del panel (aprobar/rechazar) es sólo de Secretaría, Pastor y
+// Co-pastor. Los ministerios, Kids y Oración NO entran acá aunque escriban la
+// URL: para mirar las fechas está el calendario público /intranet/calendario.
 
 export default function DashboardLayout({
   children,
@@ -37,8 +36,8 @@ export default function DashboardLayout({
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
   const esKids = !!user && esRolKids(user.role);
   const rutasDeMinisterio = esKids
-    ? [RUTA_ASISTENCIA, RUTA_AGENDA]
-    : [RUTA_ASISTENCIA, RUTA_REGISTRO, RUTA_AGENDA];
+    ? [RUTA_ASISTENCIA]
+    : [RUTA_ASISTENCIA, RUTA_REGISTRO];
   const rutaPermitida =
     !esMinisterio || rutasDeMinisterio.some((r) => pathname.startsWith(r));
 
@@ -50,8 +49,7 @@ export default function DashboardLayout({
   // El perfil Oración solo entra a su panel; cualquier otra ruta lo devuelve
   // ahí, aunque escriba la URL a mano.
   const esOracion = !!user && esRolOracion(user.role);
-  const rutaPermitidaOracion =
-    !esOracion || pathname.startsWith(RUTA_ORACION) || pathname.startsWith(RUTA_AGENDA);
+  const rutaPermitidaOracion = !esOracion || pathname.startsWith(RUTA_ORACION);
 
   useEffect(() => {
     if (!isAuthenticated) {

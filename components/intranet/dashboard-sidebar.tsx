@@ -44,11 +44,12 @@ interface NavGrupo {
   items: NavItem[];
 }
 
-// La Agenda la ven TODOS los roles sin excepción (decisión de Iván,
-// 29/08/2026): su gracia es justamente que cada ministerio vea las fechas de
-// los demás para no chocar. Por eso el mismo ítem se repite en los seis menús
-// en vez de vivir en uno solo. Lo que cambia por rol es quién CONFIRMA una
-// fecha (ver puedeAutorizarAgenda), no quién la mira.
+// El módulo Agenda del panel es SOLO para los tres perfiles que aprueban:
+// Secretaría, Pastor y Co-pastor (decisión de Iván, 30/08/2026). Ahí se
+// confirma o rechaza lo que llega. El resto de los roles no lo necesitan: si
+// alguien de un ministerio quiere ver las fechas, entra al calendario público
+// de /intranet/calendario, que no pide cuenta. Por eso ITEM_AGENDA vive sólo
+// en PASTOR_NAV, COPASTOR_NAV y SOMOSLUZ_NAV.
 const ITEM_AGENDA: NavItem = {
   href: '/intranet/dashboard/agenda',
   label: 'Agenda',
@@ -153,7 +154,6 @@ const MINISTERIO_NAV: NavGrupo[] = [
     items: [
       { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
       { href: '/intranet/dashboard/registro', label: 'Registro', icon: UserPlus, addedAt: '2026-08-21' },
-      ITEM_AGENDA,
     ],
   },
 ];
@@ -166,7 +166,6 @@ const KIDS_NAV: NavGrupo[] = [
     titulo: null,
     items: [
       { href: '/intranet/dashboard/asistencia', label: 'Asistencia', icon: ClipboardList },
-      ITEM_AGENDA,
     ],
   },
 ];
@@ -177,7 +176,6 @@ const ORACION_NAV: NavGrupo[] = [
     titulo: null,
     items: [
       { href: '/intranet/dashboard/oracion', label: 'Oración', icon: HandHeart },
-      ITEM_AGENDA,
     ],
   },
 ];
