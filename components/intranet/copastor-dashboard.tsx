@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, Activity, UserPlus, HeartHandshake, Loader2, Sprout } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { calcularRiesgo } from '@/lib/seguimiento';
+import { ultimaAsistenciaPorTipo } from '@/lib/cultos-tipos';
 import { nuevosEnLaFe, type PersonaNueva } from '@/lib/nuevos-en-la-fe';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,10 +33,11 @@ export function CopastorDashboard() {
   useEffect(() => {
     async function cargar() {
       try {
-        const [personas, cultos, asist, resVisitas] = await Promise.all([
+        const [personas, cultos, asist, cultosYouth, resVisitas] = await Promise.all([
           getPersonas(),
           getCultos({ tipo: 'general', orden: 'asc' }),
           getAsistencias(),
+          getCultos({ tipo: 'youth', orden: 'asc' }).catch(() => []),
           fetch('/api/miembros-nuevos?conVisitas=1', { cache: 'no-store' }).then((r) => r.json()),
         ]);
 
@@ -54,6 +56,9 @@ export function CopastorDashboard() {
           porPersona.get(pid)!.add(Number(a.culto_id));
         }
 
+        // Quien está activo en jóvenes no figura inactivo por faltar al domingo.
+        const ultYouth = ultimaAsistenciaPorTipo(cultosYouth ?? [], asist, 'youth');
+
         const acc: ResumenRiesgo = { bajo: 0, medio: 0, alto: 0, nombresAlto: [] };
         const altos: { nombre: string; puntaje: number }[] = [];
         for (const p of personas) {
@@ -62,6 +67,7 @@ export function CopastorDashboard() {
             porPersona.get(Number(p.id)) ?? new Set<number>(),
             new Date((p.fecha_registro ?? p.created_at) as string).getTime(),
             ahora,
+            ultYouth.get(Number(p.id)) ?? null,
           );
           acc[r.nivel] += 1;
           if (r.nivel === 'alto') altos.push({ nombre: p.nombre, puntaje: r.puntaje });

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { calcularRiesgo } from '@/lib/seguimiento';
+import { ultimaAsistenciaPorTipo } from '@/lib/cultos-tipos';
 import { nuevosEnLaFe } from '@/lib/nuevos-en-la-fe';
 import { useAuth } from '@/lib/auth-context';
 import { esRolCopastor } from '@/lib/roles';
@@ -51,10 +52,11 @@ export default function SeguimientoPage() {
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [personas, cultos, asist, resCasos] = await Promise.all([
+      const [personas, cultos, asist, cultosYouth, resCasos] = await Promise.all([
         getPersonas(),
         getCultos({ tipo: 'general', orden: 'desc' }),
         getAsistencias(),
+        getCultos({ tipo: 'youth', orden: 'asc' }).catch(() => []),
         fetch('/api/seguimiento', { cache: 'no-store' }).then((r) => r.json()),
       ]);
 
@@ -71,6 +73,10 @@ export default function SeguimientoPage() {
         asistPorPersona.get(pid)!.add(Number(a.culto_id));
       }
 
+      // Quien está activo en jóvenes no entra a la bandeja de seguimiento por
+      // faltar al domingo (ver calcularRiesgo, decisión de Iván 30/08/2026).
+      const ultYouth = ultimaAsistenciaPorTipo(cultosYouth ?? [], asist, 'youth');
+
       const casos: CasoApi[] = resCasos?.casos ?? [];
       const abiertoPorPersona = new Map<number, CasoApi>();
       for (const c of casos) if (c.estado === 'abierto') abiertoPorPersona.set(c.persona_id, c);
@@ -85,6 +91,7 @@ export default function SeguimientoPage() {
           asistPorPersona.get(Number(p.id)) ?? new Set<number>(),
           new Date((p.fecha_registro ?? p.created_at) as string).getTime(),
           ahora,
+          ultYouth.get(Number(p.id)) ?? null,
         );
         if (r.nivel !== 'bajo') {
           candidatos.set(Number(p.id), {

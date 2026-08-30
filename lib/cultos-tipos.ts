@@ -129,6 +129,31 @@ export function idsQueAsistieron(
   return out;
 }
 
+// Por persona, ms de su ÚLTIMA asistencia a un culto del tipo dado (o ausente
+// del mapa si nunca asistió). Alimenta el score de riesgo: una persona activa
+// en su reunión de ministerio (ej. jóvenes) no debe figurar inactiva por
+// faltar al domingo — ver calcularRiesgo(ultActividadAltMs).
+export function ultimaAsistenciaPorTipo(
+  cultos: { id: number; tipo: string; fecha: string }[],
+  asistencias: { culto_id: number; persona_id: number | null }[],
+  tipo: CultoTipo,
+): Map<number, number> {
+  const fechaDeCulto = new Map<number, number>();
+  for (const c of cultos) {
+    if (c.tipo === tipo) fechaDeCulto.set(Number(c.id), new Date(c.fecha).getTime());
+  }
+  const out = new Map<number, number>();
+  for (const a of asistencias) {
+    if (a.persona_id == null) continue;
+    const ms = fechaDeCulto.get(Number(a.culto_id));
+    if (ms == null) continue;
+    const pid = Number(a.persona_id);
+    const prev = out.get(pid);
+    if (prev == null || ms > prev) out.set(pid, ms);
+  }
+  return out;
+}
+
 export function descripcionCulto(tipo: CultoTipo, fechaISO: string): string {
   const fecha = new Date(fechaISO + 'T12:00:00').toLocaleDateString('es-ES', {
     day: 'numeric',

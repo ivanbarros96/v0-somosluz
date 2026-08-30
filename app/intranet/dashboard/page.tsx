@@ -23,7 +23,7 @@ import { calcularRiesgo } from '@/lib/seguimiento';
 import { esRolCopastor } from '@/lib/roles';
 import { CopastorDashboard } from '@/components/intranet/copastor-dashboard';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
-import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, type CultoTipo } from '@/lib/cultos-tipos';
+import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, ultimaAsistenciaPorTipo, type CultoTipo } from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight, Wallet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
@@ -198,6 +198,9 @@ function PastorDashboard() {
       const cultosDesc = [...cultosPasados]
         .reverse()
         .map((c) => ({ id: Number(c.id), fecha: c.fecha }));
+      // Última vez que cada persona fue al culto de jóvenes: quien está activo
+      // ahí no debe figurar inactivo por faltar al domingo (ver calcularRiesgo).
+      const ultYouth = ultimaAsistenciaPorTipo(cultosMinisterio ?? [], rawAsist ?? [], 'youth');
       const riesgo: ResumenRiesgo = { bajo: 0, medio: 0, alto: 0, nombresAlto: [] };
       const enAlto: { nombre: string; puntaje: number }[] = [];
       for (const p of personas ?? []) {
@@ -207,6 +210,7 @@ function PastorDashboard() {
           asistPorPersona.get(Number(p.id)) ?? new Set<number>(),
           join,
           ahora,
+          ultYouth.get(Number(p.id)) ?? null,
         );
         riesgo[r.nivel] += 1;
         if (r.nivel === 'alto') enAlto.push({ nombre: p.nombre, puntaje: r.puntaje });

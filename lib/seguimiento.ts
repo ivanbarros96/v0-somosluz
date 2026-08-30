@@ -34,21 +34,32 @@ const SEMANA_MS = 7 * 86_400_000;
  * @param asistio           set de culto_id a los que la persona asistió
  * @param joinTime          ms en que la persona se unió (fecha_registro)
  * @param ahora             ms de referencia (inyectable para pruebas)
+ * @param ultActividadAltMs ms de la última asistencia a una reunión ALTERNATIVA
+ *   (ej. el culto de jóvenes) o null. Un domingo faltado que sea igual o
+ *   anterior a esta fecha NO cuenta como ausencia: la persona estuvo activa por
+ *   otra vía. Sirve para que un joven que va a su culto de jóvenes no aparezca
+ *   inactivo por no ir el domingo (decisión de Iván, 30/08/2026). Se pasa para
+ *   quien tenga asistencia a jóvenes; para el resto va null y no cambia nada.
  */
 export function calcularRiesgo(
   cultosPasadosDesc: { id: number; fecha: string }[],
   asistio: Set<number>,
   joinTime: number,
   ahora: number = Date.now(),
+  ultActividadAltMs: number | null = null,
 ): ResultadoRiesgo {
   // Solo cuentan los domingos desde que la persona se unió: a alguien que
   // llegó hace dos semanas no se le reprochan los cultos anteriores.
   const elegibles = cultosPasadosDesc.filter((c) => new Date(c.fecha).getTime() >= joinTime);
 
   // Racha de ausencias consecutivas, desde el domingo más reciente hacia atrás.
+  // La racha se corta al encontrar una asistencia — sea al domingo (asistio) o
+  // a una reunión alternativa más reciente que ese domingo (ultActividadAltMs):
+  // en ambos casos la persona estuvo activa y no se la cuenta como ausente.
   let streak = 0;
   for (const c of elegibles) {
     if (asistio.has(c.id)) break;
+    if (ultActividadAltMs != null && new Date(c.fecha).getTime() <= ultActividadAltMs) break;
     streak++;
   }
 
