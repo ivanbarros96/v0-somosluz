@@ -123,12 +123,15 @@ export default function CumpleanosPage() {
 
   const enAudiencia = (p: CumpleanosRow) => {
     if (!ministerio || verTodos) return true;
+    // Sólo el público CONFIRMADO ('si'). Los de ficha incompleta no entran al
+    // filtro del ministerio — se ven con "Ver todos", igual que en Asistencia y
+    // Miembros. (Decisión de Iván, 30/08/2026.)
     return CULTO_TIPOS[ministerio].elegibilidad({
       source_tipo: p.source_tipo as 'adulto' | 'nino' | 'joven' | 'nuevo',
       sexo: p.sexo,
       edad: p.edad_actual,
       asistioAYouthAlgunaVez: asistioYouthIds.has(Number(p.id)),
-    }) !== 'no';
+    }) === 'si';
   };
 
   const visibles = useMemo(() => {

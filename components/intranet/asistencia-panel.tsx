@@ -407,7 +407,14 @@ export function AsistenciaPanel() {
   // El público sale del tipo de culto (CULTO_TIPOS): en el de Kids son los
   // registrados como Niño. Los visitantes quedan fuera por defecto porque no
   // traen edad ni categoría — se ven al activar "Ver todos".
-  const enPublicoDelRol = (p: Persona) => elegibilidadDe(p) !== 'no';
+  //
+  // Sólo entra el público CONFIRMADO ('si'). Quien tiene la ficha incompleta
+  // ('incompleto': falta sexo o edad) NO aparece en la lista pre-filtrada del
+  // ministerio: sin ese dato no se puede saber si pertenece, y mezclarlo ensucia
+  // la lista de asistencia con gente que quizá no corresponde. Se lo encuentra en
+  // la pestaña "Todos" o con "Ver todos", donde además se le puede completar la
+  // ficha. (Decisión de Iván, 30/08/2026.)
+  const enPublicoDelRol = (p: Persona) => elegibilidadDe(p) === 'si';
 
   const filtradas = personas
     .filter((p) => filtro === 'todos' || p.tipo === filtro)

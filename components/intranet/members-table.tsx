@@ -238,12 +238,15 @@ export function MembersTable() {
 
   const enAudiencia = (m: Member) => {
     if (!ministerio || verTodosMiembros) return true;
+    // Sólo el público CONFIRMADO ('si'). Los de ficha incompleta ('incompleto':
+    // falta sexo o edad) no entran al filtro del ministerio — se ven con "Ver
+    // todos", igual que en Asistencia. (Decisión de Iván, 30/08/2026.)
     return CULTO_TIPOS[ministerio].elegibilidad({
       source_tipo: m.tipo,
       sexo: m.sexo,
       edad: 'edad' in m ? (m.edad ?? null) : null,
       asistioAYouthAlgunaVez: asistioYouthIds.has(Number(m.id)),
-    }) !== 'no';
+    }) === 'si';
   };
 
   const coincide = (m: Member) => {
