@@ -1,5 +1,12 @@
 'use client';
 
+// Agenda dentro del panel. Muestra el MISMO calendario que la pantalla pública
+// (componente compartido) y, debajo, las solicitudes.
+//
+// Acá NO se pide una fecha: eso se hace desde /intranet/calendario, que es
+// abierto porque varios líderes de ministerio no tienen cuenta. Adentro sólo se
+// mira y se resuelve.
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
@@ -17,81 +24,48 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  CalendarioMes, hoyEnChile, mesDeHoy, fechaLegible, soloHora, etiquetaMinisterio,
+  type EstadoEvento,
+} from '@/components/agenda/calendario-mes';
 import { cn } from '@/lib/utils';
 import {
   CalendarDays, Loader2, Check, X, Clock, Pencil, Trash2, CalendarClock, Mail,
 } from 'lucide-react';
 
-type Estado = 'propuesta' | 'confirmada' | 'rechazada';
-
 interface Evento {
   id: number;
   titulo: string;
-  fecha: string;              // 'YYYY-MM-DD'
-  hora: string | null;        // 'HH:MM:SS'
+  fecha: string;
+  hora: string | null;
   ministerio: string | null;
   nota: string | null;
   solicitante_nombre: string;
   solicitante_email: string | null;
-  estado: Estado;
+  estado: EstadoEvento;
   creado_por: string;
   resuelto_por: string | null;
   motivo_rechazo: string | null;
 }
 
-const MESES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-];
-
-const ESTADO_STYLE: Record<Estado, string> = {
+const ESTADO_STYLE: Record<EstadoEvento, string> = {
   propuesta: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25',
   confirmada: 'bg-primary/10 text-primary border-primary/25',
   rechazada: 'bg-muted text-muted-foreground border-border',
 };
 
-const ESTADO_LABEL: Record<Estado, string> = {
+const ESTADO_LABEL: Record<EstadoEvento, string> = {
   propuesta: 'Por confirmar',
   confirmada: 'Confirmada',
   rechazada: 'Rechazada',
 };
 
-const FILTROS: { valor: Estado | 'todas'; label: string }[] = [
-  { valor: 'todas', label: 'Todas' },
+const FILTROS: { valor: EstadoEvento | 'todas'; label: string }[] = [
   { valor: 'propuesta', label: 'Por confirmar' },
   { valor: 'confirmada', label: 'Confirmadas' },
   { valor: 'rechazada', label: 'Rechazadas' },
+  { valor: 'todas', label: 'Todas' },
 ];
-
-/** Hoy en Chile, como 'YYYY-MM-DD'. */
-function hoyEnChile(): string {
-  // 'en-CA' entrega justo el formato YYYY-MM-DD. Se pide la fecha en la zona
-  // de Chile y NO se usa `new Date().toISOString()`, que da la fecha UTC: de
-  // noche en Chile el UTC ya va en el día siguiente y todo se correría un día.
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
-}
-
-/** '2026-09-12' → '12 de septiembre'. Se parte el string, no se usa Date. */
-function fechaLegible(iso: string, conAnio = false): string {
-  const [anio, mes, dia] = iso.split('-').map(Number);
-  if (!anio || !mes || !dia) return iso;
-  return `${dia} de ${MESES[mes - 1] ?? ''}${conAnio ? ` de ${anio}` : ''}`;
-}
-
-function tituloMes(iso: string): string {
-  const [anio, mes] = iso.split('-').map(Number);
-  const nombre = MESES[mes - 1] ?? '';
-  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`;
-}
-
-const soloHora = (h: string | null) => (h ? h.slice(0, 5) : null);
-
-function etiquetaMinisterio(m: string | null): string | null {
-  if (!m) return null;
-  return m in CULTO_TIPOS ? CULTO_TIPOS[m as keyof typeof CULTO_TIPOS].label : m;
-}
-
-// ── Tarjeta de un evento ────────────────────────────────────────────────────
 
 function FilaEvento({
   e, puedeAutorizar, onConfirmar, onRechazar, onEditar, onBorrar, ocupado,
@@ -159,16 +133,10 @@ function FilaEvento({
 
         {puedeAutorizar && (
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost" size="icon" title="Editar"
-              onClick={() => onEditar(e)} disabled={ocupado}
-            >
+            <Button variant="ghost" size="icon" title="Editar" onClick={() => onEditar(e)} disabled={ocupado}>
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost" size="icon" title="Borrar"
-              onClick={() => onBorrar(e)} disabled={ocupado}
-            >
+            <Button variant="ghost" size="icon" title="Borrar" onClick={() => onBorrar(e)} disabled={ocupado}>
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
           </div>
@@ -191,18 +159,16 @@ function FilaEvento({
   );
 }
 
-// ── Pantalla ────────────────────────────────────────────────────────────────
-
 export default function AgendaPage() {
   const { user } = useAuth();
   const puedeAutorizar = !!user && puedeAutorizarAgenda(user.role);
 
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState<Estado | 'todas'>('todas');
+  const [mes, setMes] = useState(mesDeHoy());
+  const [filtro, setFiltro] = useState<EstadoEvento | 'todas'>('propuesta');
   const [ocupado, setOcupado] = useState(false);
 
-  // Sólo edición: pedir una fecha se hace desde el formulario público, no acá.
   const [editando, setEditando] = useState<Evento | null>(null);
   const [form, setForm] = useState({ titulo: '', fecha: '', hora: '', ministerio: 'ninguno', nota: '' });
 
@@ -226,26 +192,22 @@ export default function AgendaPage() {
 
   const hoy = hoyEnChile();
 
-  const { proximos, pasados } = useMemo(() => {
-    const visibles = eventos.filter((e) => filtro === 'todas' || e.estado === filtro);
-    return {
-      proximos: visibles.filter((e) => e.fecha >= hoy),
-      // Los pasados van del más reciente al más antiguo: lo de ayer importa
-      // más que lo del año pasado.
-      pasados: visibles.filter((e) => e.fecha < hoy).reverse(),
-    };
-  }, [eventos, filtro, hoy]);
+  // En el calendario se dibuja lo confirmado y lo que está por confirmar (con
+  // borde punteado). Lo rechazado no: ocuparía espacio con algo que no va a
+  // pasar. Se sigue viendo en la lista con su filtro.
+  const enCalendario = useMemo(
+    () => eventos.filter((e) => e.estado !== 'rechazada'),
+    [eventos],
+  );
 
-  // Los próximos se agrupan por mes para que la lista no sea un muro plano.
-  const proximosPorMes = useMemo(() => {
-    const mapa = new Map<string, Evento[]>();
-    for (const e of proximos) {
-      const clave = e.fecha.slice(0, 7);
-      if (!mapa.has(clave)) mapa.set(clave, []);
-      mapa.get(clave)!.push(e);
-    }
-    return [...mapa.entries()];
-  }, [proximos]);
+  const listados = useMemo(() => {
+    const visibles = eventos.filter((e) => filtro === 'todas' || e.estado === filtro);
+    // Lo que viene primero; lo ya pasado al final y del más reciente al más
+    // antiguo, porque lo de ayer importa más que lo del año pasado.
+    const futuros = visibles.filter((e) => e.fecha >= hoy);
+    const pasados = visibles.filter((e) => e.fecha < hoy).reverse();
+    return [...futuros, ...pasados];
+  }, [eventos, filtro, hoy]);
 
   const pendientes = eventos.filter((e) => e.estado === 'propuesta').length;
 
@@ -266,7 +228,6 @@ export default function AgendaPage() {
       toast.error('El título y la fecha son obligatorios.');
       return;
     }
-
     setOcupado(true);
     try {
       const res = await fetch(`/api/agenda/${editando.id}`, {
@@ -306,8 +267,8 @@ export default function AgendaPage() {
       if (!res.ok) throw new Error();
       toast.success(
         accion === 'confirmar'
-          ? `Fecha confirmada. Le avisamos a ${e.solicitante_nombre}.`
-          : `Fecha rechazada. Le avisamos a ${e.solicitante_nombre}.`,
+          ? `Confirmada. Le avisamos por correo a ${e.solicitante_nombre}.`
+          : `Rechazada. Le avisamos por correo a ${e.solicitante_nombre}.`,
       );
       setRechazando(null);
       setMotivo('');
@@ -345,79 +306,79 @@ export default function AgendaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <CalendarDays className="h-6 w-6 text-primary" />
-            Agenda
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Las fechas de todos los ministerios en un solo lugar, para no chocar entre reuniones.
-            {puedeAutorizar && pendientes > 0 && (
-              <> <span className="text-orange-600 dark:text-orange-400 font-medium">
-                {pendientes} {pendientes === 1 ? 'espera' : 'esperan'} tu confirmación.
-              </span></>
-            )}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {FILTROS.map((f) => (
-          <Button
-            key={f.valor}
-            size="sm"
-            variant={filtro === f.valor ? 'default' : 'outline'}
-            onClick={() => setFiltro(f.valor)}
-          >
-            {f.label}
-          </Button>
-        ))}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <CalendarDays className="h-6 w-6 text-primary" />
+          Agenda
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          El calendario de la iglesia con las fechas de todos los ministerios.
+          {puedeAutorizar && pendientes > 0 && (
+            <> <span className="text-orange-600 dark:text-orange-400 font-medium">
+              {pendientes} {pendientes === 1 ? 'solicitud espera' : 'solicitudes esperan'} tu respuesta.
+            </span></>
+          )}
+        </p>
       </div>
 
       {cargando ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : proximos.length === 0 && pasados.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center">
-            <CalendarClock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {filtro === 'todas'
-                ? 'Todavía no hay fechas en la agenda.'
-                : 'No hay fechas con ese filtro.'}
-            </p>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="space-y-6">
-          {proximosPorMes.map(([mes, lista]) => (
-            <section key={mes} className="space-y-2">
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                {tituloMes(lista[0].fecha)}
-              </h2>
+        <>
+          <CalendarioMes mes={mes} eventos={enCalendario} onCambiarMes={setMes} />
+
+          <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-primary/25 border border-primary/40" />
+              Confirmada
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-orange-500/15 border border-dashed border-orange-500/60" />
+              Por confirmar
+            </span>
+          </div>
+
+          <section className="space-y-3">
+            <div className="flex gap-2 flex-wrap">
+              {FILTROS.map((f) => (
+                <Button
+                  key={f.valor}
+                  size="sm"
+                  variant={filtro === f.valor ? 'default' : 'outline'}
+                  onClick={() => setFiltro(f.valor)}
+                >
+                  {f.label}
+                  {f.valor === 'propuesta' && pendientes > 0 && (
+                    <span className="ml-1.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[10px] font-semibold rounded-full bg-orange-500 text-white leading-none">
+                      {pendientes}
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+
+            {listados.length === 0 ? (
+              <Card>
+                <CardContent className="py-14 text-center">
+                  <CalendarClock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    {filtro === 'propuesta'
+                      ? 'No hay solicitudes esperando respuesta.'
+                      : 'No hay fechas con ese filtro.'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
               <Card>
                 <CardContent className="p-0 divide-y divide-border">
-                  {lista.map((e) => <FilaEvento key={e.id} e={e} {...propsFila} />)}
+                  {listados.map((e) => <FilaEvento key={e.id} e={e} {...propsFila} />)}
                 </CardContent>
               </Card>
-            </section>
-          ))}
-
-          {pasados.length > 0 && (
-            <section className="space-y-2">
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                Ya pasaron
-              </h2>
-              <Card>
-                <CardContent className="p-0 divide-y divide-border opacity-70">
-                  {pasados.map((e) => <FilaEvento key={e.id} e={e} {...propsFila} />)}
-                </CardContent>
-              </Card>
-            </section>
-          )}
-        </div>
+            )}
+          </section>
+        </>
       )}
 
       {/* Edición — sólo para quienes confirman */}
@@ -426,8 +387,7 @@ export default function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Editar evento</DialogTitle>
             <DialogDescription>
-              Corrige los datos. Quien lo solicitó no se puede cambiar: es el registro de quién
-              pidió la fecha y de ahí sale el correo de la respuesta.
+              Quien lo solicitó no se puede cambiar: de ahí sale el correo de la respuesta.
             </DialogDescription>
           </DialogHeader>
 
@@ -442,7 +402,7 @@ export default function AgendaPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="ag-fecha">Fecha</Label>
                 <Input
@@ -469,10 +429,7 @@ export default function AgendaPage() {
               <Label>
                 Ministerio <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
               </Label>
-              <Select
-                value={form.ministerio}
-                onValueChange={(v) => setForm({ ...form, ministerio: v })}
-              >
+              <Select value={form.ministerio} onValueChange={(v) => setForm({ ...form, ministerio: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ninguno">Sin ministerio</SelectItem>
@@ -514,7 +471,7 @@ export default function AgendaPage() {
           <DialogHeader>
             <DialogTitle>Rechazar la fecha</DialogTitle>
             <DialogDescription>
-              Se le avisa por correo a {rechazando?.solicitante_nombre} con el motivo.
+              Le llega por correo a {rechazando?.solicitante_nombre} con el motivo que escribas.
             </DialogDescription>
           </DialogHeader>
 
