@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { puedeAutorizarAgenda } from '@/lib/roles';
 import { notificarResolucion } from '@/lib/agenda-avisos';
+import { normalizarHora } from '../route';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (accion === 'editar') {
     const titulo = typeof body.titulo === 'string' ? body.titulo.trim() : '';
     const fecha = typeof body.fecha === 'string' ? body.fecha.trim() : '';
-    const hora = typeof body.hora === 'string' && body.hora.trim() ? body.hora.trim() : null;
+    // Acepta "HH:MM" y "HH:MM:SS" (algunos navegadores agregan segundos) y
+    // guarda "HH:MM". Ver normalizarHora en ../route.
+    const hora = normalizarHora(body.hora);
     const ministerio =
       typeof body.ministerio === 'string' && body.ministerio.trim() ? body.ministerio.trim() : null;
     const nota = typeof body.nota === 'string' && body.nota.trim() ? body.nota.trim() : null;
@@ -34,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!titulo || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
       return NextResponse.json({ error: 'Título y fecha son obligatorios' }, { status: 400 });
     }
-    if (hora && !/^\d{2}:\d{2}$/.test(hora)) {
+    if (hora === 'ERR') {
       return NextResponse.json({ error: 'Hora inválida' }, { status: 400 });
     }
     if (titulo.length > 120 || (nota && nota.length > 500)) {

@@ -6,6 +6,22 @@ import { getSession } from '@/lib/session';
 // Lee cookie de sesión => siempre dinámico, nunca cacheado.
 export const dynamic = 'force-dynamic';
 
+/**
+ * Normaliza la hora que llega del formulario a "HH:MM".
+ *
+ * El <input type="time"> del navegador entrega "HH:MM", pero en algunos
+ * navegadores/SO agrega los segundos ("HH:MM:SS"). Se aceptan ambos y se
+ * guarda siempre "HH:MM". Devuelve:
+ *   - null   si viene vacía (la hora es opcional),
+ *   - "HH:MM" si es válida,
+ *   - 'ERR'  si trae algo que no es una hora, para rechazarla con un 400.
+ */
+export function normalizarHora(raw: unknown): string | null | 'ERR' {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const m = raw.trim().match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+  return m ? `${m[1]}:${m[2]}` : 'ERR';
+}
+
 // Cuántas solicitudes acepta un mismo origen por día.
 //
 // Es el límite "por navegador" que pidió Iván. No se implementa en el
@@ -78,7 +94,10 @@ export async function POST(req: NextRequest) {
 
   const titulo = typeof body.titulo === 'string' ? body.titulo.trim() : '';
   const fecha = typeof body.fecha === 'string' ? body.fecha.trim() : '';
-  const hora = typeof body.hora === 'string' && body.hora.trim() ? body.hora.trim() : null;
+  // El <input type="time"> devuelve "HH:MM", pero en algunos navegadores/SO
+  // trae los segundos ("HH:MM:SS"). Se aceptan ambos y se guarda "HH:MM": si no,
+  // a esas personas la hora les daba "inválida" al enviar.
+  const hora = normalizarHora(body.hora);
   const ministerio =
     typeof body.ministerio === 'string' && body.ministerio.trim() ? body.ministerio.trim() : null;
   const nota = typeof body.nota === 'string' && body.nota.trim() ? body.nota.trim() : null;
@@ -94,7 +113,7 @@ export async function POST(req: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 });
   }
-  if (hora && !/^\d{2}:\d{2}$/.test(hora)) {
+  if (hora === 'ERR') {
     return NextResponse.json({ error: 'Hora inválida' }, { status: 400 });
   }
   // Validación deliberadamente laxa: sólo descarta lo que claramente no es un
