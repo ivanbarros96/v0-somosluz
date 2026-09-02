@@ -9,6 +9,23 @@ export const REDES = {
   spotifyArtistId: '2wX0Vu0yhd8BEr7cIvDj9j',
 } as const;
 
+// WhatsApp de la iglesia. Es el único canal de CONVERSACIÓN del sitio:
+// Instagram y YouTube son para seguir, no para preguntar.
+//
+// `numero` va sin +, espacios ni guiones — es lo que exige wa.me.
+// `visible` es el mismo número formateado para mostrarlo a la persona.
+export const WHATSAPP = {
+  numero: '56944275759',
+  visible: '+56 9 4427 5759',
+  // El chat abre con el mensaje ya escrito: enfrentarse a un chat en blanco
+  // hace que mucha gente no llegue a escribir.
+  mensaje: 'Hola, vi la página de Somos Luz y quisiera hacer una consulta.',
+} as const;
+
+/** Enlace wa.me con el mensaje pre-escrito, listo para un href. */
+export const WHATSAPP_URL =
+  `https://wa.me/${WHATSAPP.numero}?text=${encodeURIComponent(WHATSAPP.mensaje)}`;
+
 export const HERO = {
   overline: 'Iglesia Cristiana · Valparaíso, Chile',
   titulo: 'Somos Luz',

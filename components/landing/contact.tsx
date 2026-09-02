@@ -1,5 +1,5 @@
-import { Instagram, MapPin, Youtube, Navigation } from 'lucide-react';
-import { REDES, UBICACION } from '@/lib/landing-content';
+import { Instagram, MapPin, Youtube, Navigation, MessageCircle } from 'lucide-react';
+import { REDES, UBICACION, WHATSAPP, WHATSAPP_URL } from '@/lib/landing-content';
 import { Reveal } from './reveal';
 
 const MAPS_URL = UBICACION.mapsUrl;
@@ -31,7 +31,27 @@ export function Contact() {
         </Reveal>
 
         <Reveal delay={1}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-8 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 sm:gap-8 text-center">
+            {/* WhatsApp va PRIMERO: es el único canal de conversación real del
+                sitio. Instagram y YouTube sirven para seguir a la iglesia, no
+                para preguntar algo y que te respondan. */}
+            <div>
+              <MessageCircle className="w-8 h-8 text-[oklch(0.82_0.06_85)] mx-auto mb-4" aria-hidden="true" />
+              <h3 className="font-medium text-[oklch(0.95_0.01_88)] mb-2">WhatsApp</h3>
+              <p className="text-sm text-[oklch(0.8_0.03_85)] mb-3 text-pretty">
+                {WHATSAPP.visible}
+              </p>
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-[oklch(0.9_0.05_90)] hover:text-[oklch(0.97_0.02_90)] transition-colors focus-visible:outline-2 focus-visible:outline-[oklch(0.95_0.01_88)] rounded"
+              >
+                <MessageCircle className="w-4 h-4" aria-hidden="true" />
+                Escríbenos
+              </a>
+            </div>
+
             <div>
               <Instagram className="w-8 h-8 text-[oklch(0.82_0.06_85)] mx-auto mb-4" aria-hidden="true" />
               <h3 className="font-medium text-[oklch(0.95_0.01_88)] mb-2">Instagram</h3>

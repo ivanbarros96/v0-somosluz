@@ -10,6 +10,7 @@ import { Media } from '@/components/landing/media';
 import { PrayerSection } from '@/components/landing/prayer-section';
 import { Contact } from '@/components/landing/contact';
 import { Footer } from '@/components/landing/footer';
+import { WhatsappFab } from '@/components/landing/whatsapp-fab';
 import { JsonLd } from '@/components/seo/json-ld';
 
 // Ritmo visual: luz sobre oscuro → crema editorial → salvia profundo → cierre oscuro.
@@ -38,6 +39,7 @@ export default function Home() {
         <Contact />
       </main>
       <Footer />
+      <WhatsappFab />
     </div>
   );
 }
