@@ -16,6 +16,7 @@ import {
   type CultoTipo, type Elegibilidad,
 } from '@/lib/cultos-tipos';
 import { ministerioDeRol, esRolKids, TIPOS_MARCABLES_KIDS } from '@/lib/roles';
+import { ResumenReunion } from '@/components/intranet/resumen-reunion';
 
 type Persona = {
   id: number;
@@ -437,8 +438,24 @@ export function AsistenciaPanel() {
     { key: 'nuevo', label: 'Visitas' },
   ];
 
+  // Tipo de reunión propia del rol: los ministerios ('mujeres', 'hombres',
+  // 'discipulado', 'youth') y Kids ('kids'). Secretaría y Pastor no tienen uno
+  // (ministerioDeRol es null) y ven la pantalla sin el resumen.
+  const tipoReunionPropia: CultoTipo | null = esKids ? 'kids' : ministerio;
+
   return (
     <div className="space-y-5">
+
+      {/* "Tu reunión de un vistazo": sólo para ministerios y Kids, arriba de su
+          pantalla de trabajo. */}
+      {tipoReunionPropia && (
+        <ResumenReunion
+          tipo={tipoReunionPropia}
+          cultos={cultos}
+          asistencias={todasAsistencias}
+          publico={totalElegibles}
+        />
+      )}
 
       {/* Selector de culto */}
       <Card>

@@ -51,6 +51,27 @@ async function kidsFueraDeAlcance(
   return null;
 }
 
+// PostgREST devuelve como máximo 1000 filas por consulta. La tabla de
+// asistencias ya pasó ese número, así que las consultas "todas" venían
+// TRUNCADAS en silencio: las más recientes desaparecían y por eso los cultos
+// nuevos figuraban con 0 asistentes, además de falsear la elegibilidad de
+// Youth y los cálculos de fidelidad/riesgo. Se pagina hasta traerlas todas.
+const PAGINA = 1000;
+
+async function traerPaginado<T>(
+  consulta: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<{ filas: T[]; error: string | null }> {
+  const filas: T[] = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    const { data, error } = await consulta(desde, desde + PAGINA - 1);
+    if (error) return { filas: [], error: error.message };
+    const lote = data ?? [];
+    filas.push(...lote);
+    if (lote.length < PAGINA) break;
+  }
+  return { filas, error: null };
+}
+
 // GET /api/asistencias — lectura de asistencias. Requiere sesión.
 // Sustituye la lectura directa con anon key (ver GET /api/personas).
 //   ?cultoId=N       → { asistencias: [{persona_id, miembro_nuevo_id}] } de ese culto
@@ -76,21 +97,27 @@ export async function GET(req: NextRequest) {
   }
 
   if (searchParams.get('conFechaCulto')) {
-    const { data, error } = await db
-      .from('asistencias')
-      .select('persona_id, cultos(fecha)')
-      .not('persona_id', 'is', null);
+    const { filas, error } = await traerPaginado((desde, hasta) =>
+      db
+        .from('asistencias')
+        .select('persona_id, cultos(fecha)')
+        .not('persona_id', 'is', null)
+        .range(desde, hasta),
+    );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ asistencias: data ?? [] });
+    if (error) return NextResponse.json({ error }, { status: 500 });
+    return NextResponse.json({ asistencias: filas });
   }
 
-  const { data, error } = await db
-    .from('asistencias')
-    .select('culto_id, persona_id, miembro_nuevo_id');
+  const { filas, error } = await traerPaginado((desde, hasta) =>
+    db
+      .from('asistencias')
+      .select('culto_id, persona_id, miembro_nuevo_id')
+      .range(desde, hasta),
+  );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ asistencias: data ?? [] });
+  if (error) return NextResponse.json({ error }, { status: 500 });
+  return NextResponse.json({ asistencias: filas });
 }
 
 // POST /api/asistencias — marcar presente
