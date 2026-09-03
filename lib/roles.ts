@@ -69,6 +69,18 @@ export function soloTomaAsistencia(role: string): boolean {
   return ministerioDeRol(role) !== null || esRolKids(role);
 }
 
+// Quién abre y cierra cultos. Sirve para avisarle si dejó uno sin cerrar
+// (ver lib/cultos-abiertos.ts y el aviso de la campana).
+//
+// Queda fuera Kids —su clase la abre y cierra el sistema junto al dominical,
+// ver esRolKids()— y Oración, que no toma asistencia. El resto sí: Secretaría
+// y Pastor abren el dominical, el Co-pastor puede, y cada ministerio abre su
+// propia reunión (ver POST /api/cultos).
+export function abreCultos(role: string): boolean {
+  if (!esRolValido(role)) return false;
+  return !esRolKids(role) && !esRolOracion(role);
+}
+
 // Quién da el visto bueno a una ficha nueva antes de que entre al padrón.
 //
 // Secretaría es la encargada habitual —mantiene los datos de las personas— y

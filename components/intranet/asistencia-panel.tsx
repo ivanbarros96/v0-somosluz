@@ -390,9 +390,18 @@ export function AsistenciaPanel() {
   const totalPresentes = presentes.size;
   const cultoActual = cultos.find((c) => c.id === cultoId);
 
+  // Tipo de reunión propia del rol: los ministerios ('mujeres', 'hombres',
+  // 'discipulado', 'youth') y Kids ('kids'). Secretaría y Pastor no tienen uno.
+  const tipoReunionPropia: CultoTipo | null = esKids ? 'kids' : ministerio;
+
   // Audiencia del culto seleccionado: pre-filtra la lista según el público.
   // 'incompleto' (falta sexo/edad en la ficha) se muestra con aviso, al final.
-  const tipoCulto: CultoTipo = cultoActual?.tipo ?? 'general';
+  //
+  // Sin culto seleccionado se cae al tipo del PROPIO rol, no a 'general'. El
+  // público de 'general' es toda la congregación, así que Kids sin culto
+  // abierto —su caso normal entre semana— llegaba a decir "110 niños" contando
+  // a la iglesia entera. Encontrado el 03/09/2026 revisando el resumen de Kids.
+  const tipoCulto: CultoTipo = cultoActual?.tipo ?? tipoReunionPropia ?? 'general';
   const asistioYouthIds = useMemo(
     () => idsQueAsistieron(cultos, todasAsistencias, 'youth'),
     [cultos, todasAsistencias],
@@ -437,11 +446,6 @@ export function AsistenciaPanel() {
     { key: 'nino', label: 'Niños' },
     { key: 'nuevo', label: 'Visitas' },
   ];
-
-  // Tipo de reunión propia del rol: los ministerios ('mujeres', 'hombres',
-  // 'discipulado', 'youth') y Kids ('kids'). Secretaría y Pastor no tienen uno
-  // (ministerioDeRol es null) y ven la pantalla sin el resumen.
-  const tipoReunionPropia: CultoTipo | null = esKids ? 'kids' : ministerio;
 
   return (
     <div className="space-y-5">

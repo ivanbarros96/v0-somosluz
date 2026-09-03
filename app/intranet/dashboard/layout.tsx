@@ -118,7 +118,10 @@ export default function DashboardLayout({
         </header>
 
         {/* Topbar de escritorio con la campana. Aparece en los perfiles que
-            tienen algo que atender; ministerios y Kids conservan su layout. */}
+            tienen algo que atender. Desde el 03/09/2026 eso incluye a los
+            ministerios de reunión: es su único aviso, pero es el que importa
+            —si dejan su reunión sin cerrar, sus cifras salen mal—. Kids sigue
+            sin campana: no abre ni cierra cultos. */}
         {conCampana && (
           <header className="hidden md:flex items-center justify-end px-8 py-2 border-b border-border bg-card">
             <NotificationBell role={user.role} />

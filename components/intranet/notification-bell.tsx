@@ -7,11 +7,17 @@
 //   · Oración    → peticiones sin atender.
 //   · Pastor     → aprobaciones pendientes + KPIs del mes (cómo va la iglesia).
 //   · Co-pastor  → fechas propuestas (las confirma).
-//   Los ministerios y Kids casi no generan eventos: no llevan campana por ahora.
+//   · Quien abra cultos → advertencia si dejó uno sin cerrar (ministerios
+//     incluidos: por esto llevan campana desde el 03/09/2026).
 //
 // "No leído" es por navegador (localStorage, una marca por rol): se guarda la
 // última vez que se abrió la campana; lo más nuevo cuenta como sin leer. El
 // estado real (pendiente/resuelto) vive en la base y lo maneja cada pantalla.
+//
+// EXCEPCIÓN: las advertencias no se pueden "marcar como vistas". Siguen ahí
+// mientras el problema exista, porque la única forma de resolverlas es arreglar
+// la causa (cerrar el culto). Una advertencia que se puede silenciar sin
+// arreglar nada no sirve de nada.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -19,12 +25,16 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Bell, UserPlus, CalendarDays, HandHeart, TrendingUp, CheckCheck, Inbox,
+  Bell, UserPlus, CalendarDays, HandHeart, TrendingUp, CheckCheck, Inbox, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { puedeAutorizarFichas, puedeAutorizarAgenda, puedeVerOracion } from '@/lib/roles';
+import {
+  puedeAutorizarFichas, puedeAutorizarAgenda, puedeVerOracion, abreCultos, ministerioDeRol,
+} from '@/lib/roles';
+import { CULTO_TIPOS } from '@/lib/cultos-tipos';
+import { cultosSinCerrar, tiempoAbierto, HORAS_LIMITE } from '@/lib/cultos-abiertos';
 
-type TipoNotif = 'miembro' | 'agenda' | 'oracion' | 'kpi';
+type TipoNotif = 'miembro' | 'agenda' | 'oracion' | 'kpi' | 'culto';
 
 interface Notif {
   id: string;
@@ -33,6 +43,8 @@ interface Notif {
   detalle: string;
   ts: string;          // ISO
   href: string;
+  /** Advertencia: se pinta en ámbar, va arriba y no se puede silenciar. */
+  advertencia?: boolean;
 }
 
 const POLL_MS = 60_000;
@@ -42,12 +54,19 @@ const ICONO: Record<TipoNotif, typeof UserPlus> = {
   agenda: CalendarDays,
   oracion: HandHeart,
   kpi: TrendingUp,
+  culto: AlertTriangle,
 };
 
-// Roles que llevan campana. Los ministerios de reunión y Kids no generan
-// eventos que atender, así que se quedan sin ella por ahora.
+// Roles que llevan campana.
 export function tieneCampana(role: string): boolean {
-  return puedeAutorizarFichas(role) || puedeAutorizarAgenda(role) || puedeVerOracion(role);
+  return (
+    puedeAutorizarFichas(role) ||
+    puedeAutorizarAgenda(role) ||
+    puedeVerOracion(role) ||
+    // Los ministerios de reunión entran por acá: es su único aviso, pero es el
+    // que más importa — si nadie cierra su reunión, sus propias cifras mienten.
+    abreCultos(role)
+  );
 }
 
 function leerVisto(role: string): number {
@@ -169,6 +188,34 @@ async function cargarKpiPastor(items: Notif[]) {
   });
 }
 
+// Advertencia: un culto que lleva más de 48 h abierto. Mientras siga así, la
+// asistencia de esa reunión está incompleta y todo lo que se calcula con ella
+// —promedios, tendencias, el "cómo nos fue la última vez"— sale mal sin que
+// nadie se entere. Cada quien ve solo los cultos que puede cerrar.
+async function cargarCultosSinCerrar(items: Notif[], role: string) {
+  const r = await fetch('/api/cultos', { cache: 'no-store' });
+  if (!r.ok) return;
+  const { cultos } = await r.json();
+
+  for (const c of cultosSinCerrar(cultos ?? [], ministerioDeRol(role))) {
+    const nombre = CULTO_TIPOS[c.tipo]?.label ?? 'Culto';
+    const dia = new Date(c.fecha).toLocaleDateString('es-CL', {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'long',
+    });
+    items.push({
+      id: `culto-${c.id}`,
+      tipo: 'culto',
+      titulo: 'Hay un culto sin cerrar',
+      detalle: `${nombre} del ${dia} · lleva ${tiempoAbierto(c.horas)} abierto`,
+      ts: c.fecha,
+      href: '/intranet/dashboard/asistencia',
+      advertencia: true,
+    });
+  }
+}
+
 async function construir(role: string): Promise<Notif[]> {
   const items: Notif[] = [];
   const jobs: Promise<void>[] = [];
@@ -177,9 +224,18 @@ async function construir(role: string): Promise<Notif[]> {
   if (puedeAutorizarAgenda(role)) jobs.push(cargarAgenda(items).catch(() => {}));
   if (puedeVerOracion(role)) jobs.push(cargarOracion(items).catch(() => {}));
   if (role === 'pastor') jobs.push(cargarKpiPastor(items).catch(() => {}));
+  if (abreCultos(role)) jobs.push(cargarCultosSinCerrar(items, role).catch(() => {}));
 
   await Promise.all(jobs);
-  items.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0));
+  // Las advertencias van arriba SIEMPRE, aunque sean lo más viejo de la lista:
+  // justamente por llevar días sin resolverse es que hay que verlas primero.
+  // Y entre ellas manda la MÁS VIEJA — al revés que el resto —, porque es la
+  // que lleva más tiempo estropeando las cifras en silencio.
+  items.sort((a, b) => {
+    if (!!a.advertencia !== !!b.advertencia) return a.advertencia ? -1 : 1;
+    if (a.advertencia && b.advertencia) return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0;
+    return a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0;
+  });
   return items;
 }
 
@@ -216,11 +272,19 @@ export function NotificationBell({ role }: { role: string }) {
     const t = Date.parse(n.ts);
     return Number.isNaN(t) ? 0 : t;
   };
-  const noLeidas = notifs.filter((n) => tsMs(n) > visto).length;
+  // Una advertencia cuenta como sin leer mientras exista: su fecha es la del
+  // culto (vieja), así que por fecha quedaría "leída" al instante y el aviso
+  // desaparecería sin que nadie hubiera cerrado nada.
+  const sinLeer = (n: Notif) => !!n.advertencia || tsMs(n) > visto;
+  const noLeidas = notifs.filter(sinLeer).length;
+  const advertencias = notifs.filter((n) => n.advertencia).length;
+  // "Marcar vistas" solo tiene sentido si queda algo que realmente se pueda
+  // silenciar; con puras advertencias el botón no haría nada.
+  const silenciables = noLeidas - advertencias;
 
   function onOpenChange(v: boolean) {
     setAbierto(v);
-    if (v && noLeidas > 0) {
+    if (v && silenciables > 0) {
       const ahora = Date.now();
       guardarVisto(role, ahora);
       setTimeout(() => setVisto(ahora), 1200);
@@ -251,7 +315,13 @@ export function NotificationBell({ role }: { role: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={noLeidas > 0 ? `Notificaciones, ${noLeidas} sin leer` : 'Notificaciones'}
+          aria-label={
+            advertencias > 0
+              ? `Notificaciones, ${advertencias} ${advertencias === 1 ? 'advertencia' : 'advertencias'} y ${noLeidas} sin leer`
+              : noLeidas > 0
+                ? `Notificaciones, ${noLeidas} sin leer`
+                : 'Notificaciones'
+          }
           className={cn(
             'relative inline-flex items-center justify-center h-11 w-11 rounded-full',
             'text-foreground/80 hover:text-foreground hover:bg-secondary',
@@ -262,7 +332,10 @@ export function NotificationBell({ role }: { role: string }) {
           {noLeidas > 0 && (
             <span
               aria-hidden="true"
-              className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[11px] font-semibold leading-none ring-2 ring-card"
+              className={cn(
+                'absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-white text-[11px] font-semibold leading-none ring-2 ring-card',
+                advertencias > 0 ? 'bg-amber-600' : 'bg-orange-500',
+              )}
             >
               {noLeidas > 9 ? '9+' : noLeidas}
             </span>
@@ -275,12 +348,17 @@ export function NotificationBell({ role }: { role: string }) {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm text-foreground">Notificaciones</span>
             {noLeidas > 0 && (
-              <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[11px] font-semibold leading-none">
+              <span
+                className={cn(
+                  'min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-white text-[11px] font-semibold leading-none',
+                  advertencias > 0 ? 'bg-amber-600' : 'bg-orange-500',
+                )}
+              >
                 {noLeidas}
               </span>
             )}
           </div>
-          {noLeidas > 0 && (
+          {silenciables > 0 && (
             <button
               type="button"
               onClick={marcarTodas}
@@ -302,7 +380,8 @@ export function NotificationBell({ role }: { role: string }) {
           <ul className="max-h-[min(60vh,440px)] overflow-y-auto divide-y divide-border">
             {notifs.map((n) => {
               const Icono = ICONO[n.tipo];
-              const noLeida = tsMs(n) > visto;
+              const esAdv = !!n.advertencia;
+              const noLeida = sinLeer(n);
               const esKpi = n.tipo === 'kpi';
               return (
                 <li key={n.id}>
@@ -312,13 +391,21 @@ export function NotificationBell({ role }: { role: string }) {
                     className={cn(
                       'w-full text-left flex items-start gap-3 px-4 py-3 transition-colors hover:bg-secondary',
                       'focus-visible:outline-none focus-visible:bg-secondary',
-                      noLeida && 'bg-orange-500/[0.06]',
+                      // La advertencia se distingue del "no leído" normal: no es
+                      // una novedad que mirar, es algo roto que hay que arreglar.
+                      esAdv
+                        ? 'bg-amber-500/10 border-l-2 border-amber-500'
+                        : noLeida && 'bg-orange-500/[0.06]',
                     )}
                   >
                     <span
                       className={cn(
                         'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                        esKpi ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
+                        esAdv
+                          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                          : esKpi
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary',
                       )}
                     >
                       <Icono className="h-[18px] w-[18px]" />
@@ -326,10 +413,23 @@ export function NotificationBell({ role }: { role: string }) {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground">{n.titulo}</span>
-                        {noLeida && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" aria-label="sin leer" />}
+                        {esAdv ? (
+                          <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                            Atención
+                          </span>
+                        ) : (
+                          noLeida && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" aria-label="sin leer" />
+                        )}
                       </span>
-                      <span className="block text-sm text-muted-foreground truncate">{n.detalle}</span>
-                      <span className="block text-xs text-muted-foreground/80 mt-0.5">{cuando(n)}</span>
+                      <span className="block text-sm text-muted-foreground">{n.detalle}</span>
+                      {esAdv ? (
+                        // Sin el "qué hago ahora", el aviso solo genera angustia.
+                        <span className="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">
+                          Ábrelo en Asistencia y ciérralo para que las cifras cuadren.
+                        </span>
+                      ) : (
+                        <span className="block text-xs text-muted-foreground/80 mt-0.5">{cuando(n)}</span>
+                      )}
                     </span>
                   </button>
                 </li>
