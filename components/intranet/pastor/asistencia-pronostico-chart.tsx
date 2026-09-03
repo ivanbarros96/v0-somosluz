@@ -10,12 +10,31 @@ import { SinDatos, Titular, COLOR, EJE, GRID } from './chart-kit';
 import { ajustarLineal, proyectar, confiabilidad } from '@/lib/forecast';
 
 export interface DomingoAsistencia {
-  fecha: string; // ISO del domingo
-  total: number; // asistentes ese domingo
+  fecha: string; // ISO de la reunión
+  total: number; // asistentes esa vez
 }
 
-const PASOS = 6; // domingos a proyectar (~mes y medio)
-const DOMINGOS_POR_MES = 4.345;
+/**
+ * Cómo nombrar el período. Existe porque la misma gráfica sirve para el culto
+ * dominical y para las reuniones de ministerio (Amadas es martes, Youth
+ * sábado): decir "domingo" ahí sería sencillamente falso.
+ */
+export interface PeriodoPronostico {
+  singular: string; // "domingo" | "reunión"
+  plural: string;   // "domingos" | "reuniones"
+  /** Artículo para "el próximo …" / "la próxima …". */
+  proximo: string;
+}
+
+const PERIODO_DOMINGO: PeriodoPronostico = {
+  singular: 'domingo',
+  plural: 'domingos',
+  proximo: 'Próximo domingo',
+};
+
+const PASOS = 6; // reuniones a proyectar (~mes y medio)
+// Todas las reuniones son semanales, así que el paso es de 7 días en ambos casos.
+const PERIODOS_POR_MES = 4.345;
 
 const fmtFecha = (iso: string) =>
   new Date(iso).toLocaleDateString('es-CL', { timeZone: 'UTC', day: 'numeric', month: 'short' });
@@ -57,7 +76,15 @@ const TooltipPron = ({ active, payload, label }: any) => {
   );
 };
 
-export function AsistenciaPronosticoChart({ data }: { data: DomingoAsistencia[] }) {
+export function AsistenciaPronosticoChart({
+  data,
+  periodo = PERIODO_DOMINGO,
+  subtitulo,
+}: {
+  data: DomingoAsistencia[];
+  periodo?: PeriodoPronostico;
+  subtitulo?: string;
+}) {
   const modelo = useMemo(() => {
     const y = data.map((d) => d.total);
     const reg = ajustarLineal(y);
@@ -97,18 +124,18 @@ export function AsistenciaPronosticoChart({ data }: { data: DomingoAsistencia[] 
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="text-base">Tendencia y pronóstico de asistencia</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Asistencia dominical y proyección de las próximas semanas al ritmo actual
+          {subtitulo ?? 'Asistencia dominical y proyección de las próximas semanas al ritmo actual'}
         </p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
         {!modelo ? (
           <SinDatos>
-            Se necesitan al menos 3 domingos con asistencia para estimar una tendencia.
+            Se necesitan al menos 3 {periodo.plural} con asistencia para estimar una tendencia.
           </SinDatos>
         ) : (
           <>
             {(() => {
-              const porMes = Math.round(modelo.reg.pendiente * DOMINGOS_POR_MES);
+              const porMes = Math.round(modelo.reg.pendiente * PERIODOS_POR_MES);
               const tono = porMes > 0 ? 'bueno' : porMes < 0 ? 'grave' : 'normal';
               const Icono = porMes > 0 ? TrendingUp : porMes < 0 ? TrendingDown : Minus;
               const prox = modelo.proy[0];
@@ -122,12 +149,12 @@ export function AsistenciaPronosticoChart({ data }: { data: DomingoAsistencia[] 
                       <span className="inline-flex items-center gap-1">
                         <Icono className="h-3.5 w-3.5" aria-hidden />
                         {porMes > 0 ? 'creciendo' : porMes < 0 ? 'a la baja' : 'estable'} · promedio
-                        por domingo
+                        por {periodo.singular}
                       </span>
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    Próximo domingo:{' '}
+                    {periodo.proximo}:{' '}
                     <span className="font-semibold tabular-nums text-foreground">
                       ~{prox.valor}
                     </span>{' '}

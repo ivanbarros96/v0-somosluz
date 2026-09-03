@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
+import { getPersonas, getCultos, getAsistencias, type CultoRow } from '@/lib/datos';
 import { KpiCards, type KpiData } from '@/components/intranet/pastor/kpi-cards';
 import { AsistenciaChart, type CultoAsistencia } from '@/components/intranet/pastor/asistencia-chart';
 import { AsistenciaMensualChart, type AsistenciaMes } from '@/components/intranet/pastor/asistencia-mensual-chart';
@@ -23,7 +23,13 @@ import { calcularRiesgo } from '@/lib/seguimiento';
 import { esRolCopastor } from '@/lib/roles';
 import { CopastorDashboard } from '@/components/intranet/copastor-dashboard';
 import { FinanzasTendenciaChart, type FinanzasTendenciaMes } from '@/components/intranet/pastor/finanzas-tendencia-chart';
-import { CULTO_TIPOS, MINISTERIO_KEYS, idsQueAsistieron, ultimaAsistenciaPorTipo, type CultoTipo } from '@/lib/cultos-tipos';
+import { FiltroServicio, type OpcionServicio } from '@/components/intranet/pastor/filtro-servicio';
+import { PulsoAsistenciaCard } from '@/components/intranet/pastor/pulso-asistencia-card';
+import { pulsoAsistencia } from '@/lib/pulso-asistencia';
+import {
+  CULTO_TIPOS, CULTO_TIPO_KEYS, MINISTERIO_KEYS, esCultoTipo,
+  idsQueAsistieron, ultimaAsistenciaPorTipo, type CultoTipo,
+} from '@/lib/cultos-tipos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, UserPlus, ClipboardList, UserX, Settings, Activity, HandHeart, ArrowRight, Wallet } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInMonths } from 'date-fns';
@@ -41,9 +47,13 @@ function PastorDashboard() {
   const router = useRouter();
   const [kpis, setKpis] = useState<KpiData>({ totalMiembros: 0, adultos: 0, jovenes: 0, ninos: 0, pctAsistenciaPromedio: 0, retencionVisitantes: null });
   const [oracionPendientes, setOracionPendientes] = useState(0);
-  const [asistenciaData, setAsistenciaData] = useState<CultoAsistencia[]>([]);
-  const [serieDomingos, setSerieDomingos] = useState<DomingoAsistencia[]>([]);
-  const [asistenciaMensual, setAsistenciaMensual] = useState<AsistenciaMes[]>([]);
+  // Materia prima del bloque de asistencia: TODAS las reuniones (generales y de
+  // ministerio) más cuánta gente hubo en cada una. Las gráficas se derivan de
+  // acá según el tipo elegido en el filtro, sin volver a pedir datos al
+  // servidor: cambiar de "General" a "Youth" es instantáneo.
+  const [cultosTodos, setCultosTodos] = useState<CultoRow[]>([]);
+  const [conteoCulto, setConteoCulto] = useState<Record<number, number>>({});
+  const [tipoServicio, setTipoServicio] = useState<CultoTipo>('general');
   const [crecimientoData, setCrecimientoData] = useState<CrecimientoMes[]>([]);
   const [bautizadosData, setBautizadosData] = useState<BautizadosData>({ bautizados: 0, en_proceso: 0, no_bautizados: 0 });
   const [sexoData, setSexoData] = useState<SexoData>({ femenino: 0, masculino: 0, sin_dato: 0 });
@@ -132,48 +142,16 @@ function PastorDashboard() {
         getCultos({ tipoDistinto: 'general', orden: 'asc' }).catch(() => []),
       ]);
 
-      // Conteo por culto
+      // Asistentes por culto — de TODOS los tipos, no solo del dominical: el
+      // filtro por servicio del bloque de Asistencia se sirve de este mismo mapa.
       const conteoPorCulto: Record<number, number> = {};
       for (const a of rawAsist ?? []) {
         const cId = Number(a.culto_id);
         conteoPorCulto[cId] = (conteoPorCulto[cId] ?? 0) + 1;
       }
 
-      // Asistencia por CULTO (últimos 8)
       const cultosOrden = cultos ?? [];
       const ultimos8 = cultosOrden.slice(-8);
-      const asistencias: CultoAsistencia[] = ultimos8.map((c) => ({
-        fecha: c.fecha,
-        total: conteoPorCulto[Number(c.id)] ?? 0,
-        descripcion: c.descripcion,
-      }));
-
-      // Serie COMPLETA de domingos ya realizados (para tendencia y pronóstico).
-      // A diferencia de `ultimos8`, aquí van todos, en orden cronológico.
-      const serieDomingos: DomingoAsistencia[] = cultosOrden
-        .filter((c) => new Date(c.fecha).getTime() <= Date.now())
-        .map((c) => ({ fecha: c.fecha, total: conteoPorCulto[Number(c.id)] ?? 0 }));
-
-      // Asistencia por MES (promedio por culto dentro del mes)
-      const fechaPorCulto: Record<number, string> = {};
-      for (const c of cultosOrden) fechaPorCulto[Number(c.id)] = c.fecha;
-      const porMes: Record<string, { total: number; cultos: Set<number>; orden: number }> = {};
-      for (const a of rawAsist ?? []) {
-        const cId = Number(a.culto_id);
-        const fecha = fechaPorCulto[cId];
-        if (!fecha) continue;
-        const d = parseISO(fecha);
-        const key = format(d, 'yyyy-MM');
-        if (!porMes[key]) porMes[key] = { total: 0, cultos: new Set(), orden: d.getTime() };
-        porMes[key].total += 1;
-        porMes[key].cultos.add(cId);
-      }
-      const mensual: AsistenciaMes[] = Object.entries(porMes)
-        .sort((a, b) => a[1].orden - b[1].orden)
-        .map(([key, v]) => ({
-          mes: capMes(parseISO(key + '-01')),
-          total: Math.round(v.total / v.cultos.size),
-        }));
 
       // % asistencia promedio sobre últimos 8 cultos
       const totalPresencias = ultimos8.reduce((s, c) => s + (conteoPorCulto[Number(c.id)] ?? 0), 0);
@@ -261,11 +239,6 @@ function PastorDashboard() {
         : null;
 
       // Vida de Ministerios: participación = asistentes promedio / público elegible
-      const conteoTodosCultos: Record<number, number> = {};
-      for (const a of rawAsist ?? []) {
-        const cId = Number(a.culto_id);
-        conteoTodosCultos[cId] = (conteoTodosCultos[cId] ?? 0) + 1;
-      }
       // Adulto (o Niño) de 15-20 años no cuenta como público de Youth solo por
       // edad — necesita al menos una asistencia previa a un culto de Youth.
       const asistioYouthIds = idsQueAsistieron(cultosMinisterio ?? [], rawAsist ?? [], 'youth');
@@ -275,7 +248,7 @@ function PastorDashboard() {
         const reuniones = (cultosMinisterio ?? []).filter(
           (c) => c.tipo === tipo && new Date(c.fecha).getTime() <= ahora,
         );
-        const totalAsist = reuniones.reduce((s, c) => s + (conteoTodosCultos[Number(c.id)] ?? 0), 0);
+        const totalAsist = reuniones.reduce((s, c) => s + (conteoPorCulto[Number(c.id)] ?? 0), 0);
         const promedio = reuniones.length ? Math.round(totalAsist / reuniones.length) : 0;
         const elegibles = (personas ?? []).filter(
           (p) =>
@@ -409,9 +382,8 @@ function PastorDashboard() {
       }
 
       setKpis({ totalMiembros: total, adultos, jovenes, ninos, pctAsistenciaPromedio, retencionVisitantes });
-      setAsistenciaData(asistencias);
-      setSerieDomingos(serieDomingos);
-      setAsistenciaMensual(mensual);
+      setCultosTodos([...cultosOrden, ...(cultosMinisterio ?? [])]);
+      setConteoCulto(conteoPorCulto);
       setCrecimientoData(meses);
       setBautizadosData({ bautizados, en_proceso, no_bautizados });
       setSexoData({ femenino, masculino, sin_dato: sexoSinDato });
@@ -429,6 +401,86 @@ function PastorDashboard() {
 
     fetchAll();
   }, []);
+
+  // Tipos de servicio que se pueden elegir: solo los que YA tuvieron reuniones.
+  // Ofrecer un filtro que siempre lleva a "sin datos" es peor que no ofrecerlo.
+  const opcionesServicio: OpcionServicio[] = useMemo(() => {
+    const ahora = Date.now();
+    const conteo = new Map<CultoTipo, number>();
+    for (const c of cultosTodos) {
+      if (!esCultoTipo(c.tipo)) continue;
+      if (new Date(c.fecha).getTime() > ahora) continue;
+      conteo.set(c.tipo, (conteo.get(c.tipo) ?? 0) + 1);
+    }
+    return CULTO_TIPO_KEYS.filter((t) => conteo.has(t)).map((t) => ({
+      tipo: t,
+      reuniones: conteo.get(t)!,
+    }));
+  }, [cultosTodos]);
+
+  // Las tres gráficas de asistencia + el pulso, recalculadas para el tipo
+  // elegido. Todo sale de datos ya en memoria, así que el filtro no espera red.
+  const vistaServicio = useMemo(() => {
+    const ahora = Date.now();
+    const propias = cultosTodos
+      .filter((c) => c.tipo === tipoServicio && new Date(c.fecha).getTime() <= ahora)
+      .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+    const totalDe = (c: CultoRow) => conteoCulto[Number(c.id)] ?? 0;
+
+    // UNA sola regla para todo el bloque: una reunión sin NADIE marcado no es
+    // un dato, es una asistencia que quedó sin cerrar. Contarla como "vinieron
+    // 0" mentía en los tres lados — hundía el promedio del mes, torcía la
+    // tendencia y, lo peor, hacía que el titular gritara "100% bajo lo normal".
+    // Caso real encontrado el 02/09/2026: el culto de Youth del 29 de agosto
+    // seguía abierto (activo=true) y marcaba 0.
+    const conAsistencia = propias.filter((c) => totalDe(c) > 0);
+    const sinRegistrar = propias.filter((c) => totalDe(c) === 0).map((c) => c.fecha);
+
+    const porCulto: CultoAsistencia[] = conAsistencia.slice(-8).map((c) => ({
+      fecha: c.fecha,
+      total: totalDe(c),
+      descripcion: c.descripcion,
+    }));
+
+    const serie: DomingoAsistencia[] = conAsistencia.map((c) => ({
+      fecha: c.fecha,
+      total: totalDe(c),
+    }));
+
+    // El mes se saca RECORTANDO el texto de la fecha ('2026-09-01…' → '2026-09'),
+    // nunca parseando a Date: los cultos se guardan a medianoche UTC y en Chile
+    // (UTC-4) eso es el día anterior, así que una reunión del 1 de septiembre
+    // aterrizaba en agosto. Verificado el 02/09/2026 con la reunión de Amadas.
+    const porMes = new Map<string, { suma: number; n: number }>();
+    for (const c of conAsistencia) {
+      const key = c.fecha.slice(0, 7); // 'YYYY-MM'
+      const acc = porMes.get(key) ?? { suma: 0, n: 0 };
+      acc.suma += totalDe(c);
+      acc.n += 1;
+      porMes.set(key, acc);
+    }
+    const mensual: AsistenciaMes[] = [...porMes.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      // parseISO de una fecha SIN hora sí es seguro: date-fns la toma como
+      // medianoche local, no UTC. Solo se usa para el nombre del mes.
+      .map(([key, v]) => ({ mes: capMes(parseISO(key + '-01')), total: Math.round(v.suma / v.n) }));
+
+    return {
+      porCulto,
+      serie,
+      mensual,
+      sinRegistrar,
+      pulso: pulsoAsistencia(serie),
+      ultimaFecha: serie.length ? serie[serie.length - 1].fecha : null,
+    };
+  }, [cultosTodos, conteoCulto, tipoServicio]);
+
+  // El dominical se sigue llamando "domingo"; Amadas es martes y Youth sábado,
+  // así que ahí el texto genérico es el correcto.
+  const periodoServicio = tipoServicio === 'general'
+    ? undefined
+    : { singular: 'reunión', plural: 'reuniones', proximo: 'Próxima reunión' };
 
   if (loading) {
     return (
@@ -499,11 +551,50 @@ function PastorDashboard() {
         href="/intranet/dashboard/mapa-asistencia"
         hrefLabel="Ver mapa de asistencia"
       >
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <AsistenciaChart data={asistenciaData} />
-          <AsistenciaMensualChart data={asistenciaMensual} />
+        {/* Bloque FILTRADO. El recuadro existe para que se vea de un vistazo
+            hasta dónde llega el filtro: lo que está dentro cambia al elegir un
+            servicio, lo que está fuera no. Sin ese límite visible, el pastor no
+            sabría si "Vida de ministerios" también se filtró. */}
+        <div className="rounded-xl border border-border bg-muted/30 p-3 md:p-4 space-y-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold text-foreground">Ver por servicio</h3>
+            <p className="text-xs text-muted-foreground">
+              Las tarjetas de este recuadro muestran{' '}
+              <span className="font-medium text-foreground">
+                {CULTO_TIPOS[tipoServicio].label}
+              </span>
+            </p>
+          </div>
+
+          <FiltroServicio
+            opciones={opcionesServicio}
+            valor={tipoServicio}
+            onChange={setTipoServicio}
+          />
+
+          <PulsoAsistenciaCard
+            pulso={vistaServicio.pulso}
+            tipo={tipoServicio}
+            fechaUltima={vistaServicio.ultimaFecha}
+            sinRegistrar={vistaServicio.sinRegistrar}
+          />
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+            <AsistenciaChart data={vistaServicio.porCulto} />
+            <AsistenciaMensualChart data={vistaServicio.mensual} />
+          </div>
+
+          <AsistenciaPronosticoChart
+            data={vistaServicio.serie}
+            periodo={periodoServicio}
+            subtitulo={
+              tipoServicio === 'general'
+                ? undefined
+                : `Asistencia de ${CULTO_TIPOS[tipoServicio].label} y proyección de las próximas semanas al ritmo actual`
+            }
+          />
         </div>
-        <AsistenciaPronosticoChart data={serieDomingos} />
+
         <MinisteriosPanel data={ministerios} />
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <KidsCoberturaChart data={coberturaKids} />

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CULTO_TIPO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
+import { CULTO_TIPOS, CULTO_TIPO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, X, Clock, CalendarOff } from 'lucide-react';
 
@@ -62,19 +62,15 @@ export function fechaLegible(iso: string, conAnio = false): string {
 
 export const soloHora = (h: string | null) => (h ? h.slice(0, 5) : null);
 
-// Nombres cortos, SOLO para la agenda. `CULTO_TIPOS[t].label` ("Viernes de
-// Discipulado", "Generación Youth") es el nombre largo que usan Asistencia,
-// Miembros y Cumpleaños — no se toca, para no cambiarlo también ahí. Acá, en
-// un chip de calendario y en un desplegable angosto, el nombre corto se lee
-// mejor y es el mismo que ya usa el login (ver `corto` en intranet/page.tsx).
-export const MINISTERIOS_AGENDA: Record<CultoTipo, string> = {
-  general: 'General',
-  hombres: 'Hombría',
-  mujeres: 'Amadas',
-  discipulado: 'Discipulado',
-  youth: 'Youth',
-  kids: 'Kids',
-};
+// Nombres cortos. `CULTO_TIPOS[t].label` ("Viernes de Discipulado",
+// "Generación Youth") es el nombre largo que usan Asistencia, Miembros y
+// Cumpleaños — no se toca. Acá, en un chip de calendario y en un desplegable
+// angosto, el nombre corto se lee mejor. Sale del catálogo (`corto`) y no de
+// una lista propia: el filtro por servicio del Pastor usa los mismos nombres y
+// no deben poder divergir.
+export const MINISTERIOS_AGENDA = Object.fromEntries(
+  CULTO_TIPO_KEYS.map((t) => [t, CULTO_TIPOS[t].corto]),
+) as Record<CultoTipo, string>;
 
 export const MINISTERIO_AGENDA_KEYS = CULTO_TIPO_KEYS;
 

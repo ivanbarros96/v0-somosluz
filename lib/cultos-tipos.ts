@@ -34,17 +34,21 @@ export const CULTO_TIPOS: Record<
   CultoTipo,
   {
     label: string;
+    /** Nombre corto para chips, selectores y celdas apretadas. */
+    corto: string;
     publico: string;
     elegibilidad: (p: PersonaAudiencia) => Elegibilidad;
   }
 > = {
   general: {
     label: 'Culto General',
+    corto: 'General',
     publico: 'Toda la congregación',
     elegibilidad: () => 'si',
   },
   hombres: {
     label: 'Hombría al Máximo',
+    corto: 'Hombría',
     publico: 'Varones adultos',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
@@ -57,6 +61,7 @@ export const CULTO_TIPOS: Record<
   },
   mujeres: {
     label: 'Amadas',
+    corto: 'Amadas',
     publico: 'Mujeres adultas',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
@@ -69,6 +74,7 @@ export const CULTO_TIPOS: Record<
   },
   discipulado: {
     label: 'Viernes de Discipulado',
+    corto: 'Discipulado',
     publico: 'Adultos',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
@@ -80,6 +86,7 @@ export const CULTO_TIPOS: Record<
   },
   youth: {
     label: 'Generación Youth',
+    corto: 'Youth',
     publico: 'Jóvenes 15–20',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
@@ -94,6 +101,7 @@ export const CULTO_TIPOS: Record<
   },
   kids: {
     label: 'Clase de Kids',
+    corto: 'Kids',
     publico: 'Niños',
     elegibilidad: (p) => {
       if (p.source_tipo === 'nuevo') return 'no'; // ocultos por defecto: se ven con "Ver todos"
