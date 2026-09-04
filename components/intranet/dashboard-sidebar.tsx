@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
 import { useConteoPendiente } from '@/hooks/use-conteo-pendiente';
 import { useCultosSinCerrar } from '@/hooks/use-cultos-sin-cerrar';
+import { leerVisto, alCambiarVisto } from '@/lib/notif-visto';
+import { inicioDelDia, HORAS_LIMITE } from '@/lib/cultos-abiertos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -232,6 +234,22 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   // campana, para que los dos números no puedan contradecirse.
   const cultosAbiertos = useCultosSinCerrar(user?.role);
 
+  // ...y la misma marca de "visto": al abrir la campana este badge también se
+  // apaga. Antes el aviso se apagaba en la campana y seguía encendido acá.
+  const [visto, setVisto] = useState(0);
+  useEffect(() => {
+    if (!user?.role) return;
+    setVisto(leerVisto(user.role));
+    return alCambiarVisto(user.role, setVisto);
+  }, [user?.role]);
+
+  // Se cuentan sólo los que aún no se han visto. El aviso desaparece del
+  // contador, no de la pantalla de Asistencia: ahí el culto sigue listado
+  // hasta que alguien lo cierre de verdad.
+  const cultosSinVer = cultosAbiertos.filter(
+    (c) => inicioDelDia(c.fecha) + HORAS_LIMITE * 3_600_000 > visto,
+  ).length;
+
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\)\s*/, '');
     document.title = oracionPendientes > 0 ? `(${oracionPendientes}) ${base}` : base;
@@ -323,7 +341,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
             // arreglar. Mismo color que la advertencia de la campana, para que
             // se lean como la misma cosa en los dos lados.
             const avisoCultos =
-              item.href === '/intranet/dashboard/asistencia' ? cultosAbiertos.length : 0;
+              item.href === '/intranet/dashboard/asistencia' ? cultosSinVer : 0;
             return (
               <li key={item.href}>
                 <button

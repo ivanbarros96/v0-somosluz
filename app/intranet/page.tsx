@@ -90,10 +90,26 @@ export default function IntranetLoginPage() {
   const [shake, setShake] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [conteos, setConteos] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (isAuthenticated) router.replace('/intranet/dashboard');
   }, [isAuthenticated, router]);
+
+  // Contadores de la pantalla de acceso. Se piden RECIÉN al desplegar un grupo,
+  // no al abrir la página: así la pantalla inicial no hace ninguna consulta y
+  // el endpoint público sólo se toca cuando alguien va de verdad a entrar.
+  useEffect(() => {
+    if (!grupoAbierto) return;
+    let vivo = true;
+    fetch('/api/notificaciones/publico', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (vivo && d?.conteos) setConteos(d.conteos); })
+      .catch(() => {
+        // Silencioso: sin contador se entra igual. Nunca bloquear el login.
+      });
+    return () => { vivo = false; };
+  }, [grupoAbierto]);
 
   // Animación de progreso post-login
   useEffect(() => {
@@ -247,10 +263,23 @@ export default function IntranetLoginPage() {
                     >
                       <Icon className={cn('h-4 w-4', esPastor ? 'text-accent' : 'text-primary')} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-foreground font-medium text-sm">{ROLES[role].name}</p>
                       <p className="text-muted-foreground text-xs mt-0.5">{desc}</p>
                     </div>
+                    {/* Contador y NADA más. A propósito no dice de qué son los
+                        avisos: esta pantalla es pública y un desconocido no
+                        tiene por qué saber que hay peticiones de oración sin
+                        atender ni quién se registró. Sólo aparece acá, con el
+                        grupo ya desplegado, no en la primera pantalla. */}
+                    {(conteos[role] ?? 0) > 0 && (
+                      <span
+                        className="ml-auto shrink-0 min-w-6 h-6 px-1.5 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-xs font-semibold leading-none tabular-nums"
+                        aria-label={`${conteos[role]} ${conteos[role] === 1 ? 'aviso pendiente' : 'avisos pendientes'}`}
+                      >
+                        {conteos[role] >= 9 ? '9+' : conteos[role]}
+                      </span>
+                    )}
                   </div>
                 </button>
               );

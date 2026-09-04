@@ -32,7 +32,8 @@ import {
   puedeAutorizarFichas, puedeAutorizarAgenda, puedeVerOracion, abreCultos, ministerioDeRol,
 } from '@/lib/roles';
 import { CULTO_TIPOS } from '@/lib/cultos-tipos';
-import { cultosSinCerrar, tiempoAbierto, HORAS_LIMITE } from '@/lib/cultos-abiertos';
+import { cultosSinCerrar, tiempoAbierto, inicioDelDia, HORAS_LIMITE } from '@/lib/cultos-abiertos';
+import { leerVisto, guardarVisto, alCambiarVisto } from '@/lib/notif-visto';
 
 type TipoNotif = 'miembro' | 'agenda' | 'oracion' | 'kpi' | 'culto';
 
@@ -69,21 +70,7 @@ export function tieneCampana(role: string): boolean {
   );
 }
 
-function leerVisto(role: string): number {
-  try {
-    const v = localStorage.getItem(`sl_notif_seen_${role}`);
-    return v ? Number(v) : 0;
-  } catch {
-    return 0;
-  }
-}
-function guardarVisto(role: string, ts: number) {
-  try {
-    localStorage.setItem(`sl_notif_seen_${role}`, String(ts));
-  } catch {
-    // Storage bloqueado (modo privado): el badge no persiste, no pasa nada.
-  }
-}
+// La marca de "visto" es compartida con el menú (lib/notif-visto).
 
 const MES = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -209,7 +196,10 @@ async function cargarCultosSinCerrar(items: Notif[], role: string) {
       tipo: 'culto',
       titulo: 'Hay un culto sin cerrar',
       detalle: `${nombre} del ${dia} · lleva ${tiempoAbierto(c.horas)} abierto`,
-      ts: c.fecha,
+      // La fecha del aviso es cuando CUMPLIÓ las 48 h, no la del culto. Con la
+      // del culto (vieja) el aviso nacía "ya leído" y el contador nunca se
+      // encendía. Así se enciende al aparecer y se apaga al abrir la campana.
+      ts: new Date(inicioDelDia(c.fecha) + HORAS_LIMITE * 3_600_000).toISOString(),
       href: '/intranet/dashboard/asistencia',
       advertencia: true,
     });
@@ -262,9 +252,11 @@ export function NotificationBell({ role }: { role: string }) {
     timer.current = setInterval(cargar, POLL_MS);
     const onVisible = () => { if (document.visibilityState === 'visible') cargar(); };
     document.addEventListener('visibilitychange', onVisible);
+    const off = alCambiarVisto(role, setVisto);
     return () => {
       if (timer.current) clearInterval(timer.current);
       document.removeEventListener('visibilitychange', onVisible);
+      off();
     };
   }, [cargar, role]);
 
@@ -272,19 +264,17 @@ export function NotificationBell({ role }: { role: string }) {
     const t = Date.parse(n.ts);
     return Number.isNaN(t) ? 0 : t;
   };
-  // Una advertencia cuenta como sin leer mientras exista: su fecha es la del
-  // culto (vieja), así que por fecha quedaría "leída" al instante y el aviso
-  // desaparecería sin que nadie hubiera cerrado nada.
-  const sinLeer = (n: Notif) => !!n.advertencia || tsMs(n) > visto;
+  // Leído es leído, también para las advertencias (decisión de Iván,
+  // 03/09/2026): al abrir la campana el contador se apaga en todos lados.
+  // El aviso NO se borra de la lista ni de la pantalla de Asistencia — deja de
+  // perseguirte, pero el trabajo pendiente sigue a la vista donde se hace.
+  const sinLeer = (n: Notif) => tsMs(n) > visto;
   const noLeidas = notifs.filter(sinLeer).length;
-  const advertencias = notifs.filter((n) => n.advertencia).length;
-  // "Marcar vistas" solo tiene sentido si queda algo que realmente se pueda
-  // silenciar; con puras advertencias el botón no haría nada.
-  const silenciables = noLeidas - advertencias;
+  const advertencias = notifs.filter((n) => n.advertencia && sinLeer(n)).length;
 
   function onOpenChange(v: boolean) {
     setAbierto(v);
-    if (v && silenciables > 0) {
+    if (v && noLeidas > 0) {
       const ahora = Date.now();
       guardarVisto(role, ahora);
       setTimeout(() => setVisto(ahora), 1200);
@@ -358,7 +348,7 @@ export function NotificationBell({ role }: { role: string }) {
               </span>
             )}
           </div>
-          {silenciables > 0 && (
+          {noLeidas > 0 && (
             <button
               type="button"
               onClick={marcarTodas}
