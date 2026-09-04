@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { Loader2, CalendarPlus, Users, UserCheck, XCircle, Trash2, ShieldAlert, Eye, EyeOff, Lock, Unlock, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/lib/cultos-tipos';
 import { ministerioDeRol, esRolKids, TIPOS_MARCABLES_KIDS } from '@/lib/roles';
 import { ResumenReunion } from '@/components/intranet/resumen-reunion';
+import { cultosSinCerrar, tiempoAbierto } from '@/lib/cultos-abiertos';
 
 type Persona = {
   id: number;
@@ -394,6 +395,20 @@ export function AsistenciaPanel() {
   // 'discipulado', 'youth') y Kids ('kids'). Secretaría y Pastor no tienen uno.
   const tipoReunionPropia: CultoTipo | null = esKids ? 'kids' : ministerio;
 
+  // Se calcula sobre los cultos que YA están en pantalla, no con una consulta
+  // aparte: así el aviso desaparece en el mismo instante en que se cierra el
+  // culto (setCultos lo marca inactivo localmente), sin esperar al siguiente
+  // refresco. Kids no cierra cultos, así que tampoco recibe el aviso.
+  const sinCerrar = useMemo(
+    () => (esKids ? [] : cultosSinCerrar(cultos, ministerio)),
+    [cultos, ministerio, esKids],
+  );
+  // id → horas abiertas, para marcar el culto atrasado dentro del selector.
+  const atrasados = useMemo(
+    () => new Map(sinCerrar.map((c) => [c.id, c.horas])),
+    [sinCerrar],
+  );
+
   // Audiencia del culto seleccionado: pre-filtra la lista según el público.
   // 'incompleto' (falta sexo/edad en la ficha) se muestra con aviso, al final.
   //
@@ -449,6 +464,59 @@ export function AsistenciaPanel() {
 
   return (
     <div className="space-y-5">
+
+      {/* Cierre del rastro que abre la campana. La campana avisa "hay 3 cultos
+          sin cerrar" y manda acá; sin este bloque uno llegaba a una pantalla
+          normal, sin saber CUÁLES eran ni por dónde empezar. Cada fila
+          selecciona ese culto para poder cerrarlo en el acto. */}
+      {sinCerrar.length > 0 && (
+        <section
+          aria-labelledby="titulo-sin-cerrar"
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle
+              className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500"
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <h2 id="titulo-sin-cerrar" className="text-sm font-semibold text-foreground">
+                {sinCerrar.length === 1
+                  ? 'Hay un culto sin cerrar'
+                  : `Hay ${sinCerrar.length} cultos sin cerrar`}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Mientras siga abierto, su asistencia cuenta como incompleta y los promedios
+                salen mal. Tócalo para abrirlo y ciérralo.
+              </p>
+
+              <ul className="mt-3 space-y-2">
+                {sinCerrar.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => setCultoId(c.id)}
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-card px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {CULTO_TIPOS[c.tipo]?.label ?? 'Culto'}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatFecha(c.fecha)} · lleva {tiempoAbierto(c.horas)} abierto
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        {cultoId === c.id ? 'Seleccionado' : 'Abrir'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* "Tu reunión de un vistazo": sólo para ministerios y Kids, arriba de su
           pantalla de trabajo. */}
@@ -573,8 +641,18 @@ export function AsistenciaPanel() {
                           {CULTO_TIPOS[c.tipo].publico}
                         </span>
                       )}
+                      {/* El culto atrasado se distingue del recién abierto:
+                          verde "Abierto" es normal, ámbar con el tiempo es el
+                          que hay que cerrar. Sin esto, en la lista se veían
+                          idénticos. */}
                       {c.activo && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Abierto</span>
+                        atrasados.has(c.id) ? (
+                          <span className="text-xs bg-amber-500/20 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                            Sin cerrar · {tiempoAbierto(atrasados.get(c.id)!)}
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Abierto</span>
+                        )
                       )}
                     </span>
                   </div>

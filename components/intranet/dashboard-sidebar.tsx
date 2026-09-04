@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
 import { useConteoPendiente } from '@/hooks/use-conteo-pendiente';
+import { useCultosSinCerrar } from '@/hooks/use-cultos-sin-cerrar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -227,6 +228,10 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
     !!user && puedeAutorizarAgenda(user.role),
   );
 
+  // Cultos que quedaron abiertos más de 48 h. Es la MISMA fuente que usa la
+  // campana, para que los dos números no puedan contradecirse.
+  const cultosAbiertos = useCultosSinCerrar(user?.role);
+
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\)\s*/, '');
     document.title = oracionPendientes > 0 ? `(${oracionPendientes}) ${base}` : base;
@@ -312,6 +317,13 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
               : item.href === '/intranet/dashboard/members' ? registrosPendientes
               : item.href === '/intranet/dashboard/agenda' ? agendaPendientes
               : 0;
+
+            // Asistencia lleva su propio badge, en ÁMBAR y no en naranja: los
+            // otros tres son novedades que revisar, éste es algo roto que
+            // arreglar. Mismo color que la advertencia de la campana, para que
+            // se lean como la misma cosa en los dos lados.
+            const avisoCultos =
+              item.href === '/intranet/dashboard/asistencia' ? cultosAbiertos.length : 0;
             return (
               <li key={item.href}>
                 <button
@@ -327,7 +339,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
                   <span>{item.label}</span>
-                  {pendientes > 0 ? (
+                  {avisoCultos > 0 ? (
+                    <span
+                      className="ml-auto min-w-5 h-5 px-1.5 inline-flex items-center justify-center text-[11px] font-semibold rounded-full bg-amber-600 text-white leading-none"
+                      aria-label={`${avisoCultos} ${avisoCultos === 1 ? 'culto sin cerrar' : 'cultos sin cerrar'}`}
+                    >
+                      {avisoCultos > 9 ? '9+' : avisoCultos}
+                    </span>
+                  ) : pendientes > 0 ? (
                     <span
                       className="ml-auto min-w-5 h-5 px-1.5 inline-flex items-center justify-center text-[11px] font-semibold rounded-full bg-orange-500 text-white leading-none"
                       aria-label={
