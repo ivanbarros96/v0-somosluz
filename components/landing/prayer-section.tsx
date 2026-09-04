@@ -12,9 +12,14 @@ const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export function PrayerSection() {
-  const [form, setForm] = useState({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
+  const [form, setForm] = useState({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '', beneficiario: '' });
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  // Muchas peticiones son POR OTRA PERSONA (una madre por su hijo, una hermana
+  // por una amiga). Antes todo caía en un solo campo "nombre" y después no se
+  // sabía a quién llamar para hacer seguimiento. Va oculto tras una casilla
+  // para no agregarle un campo a quien pide por sí mismo, que es el caso común.
+  const [paraOtro, setParaOtro] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +34,9 @@ export function PrayerSection() {
         body: JSON.stringify({
           ...form,
           telefono: form.telefono.trim() ? `${form.codTel} ${form.telefono.trim()}` : '',
+          // Sólo viaja si la casilla está marcada: si alguien la marca, escribe
+          // un nombre y luego se arrepiente, no debe quedar guardado igual.
+          beneficiario: paraOtro ? form.beneficiario.trim() : '',
         }),
       });
       if (!res.ok) {
@@ -36,7 +44,8 @@ export function PrayerSection() {
         throw new Error(data.error || 'No pudimos enviar tu petición');
       }
       setEnviado(true);
-      setForm({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '' });
+      setForm({ nombre: '', peticion: '', codTel: '+56', telefono: '', sitioWeb: '', beneficiario: '' });
+      setParaOtro(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No pudimos enviar tu petición. Intenta de nuevo.');
     } finally {
@@ -96,6 +105,42 @@ export function PrayerSection() {
                   className={inputCls}
                   placeholder="Tu nombre…"
                 />
+              </div>
+
+              {/* Divulgación progresiva: la casilla no estorba a quien pide por
+                  sí mismo, y quien pide por otro encuentra dónde decirlo. */}
+              <div>
+                <label className="flex min-h-11 items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={paraOtro}
+                    onChange={(e) => setParaOtro(e.target.checked)}
+                    className="h-4 w-4 shrink-0 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  />
+                  <span className="text-sm">La oración es por otra persona</span>
+                </label>
+
+                {paraOtro && (
+                  <div className="mt-2">
+                    <label htmlFor="oracion-beneficiario" className="block text-sm font-medium mb-2">
+                      ¿Por quién oramos?
+                    </label>
+                    <input
+                      id="oracion-beneficiario"
+                      type="text"
+                      name="beneficiario"
+                      required
+                      maxLength={100}
+                      value={form.beneficiario}
+                      onChange={(e) => setForm({ ...form, beneficiario: e.target.value })}
+                      className={inputCls}
+                      placeholder="Nombre de la persona…"
+                    />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Tus datos siguen siendo los de contacto: te escribimos a ti para saber cómo va.
+                    </p>
+                  </div>
+                )}
               </div>
               {/* El telefono va ANTES del email: el equipo respondio que prefiere
                   llamar o escribir por WhatsApp antes que mandar un correo, por

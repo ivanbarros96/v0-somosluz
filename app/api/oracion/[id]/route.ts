@@ -3,36 +3,31 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { puedeVerOracion } from '@/lib/roles';
 
-// DELETE /api/oracion/[id] — borra una petición.
+// DELETE /api/oracion/[id] — elimina una petición.
 //
-// El pastor NO reingresa su clave: su sesión ya es la prueba de identidad,
-// igual que al eliminar un miembro (ver api/personas/[id]). Pedírsela de
-// nuevo sería autenticarlo dos veces para la misma acción.
+// Quien administra las peticiones puede eliminarlas por su cuenta, sin la
+// clave del pastor (permiso pedido por Nicole, decidido por Iván el
+// 03/09/2026). Antes el perfil Oración tenía que pedírsela, lo que la dejaba
+// bloqueada para limpiar duplicados o pruebas.
 //
-// El perfil Oración sí la necesita: administra estados libremente, pero
-// borrar es definitivo y no deja rastro, así que ahí se pide autorización del
-// pastor — comprobada ACÁ y no solo en la pantalla, porque si el candado
-// viviera únicamente en el cliente bastaría con llamar a este endpoint sin
-// pasar por el diálogo para borrar sin autorización.
+// A cambio, el borrado dejó de ser destructivo: marca `archivada_en` en vez de
+// borrar la fila. Desde la app se comporta igual —desaparece de la lista— pero
+// se puede deshacer en el momento (PATCH con restaurar) y el dato sigue ahí si
+// alguna vez hay que recuperarlo. Una petición de oración es algo que una
+// persona confió a la iglesia; un toque equivocado no debería borrarla para
+// siempre.
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = getSession(req);
   if (!session || !puedeVerOracion(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  if (session.role !== 'pastor') {
-    const { password } = await req.json().catch(() => ({ password: '' }));
-    const esperada = process.env.PASTOR_PASSWORD;
-    if (!esperada || typeof password !== 'string' || password !== esperada) {
-      return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 403 });
-    }
-  }
-
   const { id } = await params;
   const { data, error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .delete()
+    .update({ archivada_en: new Date().toISOString() })
     .eq('id', id)
+    .is('archivada_en', null)
     .select('id')
     .maybeSingle();
 

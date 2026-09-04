@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { puedeVerOracion } from '@/lib/roles';
+import { esCategoriaOracion } from '@/lib/oracion-categorias';
 
 // POST /api/oracion/interna — registrar una petición de un miembro desde la
 // intranet. Distinto del POST público de /api/oracion (que es sin sesión y
@@ -21,6 +22,11 @@ export async function POST(req: NextRequest) {
   const visitaId = typeof body.miembro_nuevo_id === 'number' ? body.miembro_nuevo_id : null;
   const nombreLibre = typeof body.nombre === 'string' ? body.nombre.trim() : '';
   const peticion = typeof body.peticion === 'string' ? body.peticion.trim() : '';
+  // Por quién se ora, cuando no es quien la trae. Vacío = para sí mismo.
+  const beneficiario = typeof body.beneficiario === 'string' ? body.beneficiario.trim() : '';
+  // Opcional: quien registra desde la intranet sí conoce las categorías, pero
+  // no se le obliga a elegir para no frenar la anotación rápida.
+  const categoria = esCategoriaOracion(body.categoria) ? body.categoria : null;
 
   if (!peticion) {
     return NextResponse.json({ error: 'La petición es obligatoria' }, { status: 400 });
@@ -75,12 +81,14 @@ export async function POST(req: NextRequest) {
     nombre = visita.nombre;
   }
 
-  if (nombre.length > 100) {
+  if (nombre.length > 100 || beneficiario.length > 100) {
     return NextResponse.json({ error: 'El nombre es demasiado largo' }, { status: 400 });
   }
 
   const { error } = await db.from('peticiones_oracion').insert({
     nombre,
+    beneficiario: beneficiario || null,
+    categoria,
     peticion,
     origen: 'interna',
     persona_id: personaId,

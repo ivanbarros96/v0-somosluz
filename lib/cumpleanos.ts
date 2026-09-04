@@ -91,17 +91,18 @@ const JOVENES: string[] = [
 ];
 
 // Dirigidos al APODERADO, felicitando al niño. Marcadores: {apo} y {nino}.
+// Usa "le" (neutro) para no depender del género del niño.
 const APODERADO: string[] = [
-  "🎈 ¡Hola {apo}! Hoy {nino} está de cumpleaños y toda la familia Somos Luz lo celebra contigo. Que Dios lo llene de alegría. «El Señor lo bendiga y lo guarde» (Números 6:24). ¡Felicidades! 🎂",
-  "🎂 {apo}, hoy es el cumpleaños de {nino} y en la familia Somos Luz lo queremos mucho. Que Dios cuide cada uno de sus pasos. «El Señor lo guardará de todo mal» (Salmo 121:7). ¡Feliz cumple! 🎉",
-  "🌈 ¡Hola {apo}! Hoy celebramos a {nino} junto a toda la familia Somos Luz. Que Dios lo llene de amor y sonrisas. «Maravillosas son tus obras» (Salmo 139:14). ¡Felicidades para {nino}! 🎈",
+  "🎈 ¡Hola {apo}! Hoy {nino} está de cumpleaños y toda la familia Somos Luz le celebra contigo. Que Dios le llene de alegría. «El Señor le bendiga y le guarde» (Números 6:24). ¡Felicidades! 🎂",
+  "🎂 {apo}, hoy es el cumpleaños de {nino} y en la familia Somos Luz le queremos mucho. Que Dios cuide cada uno de sus pasos. «El Señor le guardará de todo mal» (Salmo 121:7). ¡Feliz cumple! 🎉",
+  "🌈 ¡Hola {apo}! Hoy celebramos a {nino} junto a toda la familia Somos Luz. Que Dios le llene de amor y sonrisas. «Maravillosas son tus obras» (Salmo 139:14). ¡Felicidades para {nino}! 🎈",
   "🎈 {apo}, hoy {nino} está de cumpleaños y en Somos Luz damos gracias a Dios por su vida. Es un regalo precioso. «Los hijos son herencia del Señor» (Salmo 127:3). ¡Feliz cumpleaños a {nino}! 🎂",
-  "🎂 ¡Hola {apo}! Toda la familia Somos Luz saluda a {nino} en su cumpleaños con mucho cariño. Que Dios lo bendiga siempre. «Dejen que los niños vengan a mí» (Marcos 10:14). ¡Felicidades! 🎉",
-  "🌈 {apo}, hoy es el día especial de {nino} y en Somos Luz lo celebramos con alegría. Que Jesús lo acompañe siempre. «El Señor es su guardador» (Salmo 121:5). ¡Feliz cumpleaños a {nino}! 🎈",
-  "🎈 ¡Hola {apo}! Hoy {nino} cumple años y la familia Somos Luz lo abraza con amor. Que Dios lo llene de salud y felicidad. «El Señor es su pastor, nada le faltará» (Salmo 23:1). ¡Felicidades! 🎂",
-  "🎂 {apo}, hoy toda la familia Somos Luz celebra la vida de {nino}. Que Dios derrame su bendición sobre él. «El Señor lo bendiga y haga resplandecer su rostro sobre él» (Números 6:25). ¡Feliz cumple! 🎉",
-  "🎈 ¡Hola {apo}! En este día tan especial saludamos a {nino} desde toda la familia Somos Luz. Que Dios lo cuide. «Grande es su amor por él» (Salmo 103:11). ¡Feliz cumpleaños a {nino}! 🌈",
-  "🎂 {apo}, hoy {nino} está de cumpleaños y en Somos Luz le deseamos un día lleno de juegos y risas. Dios lo ama muchísimo. «El Señor lo bendiga y lo guarde» (Números 6:24). ¡Felicidades! 🎉",
+  "🎂 ¡Hola {apo}! Toda la familia Somos Luz saluda a {nino} en su cumpleaños con mucho cariño. Que Dios le bendiga siempre. «Dejen que los niños vengan a mí» (Marcos 10:14). ¡Felicidades! 🎉",
+  "🌈 {apo}, hoy es el día especial de {nino} y en Somos Luz le celebramos con alegría. Que Jesús le acompañe siempre. «El Señor es su guardador» (Salmo 121:5). ¡Feliz cumpleaños a {nino}! 🎈",
+  "🎈 ¡Hola {apo}! Hoy {nino} cumple años y la familia Somos Luz le abraza con amor. Que Dios le llene de salud y felicidad. «El Señor es su pastor, nada le faltará» (Salmo 23:1). ¡Felicidades! 🎂",
+  "🎂 {apo}, hoy toda la familia Somos Luz celebra la vida de {nino}. Que Dios derrame su bendición sobre su vida. «El Señor le bendiga y haga resplandecer su rostro» (Números 6:25). ¡Feliz cumple! 🎉",
+  "🎈 ¡Hola {apo}! En este día tan especial saludamos a {nino} desde toda la familia Somos Luz. Que Dios le cuide. «Tan grande es su amor» (Salmo 103:11). ¡Feliz cumpleaños a {nino}! 🌈",
+  "🎂 {apo}, hoy {nino} está de cumpleaños y en Somos Luz le deseamos un día lleno de juegos y risas. Dios le ama muchísimo. «El Señor le bendiga y le guarde» (Números 6:24). ¡Felicidades! 🎉",
   "🌈 ¡Hola {apo}! Hoy celebramos a {nino} con todo el cariño de la familia Somos Luz. Que Dios llene su vida de bendición. «Este es el día que hizo el Señor» (Salmo 118:24). ¡Feliz cumple a {nino}! 🎈",
   "🎈 {apo}, toda la familia Somos Luz saluda hoy a {nino} en su cumpleaños. Que crezca en sabiduría y en gracia. «Jesús crecía en sabiduría y en gracia» (Lucas 2:52). ¡Felicidades a {nino}! 🎂",
 ];

@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { getResend } from '@/lib/resend';
 import { puedeVerOracion } from '@/lib/roles';
+import { esCategoriaOracion } from '@/lib/oracion-categorias';
+import { esOrigenOracion } from '@/lib/oracion-origen';
 
 const ESTADOS = ['pendiente', 'orando', 'contestada'] as const;
 
@@ -18,7 +20,7 @@ function escapeHtml(s: string): string {
 // Notifica por correo a quien atiende las peticiones. Fallback seguro:
 // cualquier fallo se registra y se ignora; jamás debe afectar el guardado de
 // la petición.
-async function notificarPastor(nombre: string, email: string, peticion: string) {
+async function notificarPastor(nombre: string, email: string, peticion: string, beneficiario: string) {
   const resend = getResend();
   if (!resend) return; // Sin RESEND_API_KEY no se envía (no rompe nada).
 
@@ -37,12 +39,19 @@ async function notificarPastor(nombre: string, email: string, peticion: string) 
       from: remitente,
       to: destino,
       replyTo: email || undefined,
-      subject: `🙏 Nueva petición de oración — ${nombre}`,
-      text: `Nueva petición de oración desde el sitio de Somos Luz.\n\nDe: ${nombre}${email ? ` (${email})` : ''}\n\n${peticion}\n\nVer en la intranet: https://somosluziglesia.cl/intranet/dashboard/oracion`,
+      // El asunto nombra a QUIEN SE ORA cuando es otra persona: es lo que
+      // Nicole necesita reconocer en la bandeja, no quién lo reportó.
+      subject: beneficiario
+        ? `🙏 Nueva petición de oración — por ${beneficiario}`
+        : `🙏 Nueva petición de oración — ${nombre}`,
+      text: `Nueva petición de oración desde el sitio de Somos Luz.\n\n${beneficiario ? `Se ora por: ${beneficiario}\nLa trae: ${nombre}` : `De: ${nombre}`}${email ? ` (${email})` : ''}\n\n${peticion}\n\nVer en la intranet: https://somosluziglesia.cl/intranet/dashboard/oracion`,
       html: `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;color:#1f2937">
   <h2 style="margin:0 0 4px">🙏 Nueva petición de oración</h2>
   <p style="color:#6b7280;margin:0 0 16px;font-size:14px">Enviada desde el sitio de Somos Luz</p>
-  <p style="margin:0 0 12px"><strong>${escapeHtml(nombre)}</strong>${email ? ` · ${escapeHtml(email)}` : ''}</p>
+  ${beneficiario
+    ? `<p style="margin:0 0 4px"><strong>Se ora por: ${escapeHtml(beneficiario)}</strong></p>
+  <p style="margin:0 0 12px;color:#6b7280;font-size:14px">La trae ${escapeHtml(nombre)}${email ? ` · ${escapeHtml(email)}` : ''}</p>`
+    : `<p style="margin:0 0 12px"><strong>${escapeHtml(nombre)}</strong>${email ? ` · ${escapeHtml(email)}` : ''}</p>`}
   <blockquote style="border-left:3px solid #f97316;margin:0 0 16px;padding:4px 0 4px 12px;white-space:pre-wrap;color:#374151">${escapeHtml(peticion)}</blockquote>
   <a href="https://somosluziglesia.cl/intranet/dashboard/oracion" style="color:#0f766e;font-weight:600;text-decoration:none">Ver en la intranet →</a>
 </div>`,
@@ -61,7 +70,10 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .select('id, nombre, email, telefono, peticion, estado, origen, persona_id, created_at')
+    .select('id, nombre, beneficiario, categoria, email, telefono, peticion, estado, origen, persona_id, created_at, ultimo_contacto, nota_seguimiento')
+    // Las archivadas no se listan: desde la app, eliminar tiene que verse como
+    // eliminar. La columna existe para poder deshacer, no para mostrarlas.
+    .is('archivada_en', null)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -71,21 +83,101 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ peticiones: data ?? [] });
 }
 
-// PATCH /api/oracion — cambiar el estado de una petición (pastor y Oración)
+// PATCH /api/oracion — modificar una petición (pastor y perfil Oración).
+//
+// Cada campo va por separado y todos son opcionales: clasificar, cambiar de
+// estado y corregir el texto son gestos distintos y se hacen en momentos
+// distintos. Se puede clasificar sin dar la petición por atendida.
+//
+// Corregir el texto y los nombres es permiso de Nicole desde el 03/09/2026:
+// las peticiones llegan escritas a la rápida o dictadas por teléfono, y hasta
+// ahora un dato mal anotado se quedaba mal para siempre.
 export async function PATCH(req: NextRequest) {
   const session = getSession(req);
   if (!session || !puedeVerOracion(session.role)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const { id, estado } = await req.json().catch(() => ({}));
-  if (!id || !ESTADOS.includes(estado)) {
-    return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+  const {
+    id, estado, categoria, peticion, nombre, beneficiario, origen,
+    ultimo_contacto, nota_seguimiento, restaurar,
+  } = await req.json().catch(() => ({}));
+  if (!id) {
+    return NextResponse.json({ error: 'Falta la petición' }, { status: 400 });
+  }
+
+  const cambios: Record<string, unknown> = {};
+  if (estado !== undefined) {
+    if (!ESTADOS.includes(estado)) {
+      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
+    }
+    cambios.estado = estado;
+  }
+  if (categoria !== undefined) {
+    // null desclasifica: sirve para devolver a la bandeja algo mal asignado.
+    if (categoria !== null && !esCategoriaOracion(categoria)) {
+      return NextResponse.json({ error: 'Categoría inválida' }, { status: 400 });
+    }
+    cambios.categoria = categoria;
+  }
+  if (peticion !== undefined) {
+    const p = typeof peticion === 'string' ? peticion.trim() : '';
+    if (!p) return NextResponse.json({ error: 'La petición no puede quedar vacía' }, { status: 400 });
+    if (p.length > 2000) return NextResponse.json({ error: 'La petición es demasiado larga' }, { status: 400 });
+    cambios.peticion = p;
+  }
+  if (nombre !== undefined) {
+    const n = typeof nombre === 'string' ? nombre.trim() : '';
+    if (!n) return NextResponse.json({ error: 'El nombre no puede quedar vacío' }, { status: 400 });
+    if (n.length > 100) return NextResponse.json({ error: 'El nombre es demasiado largo' }, { status: 400 });
+    cambios.nombre = n;
+  }
+  if (beneficiario !== undefined) {
+    const b = typeof beneficiario === 'string' ? beneficiario.trim() : '';
+    if (b.length > 100) return NextResponse.json({ error: 'El nombre es demasiado largo' }, { status: 400 });
+    // Vacío vuelve a "es para sí mismo": permite deshacer una separación mal
+    // hecha sin tener que borrar la petición.
+    cambios.beneficiario = b || null;
+  }
+  if (origen !== undefined) {
+    // Corregible a propósito: el canal de entrada da el valor inicial, pero un
+    // miembro de la iglesia puede escribir desde el sitio público y entraría
+    // marcado como "Fuera de Somos Luz". Ver lib/oracion-origen.
+    if (!esOrigenOracion(origen)) {
+      return NextResponse.json({ error: 'Origen inválido' }, { status: 400 });
+    }
+    cambios.origen = origen;
+  }
+  if (ultimo_contacto !== undefined) {
+    // Se guarda como 'YYYY-MM-DD' tal cual llega del <input type="date">, sin
+    // pasar por Date: convertirla a timestamp la correría un día en Chile.
+    if (ultimo_contacto === null || ultimo_contacto === '') {
+      cambios.ultimo_contacto = null;
+    } else if (typeof ultimo_contacto === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ultimo_contacto)) {
+      cambios.ultimo_contacto = ultimo_contacto;
+    } else {
+      return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 });
+    }
+  }
+  if (nota_seguimiento !== undefined) {
+    const nota = typeof nota_seguimiento === 'string' ? nota_seguimiento.trim() : '';
+    if (nota.length > 1000) {
+      return NextResponse.json({ error: 'La nota es demasiado larga' }, { status: 400 });
+    }
+    cambios.nota_seguimiento = nota || null;
+  }
+  // Deshacer un borrado. Va por acá y no por un endpoint aparte porque es
+  // literalmente devolver una columna a NULL.
+  if (restaurar === true) {
+    cambios.archivada_en = null;
+  }
+  if (Object.keys(cambios).length === 0) {
+    return NextResponse.json({ error: 'Nada que cambiar' }, { status: 400 });
   }
 
   const { error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .update({ estado })
+    .update(cambios)
     .eq('id', id);
 
   if (error) {
@@ -98,7 +190,7 @@ export async function PATCH(req: NextRequest) {
 // POST /api/oracion — recibir petición de oración (endpoint PÚBLICO, sin sesión)
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { nombre, email, peticion, telefono, sitio_web } = body as Record<string, unknown>;
+  const { nombre, email, peticion, telefono, sitio_web, beneficiario } = body as Record<string, unknown>;
 
   // Honeypot: los humanos nunca ven este campo; si viene lleno es un bot.
   // Respondemos ok para no darle señales al bot.
@@ -115,6 +207,9 @@ export async function POST(req: NextRequest) {
   const p = typeof peticion === 'string' ? peticion.trim() : '';
   const e = typeof email === 'string' ? email.trim() : '';
   const tel = typeof telefono === 'string' ? telefono.trim() : '';
+  // Por quién se ora, cuando no es quien pide. Vacío = es para sí mismo, y se
+  // guarda como NULL para que ese caso tenga una sola representación.
+  const ben = typeof beneficiario === 'string' ? beneficiario.trim() : '';
 
   // El teléfono pasó a ser obligatorio (reunión 24/08/2026): el equipo lo
   // prioriza sobre el email para contactar a quien pide oración. Se valida
@@ -123,7 +218,7 @@ export async function POST(req: NextRequest) {
   if (!n || !p || !tel) {
     return NextResponse.json({ error: 'Nombre, teléfono y petición son obligatorios' }, { status: 400 });
   }
-  if (n.length > 100 || p.length > 2000 || e.length > 200 || tel.length > 30) {
+  if (n.length > 100 || p.length > 2000 || e.length > 200 || tel.length > 30 || ben.length > 100) {
     return NextResponse.json({ error: 'Datos demasiado largos' }, { status: 400 });
   }
 
@@ -132,6 +227,7 @@ export async function POST(req: NextRequest) {
     email: e || null,
     telefono: tel || null,
     peticion: p,
+    beneficiario: ben || null,
     origen: 'externa',
   });
 
@@ -141,7 +237,7 @@ export async function POST(req: NextRequest) {
 
   // Notifica al pastor DESPUÉS de responder: no añade latencia al formulario
   // y un fallo del correo no afecta al visitante que ya quedó guardado.
-  after(() => notificarPastor(n, e, p));
+  after(() => notificarPastor(n, e, p, ben));
 
   return NextResponse.json({ ok: true });
 }
