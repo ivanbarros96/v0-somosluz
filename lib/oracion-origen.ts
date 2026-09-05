@@ -13,18 +13,15 @@
 
 export type OrigenOracion = 'interna' | 'externa';
 
-export const ORIGENES_ORACION: Record<
-  OrigenOracion,
-  { label: string; corto: string; clase: string }
-> = {
+// Un solo nombre, igual que en las categorías: la misma cosa no puede leerse
+// distinta según dónde aparezca.
+export const ORIGENES_ORACION: Record<OrigenOracion, { nombre: string; clase: string }> = {
   interna: {
-    label: 'Dentro de Somos Luz',
-    corto: 'Dentro',
+    nombre: 'Dentro de Somos Luz',
     clase: 'bg-primary/10 text-primary',
   },
   externa: {
-    label: 'Fuera de Somos Luz',
-    corto: 'Fuera',
+    nombre: 'Fuera de Somos Luz',
     clase: 'bg-secondary text-muted-foreground',
   },
 };

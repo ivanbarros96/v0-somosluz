@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .select('id, nombre, beneficiario, categoria, email, telefono, peticion, estado, origen, persona_id, created_at, ultimo_contacto, nota_seguimiento')
+    .select('id, nombre, beneficiario, beneficiario_persona_id, categoria, email, telefono, peticion, estado, origen, persona_id, created_at')
     // Las archivadas no se listan: desde la app, eliminar tiene que verse como
     // eliminar. La columna existe para poder deshacer, no para mostrarlas.
     .is('archivada_en', null)
@@ -99,8 +99,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   const {
-    id, estado, categoria, peticion, nombre, beneficiario, origen,
-    ultimo_contacto, nota_seguimiento, restaurar,
+    id, estado, categoria, peticion, nombre, beneficiario, beneficiario_persona_id,
+    origen, restaurar,
   } = await req.json().catch(() => ({}));
   if (!id) {
     return NextResponse.json({ error: 'Falta la petición' }, { status: 400 });
@@ -148,23 +148,16 @@ export async function PATCH(req: NextRequest) {
     }
     cambios.origen = origen;
   }
-  if (ultimo_contacto !== undefined) {
-    // Se guarda como 'YYYY-MM-DD' tal cual llega del <input type="date">, sin
-    // pasar por Date: convertirla a timestamp la correría un día en Chile.
-    if (ultimo_contacto === null || ultimo_contacto === '') {
-      cambios.ultimo_contacto = null;
-    } else if (typeof ultimo_contacto === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ultimo_contacto)) {
-      cambios.ultimo_contacto = ultimo_contacto;
+  if (beneficiario_persona_id !== undefined) {
+    // Se ora por alguien de la congregación: se guarda la ficha además del
+    // nombre. null desliga sin borrar el texto.
+    if (beneficiario_persona_id === null) {
+      cambios.beneficiario_persona_id = null;
+    } else if (typeof beneficiario_persona_id === 'number') {
+      cambios.beneficiario_persona_id = beneficiario_persona_id;
     } else {
-      return NextResponse.json({ error: 'Fecha inválida' }, { status: 400 });
+      return NextResponse.json({ error: 'Persona inválida' }, { status: 400 });
     }
-  }
-  if (nota_seguimiento !== undefined) {
-    const nota = typeof nota_seguimiento === 'string' ? nota_seguimiento.trim() : '';
-    if (nota.length > 1000) {
-      return NextResponse.json({ error: 'La nota es demasiado larga' }, { status: 400 });
-    }
-    cambios.nota_seguimiento = nota || null;
   }
   // Deshacer un borrado. Va por acá y no por un endpoint aparte porque es
   // literalmente devolver una columna a NULL.

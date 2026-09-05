@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
   const nombreLibre = typeof body.nombre === 'string' ? body.nombre.trim() : '';
   const peticion = typeof body.peticion === 'string' ? body.peticion.trim() : '';
   // Por quién se ora, cuando no es quien la trae. Vacío = para sí mismo.
-  const beneficiario = typeof body.beneficiario === 'string' ? body.beneficiario.trim() : '';
+  let beneficiario = typeof body.beneficiario === 'string' ? body.beneficiario.trim() : '';
+  // Se puede orar por alguien QUE SÍ ESTÁ en la congregación: entonces viene su
+  // ficha y el nombre se toma de ahí, no escrito a mano.
+  const beneficiarioPersonaId =
+    typeof body.beneficiario_persona_id === 'number' ? body.beneficiario_persona_id : null;
   // Opcional: quien registra desde la intranet sí conoce las categorías, pero
   // no se le obliga a elegir para no frenar la anotación rápida.
   const categoria = esCategoriaOracion(body.categoria) ? body.categoria : null;
@@ -81,6 +85,19 @@ export async function POST(req: NextRequest) {
     nombre = visita.nombre;
   }
 
+  if (beneficiarioPersonaId) {
+    const { data: ben, error } = await db
+      .from('personas')
+      .select('nombre')
+      .eq('id', beneficiarioPersonaId)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!ben) return NextResponse.json({ error: 'Esa persona no existe' }, { status: 404 });
+    // El nombre se guarda igual aunque haya ficha: la lista se lee sin join y
+    // la petición sobrevive si algún día se borra la persona.
+    beneficiario = ben.nombre;
+  }
+
   if (nombre.length > 100 || beneficiario.length > 100) {
     return NextResponse.json({ error: 'El nombre es demasiado largo' }, { status: 400 });
   }
@@ -88,6 +105,7 @@ export async function POST(req: NextRequest) {
   const { error } = await db.from('peticiones_oracion').insert({
     nombre,
     beneficiario: beneficiario || null,
+    beneficiario_persona_id: beneficiarioPersonaId,
     categoria,
     peticion,
     origen: 'interna',

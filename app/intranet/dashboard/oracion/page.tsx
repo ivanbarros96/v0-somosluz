@@ -14,7 +14,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil } from 'lucide-react';
+import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -52,6 +52,16 @@ interface Seleccion {
 type Estado = 'pendiente' | 'orando' | 'contestada';
 type Origen = 'interna' | 'externa';
 
+/** Un contacto con quien trae la petición. Varios por petición: es el historial. */
+interface Seguimiento {
+  id: string;
+  peticion_id: string;
+  fecha: string; // 'YYYY-MM-DD'
+  nota: string;
+  registrado_por: string | null;
+  created_at: string;
+}
+
 interface Peticion {
   id: string;
   /** Quien trae la petición. Es SIEMPRE el contacto para el seguimiento. */
@@ -60,10 +70,8 @@ interface Peticion {
   beneficiario: string | null;
   /** Clasificación de Nicole. null = todavía sin clasificar. */
   categoria: CategoriaOracion | null;
-  /** Último día en que se habló con quien la trae. 'YYYY-MM-DD' o null. */
-  ultimo_contacto: string | null;
-  /** Qué se supo la última vez. */
-  nota_seguimiento: string | null;
+  /** Ficha, cuando se ora por alguien de la congregación. */
+  beneficiario_persona_id: number | null;
   email: string | null;
   telefono: string | null;
   peticion: string;
@@ -92,7 +100,7 @@ const FILTROS_ORIGEN: { valor: Origen | 'todos'; label: string }[] = [
 const FILTROS_CATEGORIA: { valor: CategoriaOracion | 'todas' | 'sin'; label: string }[] = [
   { valor: 'todas', label: 'Toda categoría' },
   { valor: 'sin', label: 'Sin clasificar' },
-  ...CATEGORIA_KEYS.map((k) => ({ valor: k, label: CATEGORIAS_ORACION[k].corto })),
+  ...CATEGORIA_KEYS.map((k) => ({ valor: k, label: CATEGORIAS_ORACION[k].nombre })),
 ];
 
 const ESTADO_STYLE: Record<Estado, string> = {
@@ -123,6 +131,22 @@ export default function OracionPage() {
   const [eliminando, setEliminando] = useState(false);
   // Petición que se está editando.
   const [aEditar, setAEditar] = useState<Peticion | null>(null);
+  // Historial de contactos de TODAS las peticiones; se agrupa por petición al
+  // pintar. Anotar un contacto es la acción más repetida del perfil, así que
+  // tiene su propio botón y no vive escondida dentro de "editar".
+  const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
+  const [aSeguir, setASeguir] = useState<Peticion | null>(null);
+
+  // id de petición → sus contactos, del más reciente al más antiguo.
+  const porPeticion = useMemo(() => {
+    const m = new Map<string, Seguimiento[]>();
+    for (const s of seguimientos) {
+      const lista = m.get(s.peticion_id);
+      if (lista) lista.push(s);
+      else m.set(s.peticion_id, [s]);
+    }
+    return m;
+  }, [seguimientos]);
 
   async function restaurar(p: Peticion) {
     try {
@@ -173,8 +197,6 @@ export default function OracionPage() {
     nombre: string;
     beneficiario: string;
     origen: Origen;
-    ultimo_contacto: string;
-    nota_seguimiento: string;
   }) {
     if (!aEditar) return;
     const id = aEditar.id;
@@ -184,8 +206,6 @@ export default function OracionPage() {
       nombre: cambios.nombre.trim(),
       beneficiario: cambios.beneficiario.trim() || null,
       origen: cambios.origen,
-      ultimo_contacto: cambios.ultimo_contacto || null,
-      nota_seguimiento: cambios.nota_seguimiento.trim() || null,
     };
     setPeticiones((ps) => ps.map((p) => (p.id === id ? { ...p, ...nuevo } : p)));
     setAEditar(null);
@@ -197,8 +217,9 @@ export default function OracionPage() {
           id,
           ...nuevo,
           beneficiario: nuevo.beneficiario ?? '',
-          ultimo_contacto: nuevo.ultimo_contacto ?? '',
-          nota_seguimiento: nuevo.nota_seguimiento ?? '',
+          // Al reescribir el nombre a mano se desliga de la ficha: el texto ya
+          // no tiene por qué corresponder a esa persona.
+          beneficiario_persona_id: null,
         }),
       });
       if (!res.ok) {
@@ -219,14 +240,47 @@ export default function OracionPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch('/api/oracion');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setPeticiones(data.peticiones ?? []);
+      // Las dos juntas: el historial se pinta dentro de cada tarjeta, así que
+      // pedirlo aparte por petición serían decenas de consultas.
+      const [rp, rs] = await Promise.all([
+        fetch('/api/oracion'),
+        fetch('/api/oracion/seguimientos'),
+      ]);
+      if (!rp.ok) throw new Error();
+      setPeticiones((await rp.json()).peticiones ?? []);
+      if (rs.ok) setSeguimientos((await rs.json()).seguimientos ?? []);
     } catch {
       toast.error('No pudimos cargar las peticiones');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function anotarSeguimiento(peticionId: string, fecha: string, nota: string) {
+    const res = await fetch('/api/oracion/seguimientos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ peticion_id: peticionId, fecha, nota }),
+    });
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({}));
+      throw new Error(error || 'No pudimos guardar el seguimiento');
+    }
+    const { seguimiento } = await res.json();
+    setSeguimientos((ss) =>
+      [seguimiento, ...ss].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0)),
+    );
+  }
+
+  async function borrarSeguimiento(id: string) {
+    const prev = seguimientos;
+    setSeguimientos((ss) => ss.filter((s) => s.id !== id));
+    try {
+      const res = await fetch(`/api/oracion/seguimientos?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSeguimientos(prev);
+      toast.error('No pudimos eliminar la anotación');
     }
   }
 
@@ -470,7 +524,7 @@ export default function OracionPage() {
                           ORIGENES_ORACION[p.origen].clase,
                         )}
                       >
-                        {ORIGENES_ORACION[p.origen].label}
+                        {ORIGENES_ORACION[p.origen].nombre}
                       </span>
                     </div>
                     {p.beneficiario && (
@@ -517,7 +571,7 @@ export default function OracionPage() {
                                 p.categoria === k && 'font-semibold text-primary',
                               )}
                             >
-                              {CATEGORIAS_ORACION[k].label}
+                              {CATEGORIAS_ORACION[k].nombre}
                               {p.categoria === k && <Check className="h-4 w-4 shrink-0" aria-hidden />}
                             </button>
                           ))}
@@ -575,51 +629,27 @@ export default function OracionPage() {
                 {/* Seguimiento. Sin la FECHA, un "sin información" no dice nada:
                     puede ser de hace tres días o de hace tres semanas. Es
                     exactamente lo que le falta al informe en papel. */}
-                {(() => {
-                  const dias = p.ultimo_contacto ? diasDesde(p.ultimo_contacto) : null;
-                  const frio = dias !== null && dias >= DIAS_SIN_NOTICIAS;
-                  const contestada = p.estado === 'contestada';
-                  if (!p.ultimo_contacto && contestada) return null;
-                  return (
-                    <div
-                      className={cn(
-                        'mt-3 rounded-lg border px-3 py-2 text-xs',
-                        !p.ultimo_contacto || frio
-                          ? 'border-amber-500/35 bg-amber-500/10'
-                          : 'border-border bg-muted/40',
-                      )}
-                    >
-                      {p.ultimo_contacto ? (
-                        <p className="text-foreground">
-                          <span className="font-semibold">
-                            Último contacto: {fechaLegible(p.ultimo_contacto)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {dias === 0
-                              ? ' · hoy'
-                              : dias === 1
-                                ? ' · ayer'
-                                : ` · hace ${dias} días`}
-                          </span>
-                        </p>
-                      ) : (
-                        <p className="text-foreground">
-                          Todavía no se ha registrado ningún contacto
-                        </p>
-                      )}
-                      {p.nota_seguimiento && (
-                        <p className="mt-1 text-muted-foreground whitespace-pre-wrap text-pretty">
-                          {p.nota_seguimiento}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
+                <BloqueSeguimiento
+                  historial={porPeticion.get(p.id) ?? []}
+                  contestada={p.estado === 'contestada'}
+                  onBorrar={borrarSeguimiento}
+                />
 
                 {/* flex-wrap: en 375px los dos botones de estado más el lápiz y
                     la papelera no caben en una línea y la papelera quedaba
                     cortada fuera de la tarjeta. */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {/* Anotar un contacto es LA acción del seguimiento y estaba
+                      escondida dentro de "editar". Va primero y con su nombre. */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => setASeguir(p)}
+                  >
+                    <MessageSquarePlus className="mr-1 h-3.5 w-3.5" />
+                    Anotar contacto
+                  </Button>
                   {p.estado !== 'orando' && (
                     <Button
                       size="sm"
@@ -688,6 +718,12 @@ export default function OracionPage() {
         onCreada={load}
       />
 
+      <AnotarContactoDialog
+        peticion={aSeguir}
+        onCerrar={() => setASeguir(null)}
+        onGuardar={anotarSeguimiento}
+      />
+
       <EditarPeticionDialog
         peticion={aEditar}
         onCerrar={() => setAEditar(null)}
@@ -738,6 +774,204 @@ export default function OracionPage() {
   );
 }
 
+// ── Seguimiento dentro de la tarjeta ────────────────────────────────────────
+//
+// Muestra el último contacto y, si hay más, deja abrir el historial completo.
+// Antes sólo existía UNA nota que se pisaba cada vez, así que la evolución
+// —que en el informe real de la Red es la información— se perdía.
+function BloqueSeguimiento({
+  historial,
+  contestada,
+  onBorrar,
+}: {
+  historial: Seguimiento[];
+  contestada: boolean;
+  onBorrar: (id: string) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  const ultimo = historial[0];
+  const dias = ultimo ? diasDesde(ultimo.fecha) : null;
+  const frio = dias !== null && dias >= DIAS_SIN_NOTICIAS;
+
+  // Una petición ya contestada y sin seguimiento no necesita que se le recuerde
+  // nada: se cerró y ya está.
+  if (!ultimo && contestada) return null;
+
+  const cuando = (d: number) => (d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`);
+
+  return (
+    <div
+      className={cn(
+        'mt-3 rounded-lg border px-3 py-2 text-xs',
+        !ultimo || frio ? 'border-amber-500/35 bg-amber-500/10' : 'border-border bg-muted/40',
+      )}
+    >
+      {!ultimo ? (
+        <p className="text-foreground">Todavía no se ha registrado ningún contacto</p>
+      ) : (
+        <>
+          <p className="text-foreground">
+            <span className="font-semibold">Último contacto: {fechaLegible(ultimo.fecha)}</span>
+            <span className="text-muted-foreground"> · {cuando(dias!)}</span>
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-pretty text-muted-foreground">
+            {ultimo.nota}
+          </p>
+
+          {historial.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setAbierto((v) => !v)}
+                aria-expanded={abierto}
+                className="mt-1.5 inline-flex min-h-9 items-center gap-1 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+              >
+                {abierto
+                  ? 'Ocultar historial'
+                  : `Ver historial (${historial.length} contactos)`}
+                <ChevronsUpDown className="h-3 w-3" aria-hidden />
+              </button>
+
+              {abierto && (
+                // Línea de tiempo: el filete a la izquierda hace ver que son
+                // momentos de una misma historia y no notas sueltas.
+                <ol className="mt-2 space-y-2.5 border-l border-border pl-3">
+                  {historial.slice(1).map((s) => (
+                    <li key={s.id} className="group relative">
+                      <span
+                        aria-hidden
+                        className="absolute -left-[15px] top-1.5 h-1.5 w-1.5 rounded-full bg-border"
+                      />
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground">{fechaLegible(s.fecha)}</p>
+                          <p className="whitespace-pre-wrap text-pretty text-muted-foreground">
+                            {s.nota}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onBorrar(s.id)}
+                          aria-label={`Eliminar la anotación del ${fechaLegible(s.fecha)}`}
+                          className="shrink-0 rounded p-1.5 text-muted-foreground opacity-0 transition hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Anotar un contacto ──────────────────────────────────────────────────────
+function AnotarContactoDialog({
+  peticion,
+  onCerrar,
+  onGuardar,
+}: {
+  peticion: Peticion | null;
+  onCerrar: () => void;
+  onGuardar: (peticionId: string, fecha: string, nota: string) => Promise<void>;
+}) {
+  const [fecha, setFecha] = useState(hoyEnChile());
+  const [nota, setNota] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  // Cada vez que se abre parte en blanco y con la fecha de hoy: lo normal es
+  // anotar algo que acaba de pasar.
+  useEffect(() => {
+    if (!peticion) return;
+    setFecha(hoyEnChile());
+    setNota('');
+  }, [peticion]);
+
+  async function guardar() {
+    if (!peticion || !nota.trim()) return;
+    setGuardando(true);
+    try {
+      await onGuardar(peticion.id, fecha, nota.trim());
+      toast.success('Contacto anotado');
+      onCerrar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No pudimos guardarlo');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!peticion} onOpenChange={(v) => { if (!v && !guardando) onCerrar(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Anotar contacto</DialogTitle>
+          <DialogDescription>
+            {peticion && (
+              <>
+                Se habló con{' '}
+                <span className="font-medium text-foreground">{peticion.nombre}</span>
+                {peticion.beneficiario ? `, que trae la petición por ${peticion.beneficiario}.` : '.'}
+              </>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="seg-fecha">¿Cuándo?</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id="seg-fecha"
+                type="date"
+                value={fecha}
+                max={hoyEnChile()}
+                onChange={(e) => setFecha(e.target.value)}
+                className="w-auto"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11"
+                onClick={() => setFecha(hoyEnChile())}
+              >
+                Hoy
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="seg-nota">¿Qué se supo?</Label>
+            <Textarea
+              id="seg-nota"
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              autoFocus
+              placeholder="Ej: sigue en espera de la biopsia, se le escribió por WhatsApp"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onCerrar} disabled={guardando}>Cancelar</Button>
+          <Button onClick={guardar} disabled={guardando || !nota.trim()}>
+            {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando…</> : 'Anotar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Editar una petición ─────────────────────────────────────────────────────
 //
 // Permiso de Nicole desde el 03/09/2026. Las peticiones llegan escritas a la
@@ -755,16 +989,12 @@ function EditarPeticionDialog({
     nombre: string;
     beneficiario: string;
     origen: Origen;
-    ultimo_contacto: string;
-    nota_seguimiento: string;
   }) => void;
 }) {
   const [texto, setTexto] = useState('');
   const [nombre, setNombre] = useState('');
   const [beneficiario, setBeneficiario] = useState('');
   const [origen, setOrigen] = useState<Origen>('interna');
-  const [contacto, setContacto] = useState('');
-  const [nota, setNota] = useState('');
 
   // Se recarga cada vez que se abre con otra petición; sin esto el diálogo
   // mostraría los datos de la anterior.
@@ -774,8 +1004,6 @@ function EditarPeticionDialog({
     setNombre(peticion.nombre);
     setBeneficiario(peticion.beneficiario ?? '');
     setOrigen(peticion.origen);
-    setContacto(peticion.ultimo_contacto ?? '');
-    setNota(peticion.nota_seguimiento ?? '');
   }, [peticion]);
 
   const sinCambios =
@@ -783,9 +1011,7 @@ function EditarPeticionDialog({
     texto.trim() === peticion.peticion &&
     nombre.trim() === peticion.nombre &&
     (beneficiario.trim() || null) === peticion.beneficiario &&
-    origen === peticion.origen &&
-    (contacto || null) === peticion.ultimo_contacto &&
-    (nota.trim() || null) === peticion.nota_seguimiento;
+    origen === peticion.origen;
 
   return (
     <Dialog open={!!peticion} onOpenChange={(v) => { if (!v) onCerrar(); }}>
@@ -842,7 +1068,7 @@ function EditarPeticionDialog({
                       : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground',
                   )}
                 >
-                  {ORIGENES_ORACION[k].label}
+                  {ORIGENES_ORACION[k].nombre}
                 </button>
               ))}
             </div>
@@ -859,57 +1085,6 @@ function EditarPeticionDialog({
             />
           </div>
 
-          {/* Seguimiento (cap. 37 del manual). Va junto porque son una sola
-              acción: se llama, y se anota cuándo y qué se supo. */}
-          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Seguimiento
-            </p>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-contacto">Último contacto</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  id="edit-contacto"
-                  type="date"
-                  value={contacto}
-                  max={hoyEnChile()}
-                  onChange={(e) => setContacto(e.target.value)}
-                  className="w-auto"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-11"
-                  onClick={() => setContacto(hoyEnChile())}
-                >
-                  Hoy
-                </Button>
-                {contacto && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="min-h-11 text-muted-foreground"
-                    onClick={() => setContacto('')}
-                  >
-                    Quitar
-                  </Button>
-                )}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-nota">Qué se supo</Label>
-              <Textarea
-                id="edit-nota"
-                value={nota}
-                onChange={(e) => setNota(e.target.value)}
-                rows={3}
-                maxLength={1000}
-                placeholder="Ej: sigue en espera de la biopsia, se le escribió por WhatsApp"
-              />
-            </div>
-          </div>
         </div>
 
         <DialogFooter className="gap-2">
@@ -921,8 +1096,6 @@ function EditarPeticionDialog({
                 nombre,
                 beneficiario,
                 origen,
-                ultimo_contacto: contacto,
-                nota_seguimiento: nota,
               })
             }
             disabled={sinCambios || !texto.trim() || !nombre.trim()}
@@ -963,6 +1136,11 @@ function NuevaPeticionDialog({
   // Quien la trae queda como el contacto para el seguimiento.
   const [paraOtro, setParaOtro] = useState(false);
   const [beneficiario, setBeneficiario] = useState('');
+  // Por quién se ora puede ser alguien de la congregación (con ficha) o un
+  // nombre escrito a mano, para quien todavía no está registrado.
+  const [benEsMiembro, setBenEsMiembro] = useState(false);
+  const [benSeleccion, setBenSeleccion] = useState<Seleccion | null>(null);
+  const [benComboAbierto, setBenComboAbierto] = useState(false);
   const [categoria, setCategoria] = useState<CategoriaOracion | ''>('');
 
   // Carga la congregación la primera vez que se abre el diálogo.
@@ -1005,6 +1183,8 @@ function NuevaPeticionDialog({
     setSeleccion(null);
     setParaOtro(false);
     setBeneficiario('');
+    setBenEsMiembro(false);
+    setBenSeleccion(null);
     setCategoria('');
   }
 
@@ -1022,7 +1202,11 @@ function NuevaPeticionDialog({
       toast.error('Escribe el nombre');
       return;
     }
-    if (paraOtro && !beneficiario.trim()) {
+    if (paraOtro && benEsMiembro && !benSeleccion) {
+      toast.error('Elige por quién se ora');
+      return;
+    }
+    if (paraOtro && !benEsMiembro && !beneficiario.trim()) {
       toast.error('Escribe por quién se ora');
       return;
     }
@@ -1032,10 +1216,18 @@ function NuevaPeticionDialog({
     // mueven solas a la ficha nueva.
     // Quien la registra desde acá sí conoce las categorías, así que se pide en
     // el momento. Las que llegan del sitio público no: entran sin clasificar.
-    const extra = {
-      ...(paraOtro ? { beneficiario: beneficiario.trim() } : {}),
-      ...(categoria ? { categoria } : {}),
-    };
+    // Si es de la congregación viaja su ficha y el servidor toma el nombre de
+    // ahí; si no, viaja el texto escrito a mano. Las visitas (miembros_nuevos)
+    // aún no tienen columna propia, así que van por nombre.
+    const porQuien = !paraOtro
+      ? {}
+      : benEsMiembro && benSeleccion?.origen === 'persona'
+        ? { beneficiario_persona_id: benSeleccion.id }
+        : benEsMiembro && benSeleccion
+          ? { beneficiario: benSeleccion.nombre }
+          : { beneficiario: beneficiario.trim() };
+
+    const extra = { ...porQuien, ...(categoria ? { categoria } : {}) };
     const cuerpo =
       modo === 'libre'
         ? { nombre: nombreLibre.trim(), peticion: texto, ...extra }
@@ -1188,16 +1380,101 @@ function NuevaPeticionDialog({
               <span className="text-sm">Se ora por otra persona</span>
             </label>
             {paraOtro && (
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="beneficiario">¿Por quién se ora?</Label>
-                <input
-                  id="beneficiario"
-                  value={beneficiario}
-                  onChange={(e) => setBeneficiario(e.target.value)}
-                  maxLength={100}
-                  placeholder="Ej: Ricardo Aquino"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                />
+              <div className="space-y-2 pt-1">
+                {/* La persona por la que se ora puede SER de la congregación.
+                    Antes solo se podía escribir su nombre a mano, así que su
+                    petición quedaba suelta y sin relación con su ficha. */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={!benEsMiembro}
+                    onClick={() => { setBenEsMiembro(false); setBenSeleccion(null); }}
+                    className={cn(
+                      'min-h-11 rounded-full border px-3.5 text-sm transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                      !benEsMiembro
+                        ? 'border-primary bg-primary font-semibold text-primary-foreground'
+                        : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    Escribir el nombre
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={benEsMiembro}
+                    onClick={() => { setBenEsMiembro(true); setBeneficiario(''); }}
+                    className={cn(
+                      'min-h-11 rounded-full border px-3.5 text-sm transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                      benEsMiembro
+                        ? 'border-primary bg-primary font-semibold text-primary-foreground'
+                        : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    Es de la congregación
+                  </button>
+                </div>
+
+                {benEsMiembro ? (
+                  <Popover open={benComboAbierto} onOpenChange={setBenComboAbierto}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={benComboAbierto}
+                        className="w-full justify-between font-normal"
+                      >
+                        {benSeleccion?.nombre ?? 'Elige a la persona'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar por nombre…" />
+                        <CommandList>
+                          <CommandEmpty>No encontramos a nadie con ese nombre.</CommandEmpty>
+                          {grupos.map((g) => (
+                            <CommandGroup key={g.heading} heading={g.heading}>
+                              {g.items.map((item) => (
+                                <CommandItem
+                                  key={`${item.origen}-${item.id}`}
+                                  value={`${item.nombre} ${g.heading}`}
+                                  onSelect={() => {
+                                    setBenSeleccion(item);
+                                    setBenComboAbierto(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      'mr-2 h-4 w-4',
+                                      benSeleccion?.id === item.id && benSeleccion?.origen === item.origen
+                                        ? 'opacity-100'
+                                        : 'opacity-0',
+                                    )}
+                                  />
+                                  {item.nombre}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="beneficiario">¿Por quién se ora?</Label>
+                    <input
+                      id="beneficiario"
+                      value={beneficiario}
+                      onChange={(e) => setBeneficiario(e.target.value)}
+                      maxLength={100}
+                      placeholder="Ej: Ricardo Aquino"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground">
                   El contacto para el seguimiento sigue siendo quien la trae.
                 </p>
@@ -1234,7 +1511,7 @@ function NuevaPeticionDialog({
                       : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground',
                   )}
                 >
-                  {CATEGORIAS_ORACION[k].corto}
+                  {CATEGORIAS_ORACION[k].nombre}
                 </button>
               ))}
             </div>
