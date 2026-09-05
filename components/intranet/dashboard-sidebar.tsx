@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
 import { useConteoPendiente } from '@/hooks/use-conteo-pendiente';
 import { useCultosSinCerrar } from '@/hooks/use-cultos-sin-cerrar';
+import { useEquiposOracion } from '@/hooks/use-equipos-oracion';
 import { leerVisto, alCambiarVisto } from '@/lib/notif-visto';
 import { inicioDelDia, HORAS_LIMITE } from '@/lib/cultos-abiertos';
 import { Button } from '@/components/ui/button';
@@ -191,13 +192,14 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const params = useSearchParams();
 
   const isPastor = user?.role === 'pastor';
   const esCopastor = !!user && esRolCopastor(user.role);
   const esOracion = !!user && esRolOracion(user.role);
   const esKids = !!user && esRolKids(user.role);
   const esMinisterio = !!user && soloTomaAsistencia(user.role);
-  const navGrupos = isPastor
+  const navBase = isPastor
     ? PASTOR_NAV
     : esCopastor
       ? COPASTOR_NAV
@@ -208,6 +210,26 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
           : esMinisterio
             ? MINISTERIO_NAV
             : SOMOSLUZ_NAV;
+
+  // Equipos de oración como grupo propio del menú (idea de Iván, 04/09/2026):
+  // se entra directo al equipo en vez de entrar a Oración y filtrar. Cada
+  // enlace lleva la misma URL que produce el filtro de la pantalla, así que
+  // menú y filtros no se contradicen.
+  const equipos = useEquiposOracion(esOracion || isPastor);
+  const navGrupos: NavGrupo[] = useMemo(() => {
+    if (equipos.length === 0) return navBase;
+    return [
+      ...navBase,
+      {
+        titulo: 'Equipos de oración',
+        items: equipos.map((e) => ({
+          href: `/intranet/dashboard/oracion?equipo=${e.id}`,
+          label: e.nombre,
+          icon: Users,
+        })),
+      },
+    ];
+  }, [navBase, equipos]);
 
   // Peticiones de oración sin revisar. Alimenta el badge y el título de
   // pestaña. Lo ven quienes gestionan el panel de oración: pastor y el
@@ -265,10 +287,22 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
     onClose?.();
   };
 
-  const isActive = (href: string) =>
-    href === '/intranet/dashboard'
-      ? pathname === '/intranet/dashboard'
-      : pathname.startsWith(href);
+  // Los enlaces de equipo llevan parámetro (?equipo=…) y `pathname` no lo trae,
+  // así que hay que comparar también la consulta: sin esto ningún equipo se
+  // marcaría nunca y "Oración" se vería activo estando en cualquiera de ellos.
+  const equipoActual = params.get('equipo');
+  const isActive = (href: string) => {
+    const [ruta, consulta] = href.split('?');
+    const equipoDelEnlace = consulta ? new URLSearchParams(consulta).get('equipo') : null;
+
+    if (ruta === '/intranet/dashboard') return pathname === '/intranet/dashboard';
+    if (!pathname.startsWith(ruta)) return false;
+
+    // Dentro de Oración: el enlace de un equipo se marca sólo con SU equipo, y
+    // "Oración" a secas sólo cuando no hay ninguno elegido.
+    if (ruta === '/intranet/dashboard/oracion') return equipoDelEnlace === equipoActual;
+    return true;
+  };
 
   return (
     <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">

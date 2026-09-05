@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus } from 'lucide-react';
+import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -24,6 +24,11 @@ import {
 } from '@/lib/oracion-categorias';
 import { ORIGENES_ORACION, ORIGEN_KEYS } from '@/lib/oracion-origen';
 import { hoyEnChile, fechaLegible } from '@/components/agenda/calendario-mes';
+import {
+  COLORES_EQUIPO, COLOR_EQUIPO_KEYS, chipEquipo, puntoEquipo, avisarCambioEquipos,
+  type ColorEquipo, type EquipoOracion,
+} from '@/lib/oracion-equipos';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 /**
  * Días desde el último contacto. Se resta sobre las fechas en texto, sin Date:
@@ -72,6 +77,8 @@ interface Peticion {
   categoria: CategoriaOracion | null;
   /** Ficha, cuando se ora por alguien de la congregación. */
   beneficiario_persona_id: number | null;
+  /** Equipo responsable. null = nadie se ha hecho cargo todavía. */
+  equipo_id: string | null;
   email: string | null;
   telefono: string | null;
   peticion: string;
@@ -136,6 +143,49 @@ export default function OracionPage() {
   // tiene su propio botón y no vive escondida dentro de "editar".
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [aSeguir, setASeguir] = useState<Peticion | null>(null);
+  // Equipos: grupos de personas que se hacen cargo. Se administran desde acá.
+  const [equipos, setEquipos] = useState<EquipoOracion[]>([]);
+  const [equiposAbierto, setEquiposAbierto] = useState(false);
+  // El filtro por equipo sale de la URL para que los enlaces del menú de la
+  // izquierda lleven directo al equipo, y para poder compartir esa vista.
+  const params = useSearchParams();
+  const router = useRouter();
+  const filtroEquipo = params.get('equipo') ?? 'todos';
+  // Refs para que `load` los use sin tenerlos como dependencia: si no, cada
+  // cambio de URL recrearía la función y volvería a disparar la carga.
+  const paramsRef = useRef(params);
+  const routerRef = useRef(router);
+  paramsRef.current = params;
+  routerRef.current = router;
+
+  const equipoPorId = useMemo(
+    () => new Map(equipos.map((e) => [e.id, e])),
+    [equipos],
+  );
+
+  function verEquipo(valor: string) {
+    const qs = new URLSearchParams(params.toString());
+    if (valor === 'todos') qs.delete('equipo');
+    else qs.set('equipo', valor);
+    const s = qs.toString();
+    router.replace(s ? `?${s}` : '/intranet/dashboard/oracion', { scroll: false });
+  }
+
+  async function asignarEquipo(peticionId: string, equipoId: string | null) {
+    const prev = peticiones;
+    setPeticiones((ps) => ps.map((p) => (p.id === peticionId ? { ...p, equipo_id: equipoId } : p)));
+    try {
+      const res = await fetch('/api/oracion', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: peticionId, equipo_id: equipoId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPeticiones(prev);
+      toast.error('No pudimos asignar el equipo');
+    }
+  }
 
   // id de petición → sus contactos, del más reciente al más antiguo.
   const porPeticion = useMemo(() => {
@@ -242,13 +292,25 @@ export default function OracionPage() {
     try {
       // Las dos juntas: el historial se pinta dentro de cada tarjeta, así que
       // pedirlo aparte por petición serían decenas de consultas.
-      const [rp, rs] = await Promise.all([
+      const [rp, rs, re] = await Promise.all([
         fetch('/api/oracion'),
         fetch('/api/oracion/seguimientos'),
+        fetch('/api/oracion/equipos'),
       ]);
       if (!rp.ok) throw new Error();
       setPeticiones((await rp.json()).peticiones ?? []);
       if (rs.ok) setSeguimientos((await rs.json()).seguimientos ?? []);
+      if (re.ok) {
+        const lista: EquipoOracion[] = (await re.json()).equipos ?? [];
+        setEquipos(lista);
+        // Si se estaba viendo un equipo que ya no existe (lo acaban de borrar),
+        // se vuelve a "todos": quedarse ahí mostraría una lista vacía sin decir
+        // por qué.
+        const eq = paramsRef.current.get('equipo');
+        if (eq && eq !== 'sin' && !lista.some((e) => e.id === eq)) {
+          routerRef.current.replace('/intranet/dashboard/oracion', { scroll: false });
+        }
+      }
     } catch {
       toast.error('No pudimos cargar las peticiones');
     } finally {
@@ -347,10 +409,25 @@ export default function OracionPage() {
           (filtro === 'todas' || p.estado === filtro) &&
           (filtroOrigen === 'todos' || p.origen === filtroOrigen) &&
           (filtroCategoria === 'todas' ||
-            (filtroCategoria === 'sin' ? p.categoria == null : p.categoria === filtroCategoria)),
+            (filtroCategoria === 'sin' ? p.categoria == null : p.categoria === filtroCategoria)) &&
+          (filtroEquipo === 'todos' ||
+            (filtroEquipo === 'sin' ? p.equipo_id == null : p.equipo_id === filtroEquipo)),
       ),
-    [peticiones, filtro, filtroOrigen, filtroCategoria],
+    [peticiones, filtro, filtroOrigen, filtroCategoria, filtroEquipo],
   );
+
+  // Cuántas esperan por equipo, y cuántas no tienen dueño. Alimenta los badges
+  // del menú de la izquierda y del selector de equipo.
+  const pendientesPorEquipo = useMemo(() => {
+    const m = new Map<string, number>();
+    let sinEquipo = 0;
+    for (const p of peticiones) {
+      if (p.estado === 'contestada') continue;
+      if (p.equipo_id) m.set(p.equipo_id, (m.get(p.equipo_id) ?? 0) + 1);
+      else sinEquipo++;
+    }
+    return { porEquipo: m, sinEquipo };
+  }, [peticiones]);
 
   // Cuántas esperan clasificación. Alimenta el aviso de arriba: sin un número
   // a la vista, la bandeja se llena y nadie se entera.
@@ -465,6 +542,66 @@ export default function OracionPage() {
             )}
           </button>
         ))}
+      </div>
+
+      {/* Filtros por equipo. Los mismos que aparecen en el menú de la
+          izquierda: quien entra por el menú y quien filtra acá terminan en la
+          misma vista, con la misma URL. */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          onClick={() => verEquipo('todos')}
+          className={cn(
+            'text-xs px-3 py-1 rounded-full border transition',
+            filtroEquipo === 'todos'
+              ? 'bg-secondary text-foreground border-border'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Todos los equipos
+        </button>
+        <button
+          onClick={() => verEquipo('sin')}
+          className={cn(
+            'text-xs px-3 py-1 rounded-full border transition',
+            filtroEquipo === 'sin'
+              ? 'bg-secondary text-foreground border-border'
+              : 'border-transparent text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Sin asignar
+          {pendientesPorEquipo.sinEquipo > 0 && (
+            <span className="ml-1.5 tabular-nums font-semibold text-amber-700 dark:text-amber-400">
+              {pendientesPorEquipo.sinEquipo}
+            </span>
+          )}
+        </button>
+        {equipos.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => verEquipo(e.id)}
+            className={cn(
+              'inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition',
+              filtroEquipo === e.id
+                ? 'bg-secondary text-foreground border-border'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <span className={cn('h-2 w-2 rounded-full shrink-0', puntoEquipo(e.color))} aria-hidden />
+            {e.nombre}
+            {(pendientesPorEquipo.porEquipo.get(e.id) ?? 0) > 0 && (
+              <span className="tabular-nums font-semibold text-foreground">
+                {pendientesPorEquipo.porEquipo.get(e.id)}
+              </span>
+            )}
+          </button>
+        ))}
+        <button
+          onClick={() => setEquiposAbierto(true)}
+          className="inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Users className="h-3 w-3" aria-hidden />
+          {equipos.length === 0 ? 'Crear equipos' : 'Administrar equipos'}
+        </button>
       </div>
 
       {/* Aviso de bandeja: las que llegan del sitio entran sin clasificar y hay
@@ -587,6 +724,72 @@ export default function OracionPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
+                    {/* Equipo responsable, al lado de la categoría y con el
+                        mismo gesto: el chip ES el control. Sin asignar va en
+                        ámbar porque es lo que nadie ha tomado — el problema del
+                        informe real, donde 11 peticiones no tenían dueño. */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`Equipo: ${equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'sin asignar'}. Tocar para cambiar`}
+                          className={cn(
+                            'relative ml-1.5 mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                            'after:absolute after:left-0 after:right-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
+                            p.equipo_id && equipoPorId.has(p.equipo_id)
+                              ? chipEquipo(equipoPorId.get(p.equipo_id)!.color)
+                              : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+                          )}
+                        >
+                          <Users className="h-3 w-3" aria-hidden />
+                          {equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'Sin equipo'}
+                          <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-64 p-1.5">
+                        {equipos.length === 0 ? (
+                          <div className="px-2.5 py-3 text-sm text-muted-foreground">
+                            Todavía no hay equipos.{' '}
+                            <button
+                              type="button"
+                              onClick={() => setEquiposAbierto(true)}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              Crear el primero
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            {equipos.map((e) => (
+                              <button
+                                key={e.id}
+                                type="button"
+                                onClick={() => asignarEquipo(p.id, e.id)}
+                                className={cn(
+                                  'flex min-h-11 items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
+                                  p.equipo_id === e.id && 'font-semibold text-primary',
+                                )}
+                              >
+                                <span className={cn('h-2 w-2 shrink-0 rounded-full', puntoEquipo(e.color))} aria-hidden />
+                                <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
+                                {p.equipo_id === e.id && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+                              </button>
+                            ))}
+                            {p.equipo_id && (
+                              <button
+                                type="button"
+                                onClick={() => asignarEquipo(p.id, null)}
+                                className="mt-1 flex min-h-11 items-center rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                              >
+                                Quitar el equipo
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -718,6 +921,14 @@ export default function OracionPage() {
         onCreada={load}
       />
 
+      <EquiposDialog
+        open={equiposAbierto}
+        onOpenChange={setEquiposAbierto}
+        equipos={equipos}
+        pendientes={pendientesPorEquipo.porEquipo}
+        onCambio={load}
+      />
+
       <AnotarContactoDialog
         peticion={aSeguir}
         onCerrar={() => setASeguir(null)}
@@ -771,6 +982,231 @@ export default function OracionPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Equipos: crear, renombrar, recolorear, archivar ─────────────────────────
+//
+// Los equipos son grupos de PERSONAS, no áreas temáticas fijas: cambian con el
+// tiempo, así que se administran desde acá y no desde el código.
+function EquiposDialog({
+  open,
+  onOpenChange,
+  equipos,
+  pendientes,
+  onCambio,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  equipos: EquipoOracion[];
+  pendientes: Map<string, number>;
+  onCambio: () => void;
+}) {
+  const [nombre, setNombre] = useState('');
+  const [color, setColor] = useState<ColorEquipo>('salvia');
+  const [guardando, setGuardando] = useState(false);
+  const [aArchivar, setAArchivar] = useState<EquipoOracion | null>(null);
+
+  async function crear() {
+    const n = nombre.trim();
+    if (!n) return;
+    setGuardando(true);
+    try {
+      const res = await fetch('/api/oracion/equipos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: n, color }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({}));
+        throw new Error(error || 'No pudimos crear el equipo');
+      }
+      setNombre('');
+      setColor('salvia');
+      toast.success('Equipo creado');
+      avisarCambioEquipos();
+      onCambio();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No pudimos crear el equipo');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function cambiarColor(id: string, nuevo: ColorEquipo) {
+    try {
+      const res = await fetch('/api/oracion/equipos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, color: nuevo }),
+      });
+      if (!res.ok) throw new Error();
+      avisarCambioEquipos();
+      onCambio();
+    } catch {
+      toast.error('No pudimos cambiar el color');
+    }
+  }
+
+  async function archivar() {
+    if (!aArchivar) return;
+    try {
+      const res = await fetch(`/api/oracion/equipos?id=${aArchivar.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      const { liberadas } = await res.json();
+      toast.success(
+        liberadas > 0
+          ? `Equipo eliminado · ${liberadas} ${liberadas === 1 ? 'petición vuelve' : 'peticiones vuelven'} a "Sin asignar"`
+          : 'Equipo eliminado',
+      );
+      setAArchivar(null);
+      avisarCambioEquipos();
+      onCambio();
+    } catch {
+      toast.error('No pudimos eliminar el equipo');
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Equipos de oración</DialogTitle>
+            <DialogDescription>
+              Grupos que se hacen cargo de las peticiones. Cada petición se asigna a uno.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Crear va ARRIBA: al abrir esto por primera vez no hay equipos, y
+                lo primero que se necesita es poder crear uno. */}
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2.5">
+              <Label htmlFor="eq-nombre">Nuevo equipo</Label>
+              <Input
+                id="eq-nombre"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                maxLength={60}
+                placeholder="Ej: Equipo de Nicole"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); crear(); } }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                {COLOR_EQUIPO_KEYS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Color ${COLORES_EQUIPO[c].nombre}`}
+                    aria-pressed={color === c}
+                    onClick={() => setColor(c)}
+                    className={cn(
+                      'inline-flex h-11 w-11 items-center justify-center rounded-full transition',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                      color === c ? 'bg-secondary' : 'hover:bg-secondary/60',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'h-5 w-5 rounded-full',
+                        COLORES_EQUIPO[c].punto,
+                        color === c && 'ring-2 ring-foreground ring-offset-2 ring-offset-background',
+                      )}
+                    />
+                  </button>
+                ))}
+                <Button
+                  onClick={crear}
+                  disabled={guardando || !nombre.trim()}
+                  className="ml-auto min-h-11"
+                >
+                  {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Crear'}
+                </Button>
+              </div>
+            </div>
+
+            {equipos.length === 0 ? (
+              <p className="py-2 text-sm text-muted-foreground">
+                Todavía no hay equipos. Crea el primero arriba y después podrás asignarle
+                peticiones desde cada tarjeta.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {equipos.map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 py-2.5">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`Cambiar el color de ${e.nombre}`}
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <span className={cn('h-4 w-4 rounded-full', puntoEquipo(e.color))} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-1.5">
+                        <div className="flex gap-1">
+                          {COLOR_EQUIPO_KEYS.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              aria-label={COLORES_EQUIPO[c].nombre}
+                              onClick={() => cambiarColor(e.id, c)}
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <span className={cn('h-5 w-5 rounded-full', COLORES_EQUIPO[c].punto)} />
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{e.nombre}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(pendientes.get(e.id) ?? 0) === 0
+                          ? 'Sin peticiones abiertas'
+                          : `${pendientes.get(e.id)} ${pendientes.get(e.id) === 1 ? 'petición abierta' : 'peticiones abiertas'}`}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAArchivar(e)}
+                      aria-label={`Eliminar el equipo ${e.nombre}`}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!aArchivar} onOpenChange={(v) => { if (!v) setAArchivar(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar equipo</DialogTitle>
+            <DialogDescription>
+              Se eliminará <span className="font-semibold text-foreground">{aArchivar?.nombre}</span>.
+              {(() => {
+                const n = pendientes.get(aArchivar?.id ?? '') ?? 0;
+                if (n === 0) return null;
+                return n === 1
+                  ? ' Su petición abierta vuelve a “Sin asignar”; no se pierde.'
+                  : ` Sus ${n} peticiones abiertas vuelven a “Sin asignar”; no se pierde ninguna.`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAArchivar(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={archivar}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

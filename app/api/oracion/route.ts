@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await getSupabaseAdmin()
     .from('peticiones_oracion')
-    .select('id, nombre, beneficiario, beneficiario_persona_id, categoria, email, telefono, peticion, estado, origen, persona_id, created_at')
+    .select('id, nombre, beneficiario, beneficiario_persona_id, categoria, equipo_id, email, telefono, peticion, estado, origen, persona_id, created_at')
     // Las archivadas no se listan: desde la app, eliminar tiene que verse como
     // eliminar. La columna existe para poder deshacer, no para mostrarlas.
     .is('archivada_en', null)
@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest) {
 
   const {
     id, estado, categoria, peticion, nombre, beneficiario, beneficiario_persona_id,
-    origen, restaurar,
+    origen, equipo_id, restaurar,
   } = await req.json().catch(() => ({}));
   if (!id) {
     return NextResponse.json({ error: 'Falta la petición' }, { status: 400 });
@@ -157,6 +157,14 @@ export async function PATCH(req: NextRequest) {
       cambios.beneficiario_persona_id = beneficiario_persona_id;
     } else {
       return NextResponse.json({ error: 'Persona inválida' }, { status: 400 });
+    }
+  }
+  if (equipo_id !== undefined) {
+    // null devuelve la petición a la bandeja de "sin asignar".
+    if (equipo_id === null || typeof equipo_id === 'string') {
+      cambios.equipo_id = equipo_id;
+    } else {
+      return NextResponse.json({ error: 'Equipo inválido' }, { status: 400 });
     }
   }
   // Deshacer un borrado. Va por acá y no por un endpoint aparte porque es
