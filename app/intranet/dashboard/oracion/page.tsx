@@ -1087,7 +1087,7 @@ function ExportarDialog({
         <DialogHeader>
           <DialogTitle>Informe de peticiones</DialogTitle>
           <DialogDescription>
-            Se descarga un archivo que se abre en Excel, con el seguimiento de cada petición.
+            Se descarga un Excel en formato tabla, con el seguimiento de cada petición.
           </DialogDescription>
         </DialogHeader>
 
