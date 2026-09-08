@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import {
   CalendarioMes, hoyEnChile, mesDeHoy, fechaLegible, soloHora, etiquetaMinisterio,
-  MINISTERIOS_AGENDA, MINISTERIO_AGENDA_KEYS,
+  MINISTERIOS_AGENDA, MINISTERIO_AGENDA_KEYS, HORAS_AGENDA,
   type EventoCalendario,
 } from '@/components/agenda/calendario-mes';
 import { CalendarCheck, Loader2, ChevronLeft, Plus, Clock, CalendarDays } from 'lucide-react';
@@ -273,16 +273,32 @@ export default function CalendarioPublicoPage() {
                       onChange={(e) => set('fecha', e.target.value)}
                     />
                   </div>
+                  {/* Lista de horas y NO <input type="time">.
+                      El campo nativo dejó a un usuario sin poder enviar desde
+                      un Mac (07/09/2026): Safari lo da por inválido cuando
+                      queda a medio llenar —típicamente sin fijar el a.m./p.m.—
+                      y en ese estado el value se lee VACÍO, así que el campo se
+                      ve completo, el formulario se bloquea y no hay forma de
+                      saber por qué. Ya había fallado antes con los segundos.
+                      Una lista no tiene estados intermedios: o hay hora o no. */}
                   <div className="space-y-1.5">
                     <Label htmlFor="sf-hora">
                       Hora <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
                     </Label>
-                    <Input
-                      id="sf-hora"
-                      type="time"
-                      value={form.hora}
-                      onChange={(e) => set('hora', e.target.value)}
-                    />
+                    <Select
+                      value={form.hora || 'sin'}
+                      onValueChange={(v) => set('hora', v === 'sin' ? '' : v)}
+                    >
+                      <SelectTrigger id="sf-hora" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        <SelectItem value="sin">Sin hora definida</SelectItem>
+                        {HORAS_AGENDA.map((h) => (
+                          <SelectItem key={h} value={h}>{h} hrs</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

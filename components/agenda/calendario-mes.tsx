@@ -62,6 +62,27 @@ export function fechaLegible(iso: string, conAnio = false): string {
 
 export const soloHora = (h: string | null) => (h ? h.slice(0, 5) : null);
 
+/**
+ * Horas seleccionables al pedir una fecha, cada 15 minutos entre las 06:00 y
+ * las 23:45.
+ *
+ * Es una LISTA y no un `<input type="time">` a propósito: el campo nativo dejó
+ * a un usuario sin poder enviar desde un Mac (07/09/2026), porque Safari lo da
+ * por inválido mientras está a medio llenar y en ese estado devuelve el valor
+ * vacío — el campo se ve lleno y el formulario se bloquea sin explicar nada.
+ * Antes ya había fallado en otro navegador por mandar los segundos. Una lista
+ * no tiene estados intermedios ni depende del formato de 12 o 24 horas.
+ *
+ * El rango cubre de sobra las reuniones reales de la iglesia (la más temprana
+ * es a las 11:00 y la más tarde a las 21:00).
+ */
+export const HORAS_AGENDA: string[] = Array.from({ length: (24 - 6) * 4 }, (_, i) => {
+  const minutosTotales = 6 * 60 + i * 15;
+  const h = Math.floor(minutosTotales / 60);
+  const m = minutosTotales % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
+
 // Nombres cortos. `CULTO_TIPOS[t].label` ("Viernes de Discipulado",
 // "Generación Youth") es el nombre largo que usan Asistencia, Miembros y
 // Cumpleaños — no se toca. Acá, en un chip de calendario y en un desplegable
