@@ -492,123 +492,81 @@ export default function OracionPage() {
         </div>
       )}
 
-      {/* Filtros de estado */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {FILTROS.map((f) => (
-          <button
-            key={f.valor}
-            onClick={() => setFiltro(f.valor)}
-            className={cn(
-              'text-xs md:text-sm px-3 py-1.5 rounded-full border transition',
-              filtro === f.valor
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'border-border text-muted-foreground hover:text-foreground hover:bg-secondary',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* UNA fila de filtros, no cuatro.
+          Antes había cuatro filas de chips apiladas (estado, procedencia,
+          categoría, equipo) que ocupaban media pantalla antes de la primera
+          petición, todas con el mismo peso visual, así que no se sabía cuál
+          mandaba. Además la de estado repetía exactamente lo que ya hacen las
+          tres tarjetas de arriba.
+          Ahora: el estado se filtra en las tarjetas —que además muestran el
+          conteo— y los otros tres son desplegables que dicen su valor actual
+          sin desplegarse. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <FiltroMenu
+          etiqueta="Categoría"
+          valorActual={
+            filtroCategoria === 'todas' ? null
+            : filtroCategoria === 'sin' ? 'Sin clasificar'
+            : CATEGORIAS_ORACION[filtroCategoria].nombre
+          }
+          opciones={FILTROS_CATEGORIA.map((f) => ({
+            valor: f.valor,
+            label: f.label,
+            conteo: f.valor === 'sin' ? sinClasificar : undefined,
+          }))}
+          seleccionado={filtroCategoria}
+          onElegir={(v) => setFiltroCategoria(v as CategoriaOracion | 'todas' | 'sin')}
+        />
 
-      {/* Filtros de origen: separa lo interno de lo externo con un clic */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {FILTROS_ORIGEN.map((f) => (
-          <button
-            key={f.valor}
-            onClick={() => setFiltroOrigen(f.valor)}
-            className={cn(
-              'text-xs px-3 py-1 rounded-full border transition',
-              filtroOrigen === f.valor
-                ? 'bg-secondary text-foreground border-border'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+        <FiltroMenu
+          etiqueta="Equipo"
+          valorActual={
+            filtroEquipo === 'todos' ? null
+            : filtroEquipo === 'sin' ? 'Sin asignar'
+            : equipoPorId.get(filtroEquipo)?.nombre ?? null
+          }
+          opciones={[
+            { valor: 'todos', label: 'Todos los equipos' },
+            { valor: 'sin', label: 'Sin asignar', conteo: pendientesPorEquipo.sinEquipo },
+            ...equipos.map((e) => ({
+              valor: e.id,
+              label: e.nombre,
+              conteo: pendientesPorEquipo.porEquipo.get(e.id),
+              punto: puntoEquipo(e.color),
+            })),
+          ]}
+          seleccionado={filtroEquipo}
+          onElegir={verEquipo}
+          alPie={{ label: equipos.length === 0 ? 'Crear equipos' : 'Administrar equipos', onClick: () => setEquiposAbierto(true) }}
+        />
 
-      {/* Filtros por categoría (las cuatro de Nicole) */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {FILTROS_CATEGORIA.map((f) => (
-          <button
-            key={f.valor}
-            onClick={() => setFiltroCategoria(f.valor)}
-            className={cn(
-              'text-xs px-3 py-1 rounded-full border transition',
-              filtroCategoria === f.valor
-                ? 'bg-secondary text-foreground border-border'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {f.label}
-            {f.valor === 'sin' && sinClasificar > 0 && (
-              <span className="ml-1.5 tabular-nums font-semibold text-amber-700 dark:text-amber-400">
-                {sinClasificar}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+        <FiltroMenu
+          etiqueta="Procedencia"
+          valorActual={
+            filtroOrigen === 'todos' ? null : ORIGENES_ORACION[filtroOrigen].nombre
+          }
+          opciones={FILTROS_ORIGEN.map((f) => ({ valor: f.valor, label: f.label }))}
+          seleccionado={filtroOrigen}
+          onElegir={(v) => setFiltroOrigen(v as Origen | 'todos')}
+        />
 
-      {/* Filtros por equipo. Los mismos que aparecen en el menú de la
-          izquierda: quien entra por el menú y quien filtra acá terminan en la
-          misma vista, con la misma URL. */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <button
-          onClick={() => verEquipo('todos')}
-          className={cn(
-            'text-xs px-3 py-1 rounded-full border transition',
-            filtroEquipo === 'todos'
-              ? 'bg-secondary text-foreground border-border'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Todos los equipos
-        </button>
-        <button
-          onClick={() => verEquipo('sin')}
-          className={cn(
-            'text-xs px-3 py-1 rounded-full border transition',
-            filtroEquipo === 'sin'
-              ? 'bg-secondary text-foreground border-border'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          Sin asignar
-          {pendientesPorEquipo.sinEquipo > 0 && (
-            <span className="ml-1.5 tabular-nums font-semibold text-amber-700 dark:text-amber-400">
-              {pendientesPorEquipo.sinEquipo}
-            </span>
-          )}
-        </button>
-        {equipos.map((e) => (
+        {/* Salida rápida. Con filtros combinados es fácil quedarse mirando una
+            lista vacía sin recordar cuál de los cuatro la dejó así. */}
+        {(filtro !== 'todas' || filtroOrigen !== 'todos' ||
+          filtroCategoria !== 'todas' || filtroEquipo !== 'todos') && (
           <button
-            key={e.id}
-            onClick={() => verEquipo(e.id)}
-            className={cn(
-              'inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition',
-              filtroEquipo === e.id
-                ? 'bg-secondary text-foreground border-border'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
+            type="button"
+            onClick={() => {
+              setFiltro('todas');
+              setFiltroOrigen('todos');
+              setFiltroCategoria('todas');
+              verEquipo('todos');
+            }}
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-xs text-muted-foreground underline-offset-2 transition hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <span className={cn('h-2 w-2 rounded-full shrink-0', puntoEquipo(e.color))} aria-hidden />
-            {e.nombre}
-            {(pendientesPorEquipo.porEquipo.get(e.id) ?? 0) > 0 && (
-              <span className="tabular-nums font-semibold text-foreground">
-                {pendientesPorEquipo.porEquipo.get(e.id)}
-              </span>
-            )}
+            Quitar filtros
           </button>
-        ))}
-        <button
-          onClick={() => setEquiposAbierto(true)}
-          className="inline-flex min-h-9 items-center gap-1 rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <Users className="h-3 w-3" aria-hidden />
-          {equipos.length === 0 ? 'Crear equipos' : 'Administrar equipos'}
-        </button>
+        )}
       </div>
 
       {/* Aviso de bandeja: las que llegan del sitio entran sin clasificar y hay
@@ -678,125 +636,6 @@ export default function OracionPage() {
                       </p>
                     )}
 
-                    {/* El chip ES el control para clasificar: un desplegable
-                        aparte obligaría a buscarlo. Sin clasificar va en ámbar
-                        para que se note en la lista sin tener que filtrar. */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={`Categoría: ${etiquetaCategoria(p.categoria)}. Tocar para cambiar`}
-                          className={cn(
-                            'relative mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                            // El chip mide 26px de alto y es un control táctil:
-                            // el ::after le extiende el área de toque a 44px sin
-                            // engordar la píldora, que como botón de 44 quedaría
-                            // pesadísima repetida en cada tarjeta.
-                            'after:absolute after:left-0 after:right-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
-                            p.categoria
-                              ? CATEGORIAS_ORACION[p.categoria].clase
-                              : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-                          )}
-                        >
-                          {etiquetaCategoria(p.categoria)}
-                          <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" className="w-60 p-1.5">
-                        <div className="flex flex-col">
-                          {CATEGORIA_KEYS.map((k) => (
-                            <button
-                              key={k}
-                              type="button"
-                              onClick={() => cambiarCategoria(p.id, k)}
-                              className={cn(
-                                'flex min-h-11 items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
-                                p.categoria === k && 'font-semibold text-primary',
-                              )}
-                            >
-                              {CATEGORIAS_ORACION[k].nombre}
-                              {p.categoria === k && <Check className="h-4 w-4 shrink-0" aria-hidden />}
-                            </button>
-                          ))}
-                          {p.categoria && (
-                            <button
-                              type="button"
-                              onClick={() => cambiarCategoria(p.id, null)}
-                              className="mt-1 flex min-h-11 items-center rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                            >
-                              Quitar la categoría
-                            </button>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                    {/* Equipo responsable, al lado de la categoría y con el
-                        mismo gesto: el chip ES el control. Sin asignar va en
-                        ámbar porque es lo que nadie ha tomado — el problema del
-                        informe real, donde 11 peticiones no tenían dueño. */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={`Equipo: ${equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'sin asignar'}. Tocar para cambiar`}
-                          className={cn(
-                            'relative ml-1.5 mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                            'after:absolute after:left-0 after:right-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
-                            p.equipo_id && equipoPorId.has(p.equipo_id)
-                              ? chipEquipo(equipoPorId.get(p.equipo_id)!.color)
-                              : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-                          )}
-                        >
-                          <Users className="h-3 w-3" aria-hidden />
-                          {equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'Sin equipo'}
-                          <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" className="w-64 p-1.5">
-                        {equipos.length === 0 ? (
-                          <div className="px-2.5 py-3 text-sm text-muted-foreground">
-                            Todavía no hay equipos.{' '}
-                            <button
-                              type="button"
-                              onClick={() => setEquiposAbierto(true)}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              Crear el primero
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col">
-                            {equipos.map((e) => (
-                              <button
-                                key={e.id}
-                                type="button"
-                                onClick={() => asignarEquipo(p.id, e.id)}
-                                className={cn(
-                                  'flex min-h-11 items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
-                                  p.equipo_id === e.id && 'font-semibold text-primary',
-                                )}
-                              >
-                                <span className={cn('h-2 w-2 shrink-0 rounded-full', puntoEquipo(e.color))} aria-hidden />
-                                <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
-                                {p.equipo_id === e.id && <Check className="h-4 w-4 shrink-0" aria-hidden />}
-                              </button>
-                            ))}
-                            {p.equipo_id && (
-                              <button
-                                type="button"
-                                onClick={() => asignarEquipo(p.id, null)}
-                                className="mt-1 flex min-h-11 items-center rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                              >
-                                Quitar el equipo
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -836,12 +675,138 @@ export default function OracionPage() {
                   {p.peticion}
                 </p>
 
+                {/* Etiquetas DESPUES de la petición, no antes.
+                    Antes iban pegadas al nombre y empujaban el texto —lo único
+                    que de verdad hay que leer— hasta la mitad de la tarjeta.
+                    Son metadatos: se consultan después de saber de qué se trata. */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  {/* El chip ES el control para clasificar: un desplegable
+                      aparte obligaría a buscarlo. Sin clasificar va en ámbar
+                      para que se note en la lista sin tener que filtrar. */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Categoría: ${etiquetaCategoria(p.categoria)}. Tocar para cambiar`}
+                        className={cn(
+                          'relative mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                          // El chip mide 26px de alto y es un control táctil:
+                          // el ::after le extiende el área de toque a 44px sin
+                          // engordar la píldora, que como botón de 44 quedaría
+                          // pesadísima repetida en cada tarjeta.
+                          'after:absolute after:left-0 after:right-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
+                          p.categoria
+                            ? CATEGORIAS_ORACION[p.categoria].clase
+                            : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+                        )}
+                      >
+                        {etiquetaCategoria(p.categoria)}
+                        <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-60 p-1.5">
+                      <div className="flex flex-col">
+                        {CATEGORIA_KEYS.map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => cambiarCategoria(p.id, k)}
+                            className={cn(
+                              'flex min-h-11 items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
+                              p.categoria === k && 'font-semibold text-primary',
+                            )}
+                          >
+                            {CATEGORIAS_ORACION[k].nombre}
+                            {p.categoria === k && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+                          </button>
+                        ))}
+                        {p.categoria && (
+                          <button
+                            type="button"
+                            onClick={() => cambiarCategoria(p.id, null)}
+                            className="mt-1 flex min-h-11 items-center rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          >
+                            Quitar la categoría
+                          </button>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {/* Equipo responsable, al lado de la categoría y con el
+                      mismo gesto: el chip ES el control. Sin asignar va en
+                      ámbar porque es lo que nadie ha tomado — el problema del
+                      informe real, donde 11 peticiones no tenían dueño. */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Equipo: ${equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'sin asignar'}. Tocar para cambiar`}
+                        className={cn(
+                          'relative ml-1.5 mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                          'after:absolute after:left-0 after:right-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[""]',
+                          p.equipo_id && equipoPorId.has(p.equipo_id)
+                            ? chipEquipo(equipoPorId.get(p.equipo_id)!.color)
+                            : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+                        )}
+                      >
+                        <Users className="h-3 w-3" aria-hidden />
+                        {equipoPorId.get(p.equipo_id ?? '')?.nombre ?? 'Sin equipo'}
+                        <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-64 p-1.5">
+                      {equipos.length === 0 ? (
+                        <div className="px-2.5 py-3 text-sm text-muted-foreground">
+                          Todavía no hay equipos.{' '}
+                          <button
+                            type="button"
+                            onClick={() => setEquiposAbierto(true)}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            Crear el primero
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          {equipos.map((e) => (
+                            <button
+                              key={e.id}
+                              type="button"
+                              onClick={() => asignarEquipo(p.id, e.id)}
+                              className={cn(
+                                'flex min-h-11 items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
+                                p.equipo_id === e.id && 'font-semibold text-primary',
+                              )}
+                            >
+                              <span className={cn('h-2 w-2 shrink-0 rounded-full', puntoEquipo(e.color))} aria-hidden />
+                              <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
+                              {p.equipo_id === e.id && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+                            </button>
+                          ))}
+                          {p.equipo_id && (
+                            <button
+                              type="button"
+                              onClick={() => asignarEquipo(p.id, null)}
+                              className="mt-1 flex min-h-11 items-center rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                            >
+                              Quitar el equipo
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
                 {/* Seguimiento. Sin la FECHA, un "sin información" no dice nada:
                     puede ser de hace tres días o de hace tres semanas. Es
                     exactamente lo que le falta al informe en papel. */}
                 <BloqueSeguimiento
                   historial={porPeticion.get(p.id) ?? []}
                   contestada={p.estado === 'contestada'}
+                  creada={p.created_at}
                   onBorrar={borrarSeguimiento}
                 />
 
@@ -882,10 +847,13 @@ export default function OracionPage() {
                       Marcar contestada
                     </Button>
                   )}
+                  {/* Con borde como las otras dos: los tres botones hacen lo
+                      mismo —cambiar el estado— y "Reabrir" sin borde se leía
+                      como un enlace suelto en medio de la fila. */}
                   {p.estado !== 'pendiente' && (
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       className="text-xs text-muted-foreground"
                       disabled={actualizando === p.id}
                       onClick={() => cambiarEstado(p.id, 'pendiente')}
@@ -1006,6 +974,94 @@ export default function OracionPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Filtro desplegable ──────────────────────────────────────────────────────
+//
+// Reemplaza una fila de chips por un solo botón. Con cuatro criterios, las
+// filas de chips ocupaban media pantalla antes de la primera petición y todas
+// pesaban lo mismo, así que no se distinguía cuál mandaba.
+//
+// El botón dice SIEMPRE su valor actual sin desplegarse ("Equipo: Sin
+// asignar"), que es lo que un chip seleccionado comunicaba y un desplegable
+// mudo perdería.
+function FiltroMenu({
+  etiqueta,
+  valorActual,
+  opciones,
+  seleccionado,
+  onElegir,
+  alPie,
+}: {
+  etiqueta: string;
+  /** null = sin filtrar. Se muestra sólo la etiqueta. */
+  valorActual: string | null;
+  opciones: { valor: string; label: string; conteo?: number; punto?: string }[];
+  seleccionado: string;
+  onElegir: (v: string) => void;
+  alPie?: { label: string; onClick: () => void };
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const activo = valorActual !== null;
+
+  return (
+    <Popover open={abierto} onOpenChange={setAbierto}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            // 44px de alto: es el control principal de la pantalla y se toca
+            // desde el teléfono. min-h-9 (36px) quedaba bajo el mínimo.
+            'inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-xs transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            // Activo con FONDO salvia y texto crema, no con un tinte: se probó
+            // `bg-primary/8` y salía transparente, así que el estado activo se
+            // distinguía sólo por el borde — casi invisible. Es el mismo par de
+            // colores que ya usan los chips seleccionados del resto del panel.
+            activo
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border text-muted-foreground hover:bg-secondary hover:text-foreground',
+          )}
+        >
+          <span className={cn(activo && 'opacity-80')}>{etiqueta}</span>
+          {activo && <span className="font-semibold">{valorActual}</span>}
+          <ChevronsUpDown className="h-3 w-3 opacity-60" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-1.5">
+        <div className="flex flex-col">
+          {opciones.map((o) => (
+            <button
+              key={o.valor}
+              type="button"
+              onClick={() => { onElegir(o.valor); setAbierto(false); }}
+              className={cn(
+                'flex min-h-11 items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-secondary',
+                seleccionado === o.valor && 'font-semibold text-primary',
+              )}
+            >
+              {o.punto && <span className={cn('h-2 w-2 shrink-0 rounded-full', o.punto)} aria-hidden />}
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
+              {o.conteo !== undefined && o.conteo > 0 && (
+                <span className="shrink-0 tabular-nums text-xs text-muted-foreground">{o.conteo}</span>
+              )}
+              {seleccionado === o.valor && <Check className="h-4 w-4 shrink-0" aria-hidden />}
+            </button>
+          ))}
+          {alPie && (
+            <button
+              type="button"
+              onClick={() => { alPie.onClick(); setAbierto(false); }}
+              className="mt-1 flex min-h-11 items-center gap-2 rounded-md border-t border-border px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {alPie.label}
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -1386,17 +1442,30 @@ function EquiposDialog({
 function BloqueSeguimiento({
   historial,
   contestada,
+  creada,
   onBorrar,
 }: {
   historial: Seguimiento[];
   contestada: boolean;
+  /** created_at de la petición, para saber si "sin contacto" ya es tardanza. */
+  creada: string;
   onBorrar: (id: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
 
   const ultimo = historial[0];
   const dias = ultimo ? diasDesde(ultimo.fecha) : null;
-  const frio = dias !== null && dias >= DIAS_SIN_NOTICIAS;
+
+  // El ámbar es para lo que va TARDE, no para lo que todavía no toca.
+  // Antes se pintaba toda petición sin contacto, así que 27 tarjetas seguidas
+  // salían en ámbar y el color dejaba de querer decir nada. Una petición que
+  // llegó ayer y aún no tiene contacto es normal, no un problema.
+  const diasDesdeQueLlego = diasDesde(
+    new Date(creada).toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }),
+  );
+  const vaTarde = ultimo
+    ? dias! >= DIAS_SIN_NOTICIAS
+    : diasDesdeQueLlego >= DIAS_SIN_NOTICIAS;
 
   // Una petición ya contestada y sin seguimiento no necesita que se le recuerde
   // nada: se cerró y ya está.
@@ -1404,15 +1473,28 @@ function BloqueSeguimiento({
 
   const cuando = (d: number) => (d === 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`);
 
+  // Sin contacto y todavía en plazo: una línea suelta, sin caja. La caja
+  // completa para decir "nada aún" repetida en cada tarjeta era puro ruido.
+  if (!ultimo && !vaTarde) {
+    return (
+      <p className="mt-2.5 text-xs text-muted-foreground">Sin contacto registrado todavía</p>
+    );
+  }
+
   return (
     <div
       className={cn(
         'mt-3 rounded-lg border px-3 py-2 text-xs',
-        !ultimo || frio ? 'border-amber-500/35 bg-amber-500/10' : 'border-border bg-muted/40',
+        vaTarde ? 'border-amber-500/35 bg-amber-500/10' : 'border-border bg-muted/40',
       )}
     >
       {!ultimo ? (
-        <p className="text-foreground">Todavía no se ha registrado ningún contacto</p>
+        <p className="text-foreground">
+          <span className="font-semibold">Sin contacto</span>
+          <span className="text-muted-foreground">
+            {' '}· llegó hace {diasDesdeQueLlego} días y nadie ha hablado con la persona
+          </span>
+        </p>
       ) : (
         <>
           <p className="text-foreground">
