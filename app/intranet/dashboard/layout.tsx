@@ -7,6 +7,7 @@ import { DashboardSidebar } from '@/components/intranet/dashboard-sidebar';
 import { NotificationBell, tieneCampana } from '@/components/intranet/notification-bell';
 import { soloTomaAsistencia, esRolCopastor, copastorPuedeVer, esRolOracion, esRolKids } from '@/lib/roles';
 import { Menu, X } from 'lucide-react';
+import { useIdioma } from '@/lib/idioma';
 
 const RUTA_ASISTENCIA = '/intranet/dashboard/asistencia';
 const RUTA_ORACION = '/intranet/dashboard/oracion';
@@ -24,6 +25,18 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { setIdioma } = useIdioma();
+
+  // El idioma se ata al ROL de la sesión, no al navegador.
+  //
+  // Sin esto pasaba lo siguiente en el computador compartido de la iglesia:
+  // entraba el Co-pastor, quedaba guardado "portugués", y el SIGUIENTE en
+  // entrar —el Pastor, Secretaría— se encontraba el menú en portugués sin
+  // ningún selector para volver, porque ese control sólo lo ve el Co-pastor.
+  // Verificado en local antes de corregirlo.
+  useEffect(() => {
+    if (user && !esRolCopastor(user.role)) setIdioma('es');
+  }, [user, setIdioma]);
 
   // Los ministerios (Amadas, Hombría al Máximo, Discipulado, Youth) toman
   // asistencia y registran a quien llega a su reunión — lo que registran queda

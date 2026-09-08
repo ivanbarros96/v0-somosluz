@@ -1,6 +1,7 @@
 import { League_Spartan, Open_Sans } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth-context';
 import { MembersProvider } from '@/lib/members-store';
+import { IdiomaProvider } from '@/lib/idioma';
 
 // Tipografías del Manual de Marca (Equipo Creativo, 2026):
 //   · League Spartan → títulos secundarios
@@ -33,11 +34,16 @@ export default function IntranetLayout({
   return (
     <AuthProvider>
       <MembersProvider>
-        {/* `marca-intranet` acota los colores del manual a la intranet, para
-            no alterar la landing (ver app/globals.css). */}
-        <div className={`marca-intranet ${leagueSpartan.variable} ${openSans.variable}`}>
-          {children}
-        </div>
+        {/* El idioma envuelve TAMBIÉN el acceso, no sólo el panel: el
+            Co-pastor debe poder leer en portugués desde la pantalla de
+            contraseña, cuando todavía no hay sesión. */}
+        <IdiomaProvider>
+          {/* `marca-intranet` acota los colores del manual a la intranet, para
+              no alterar la landing (ver app/globals.css). */}
+          <div className={`marca-intranet ${leagueSpartan.variable} ${openSans.variable}`}>
+            {children}
+          </div>
+        </IdiomaProvider>
       </MembersProvider>
     </AuthProvider>
   );

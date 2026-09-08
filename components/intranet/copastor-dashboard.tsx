@@ -7,6 +7,7 @@ import { calcularRiesgo } from '@/lib/seguimiento';
 import { ultimaAsistenciaPorTipo } from '@/lib/cultos-tipos';
 import { nuevosEnLaFe, type PersonaNueva } from '@/lib/nuevos-en-la-fe';
 import { useAuth } from '@/lib/auth-context';
+import { useIdioma } from '@/lib/idioma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SeguimientoResumen, type ResumenRiesgo } from '@/components/intranet/pastor/seguimiento-resumen';
@@ -25,6 +26,7 @@ interface VisitaResumen {
  */
 export function CopastorDashboard() {
   const { user } = useAuth();
+  const { t } = useIdioma();
   const [riesgo, setRiesgo] = useState<ResumenRiesgo>({ bajo: 0, medio: 0, alto: 0, nombresAlto: [] });
   const [visitas, setVisitas] = useState<VisitaResumen[]>([]);
   const [nuevos, setNuevos] = useState<PersonaNueva[]>([]);
@@ -101,10 +103,10 @@ export function CopastorDashboard() {
     <div className="space-y-6 md:space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-          Bienvenido, {user?.name}
+          {t('Bienvenido')}, {user?.name}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground md:text-base">
-          Cuidado pastoral · Somos Luz Iglesia
+          {t('Panel de cuidado · Somos Luz Iglesia')}
         </p>
       </div>
 
@@ -115,16 +117,16 @@ export function CopastorDashboard() {
           <CardHeader className="p-4 md:p-6">
             <CardTitle className="flex items-center gap-2 text-base">
               <UserPlus className="h-5 w-5 text-primary" aria-hidden />
-              Visitas por acompañar
+              {t('Visitas por acompañar')}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Quienes ya vinieron varias veces y aún no son miembros
+              {t('Quienes ya vinieron varias veces y aún no son miembros')}
             </p>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
             {visitas.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                No hay visitas registradas.
+                {t('No hay visitas registradas.')}
               </p>
             ) : (
               <>
@@ -142,7 +144,7 @@ export function CopastorDashboard() {
                   href="/intranet/dashboard/members"
                   className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                 >
-                  Ver todas las visitas
+                  {t('Ver todas las visitas')}
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </a>
               </>
@@ -155,17 +157,17 @@ export function CopastorDashboard() {
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sprout className="h-5 w-5 text-primary" aria-hidden />
-            Nuevos en la fe
+            {t('Nuevos en la fe')}
             {nuevos.length > 0 && <Badge variant="secondary">{nuevos.length}</Badge>}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Recién conocen el evangelio y necesitan acompañamiento
+            {t('Recién conocen el evangelio y necesitan acompañamiento')}
           </p>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           {nuevos.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              Nadie por ahora.
+              {t('Nadie por ahora.')}
             </p>
           ) : (
             <>
@@ -179,7 +181,7 @@ export function CopastorDashboard() {
                 href="/intranet/dashboard/nuevos-en-la-fe"
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
-                Ver la lista y contactar
+                {t('Ver la lista y contactar')}
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </a>
             </>
@@ -189,14 +191,14 @@ export function CopastorDashboard() {
 
       <Card>
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base">Accesos rápidos</CardTitle>
+          <CardTitle className="text-base">{t('Accesos rápidos')}</CardTitle>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              { href: '/intranet/dashboard/seguimiento', icon: Activity, label: 'Seguimiento', desc: 'A quién llamar' },
-              { href: '/intranet/dashboard/fidelizacion', icon: HeartHandshake, label: 'Fidelización', desc: 'Quién asiste poco' },
-              { href: '/intranet/dashboard/members', icon: UserPlus, label: 'Miembros', desc: 'Buscar una ficha' },
+              { href: '/intranet/dashboard/seguimiento', icon: Activity, label: t('Seguimiento'), desc: t('A quién llamar') },
+              { href: '/intranet/dashboard/fidelizacion', icon: HeartHandshake, label: t('Fidelización'), desc: t('Quién asiste poco') },
+              { href: '/intranet/dashboard/members', icon: UserPlus, label: t('Miembros'), desc: t('Buscar una ficha') },
             ].map((item) => (
               <a
                 key={item.href}

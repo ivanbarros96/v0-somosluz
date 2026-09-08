@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Eye, EyeOff, Loader2, ChevronLeft, BookOpen, ClipboardList, Heart, Shield, GraduationCap, Flame, Baby, HeartHandshake, HandHeart, Users2, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROLES, type UserRole } from '@/lib/roles';
+import { useIdioma, idiomaDePerfil } from '@/lib/idioma';
+import { SelectorIdioma } from '@/components/intranet/selector-idioma';
 
 type Profile = UserRole | null;
 
@@ -91,10 +93,20 @@ export default function IntranetLoginPage() {
   const [showTransition, setShowTransition] = useState(false);
   const [progress, setProgress] = useState(0);
   const [conteos, setConteos] = useState<Record<string, number>>({});
+  const { t, setIdioma } = useIdioma();
 
   useEffect(() => {
     if (isAuthenticated) router.replace('/intranet/dashboard');
   }, [isAuthenticated, router]);
+
+  // Mientras no haya perfil elegido, SIEMPRE español. Sin esto el idioma
+  // quedaba guardado del último acceso y la pantalla de perfiles aparecía a
+  // medias en portugués para el siguiente que entrara — en un computador
+  // compartido, que es el caso de la iglesia, eso se ve como si algo se
+  // hubiera roto. El idioma arranca donde lo pidió Iván: en la contraseña.
+  useEffect(() => {
+    if (!selectedProfile) setIdioma('es');
+  }, [selectedProfile, setIdioma]);
 
   // Contadores de la pantalla de acceso. Se piden RECIÉN al desplegar un grupo,
   // no al abrir la página: así la pantalla inicial no hace ninguna consulta y
@@ -135,6 +147,10 @@ export default function IntranetLoginPage() {
     setSelectedProfile(p);
     setPassword('');
     setError('');
+    // El Co-pastor entra directo en portugués, sin tener que buscar nada. Es
+    // el punto exacto que pidió Iván: "desde el momento que está escribiendo
+    // la contraseña". Con el selector puede volver al español si prefiere.
+    setIdioma(idiomaDePerfil(p));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -149,7 +165,7 @@ export default function IntranetLoginPage() {
     if (ok) {
       setShowTransition(true);
     } else {
-      setError('Contraseña incorrecta');
+      setError(t('Contraseña incorrecta'));
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setIsSubmitting(false);
@@ -182,7 +198,7 @@ export default function IntranetLoginPage() {
 
         <Image src="/logo-trans.png" alt="Somos Luz" width={140} height={91} className="mb-3 opacity-95 h-14 w-auto" />
         <p className="text-muted-foreground text-sm">
-          {isPastor ? 'Preparando tu panel gerencial' : 'Cargando panel operativo'}
+          {isPastor ? 'Preparando tu panel gerencial' : t('Cargando panel operativo')}
         </p>
       </div>
     );
@@ -194,7 +210,7 @@ export default function IntranetLoginPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <Image src="/logo-trans.png" alt="Somos Luz" width={180} height={117} className="mx-auto mb-3 h-20 w-auto" />
-          <p className="text-muted-foreground text-sm">Sistema de Gestión Interna</p>
+          <p className="text-muted-foreground text-sm">{t('Sistema de Gestión Interna')}</p>
         </div>
 
         {/* Paso 1 — solo los grupos, para que la entrada se vea corta */}
@@ -293,8 +309,16 @@ export default function IntranetLoginPage() {
               className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
-              Cambiar perfil
+              {t('Cambiar perfil')}
             </button>
+
+            {/* Sólo para el Co-pastor: es el único perfil con dos idiomas, y un
+                control que nadie más puede usar sería ruido en la pantalla. */}
+            {selectedProfile === 'copastor' && (
+              <div className="mb-4 flex justify-end">
+                <SelectorIdioma />
+              </div>
+            )}
 
             {/* Perfil seleccionado */}
             <div className={cn(
@@ -318,10 +342,10 @@ export default function IntranetLoginPage() {
               </div>
               <div>
                 <p className="text-foreground font-medium text-sm">
-                  {selectedProfile ? ROLES[selectedProfile].name : ''}
+                  {selectedProfile ? t(ROLES[selectedProfile].name) : ''}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  {selectedProfile ? `Acceso ${ROLES[selectedProfile].badge.toLowerCase()}` : ''}
+                  {selectedProfile ? t(`Acceso ${ROLES[selectedProfile].badge.toLowerCase()}`) : ''}
                 </p>
               </div>
             </div>
@@ -330,7 +354,7 @@ export default function IntranetLoginPage() {
               <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Ingresa tu contraseña"
+                  placeholder={t('Ingresa tu contraseña')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pr-10 h-11"
@@ -367,9 +391,9 @@ export default function IntranetLoginPage() {
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Verificando acceso...
+                    {t('Verificando…')}
                   </span>
-                ) : 'Ingresar'}
+                ) : t('Entrar')}
               </Button>
             </form>
           </div>
@@ -387,14 +411,14 @@ export default function IntranetLoginPage() {
               className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
             >
               <CalendarDays className="h-4 w-4" />
-              Calendario de la iglesia
+              {t('Calendario de la iglesia')}
             </a>
           </div>
         )}
 
         <div className="text-center mt-6">
           <a href="/" className="text-sm text-muted-foreground hover:text-foreground transition">
-            ← Volver al sitio principal
+            {t('← Volver al sitio principal')}
           </a>
         </div>
       </div>

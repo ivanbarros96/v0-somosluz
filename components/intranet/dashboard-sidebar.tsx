@@ -8,6 +8,8 @@ import { usePeticionesPendientes } from '@/hooks/use-peticiones-pendientes';
 import { useConteoPendiente } from '@/hooks/use-conteo-pendiente';
 import { useCultosSinCerrar } from '@/hooks/use-cultos-sin-cerrar';
 import { useEquiposOracion } from '@/hooks/use-equipos-oracion';
+import { useIdioma } from '@/lib/idioma';
+import { SelectorIdioma } from '@/components/intranet/selector-idioma';
 import { leerVisto, alCambiarVisto } from '@/lib/notif-visto';
 import { inicioDelDia, HORAS_LIMITE } from '@/lib/cultos-abiertos';
 import { Button } from '@/components/ui/button';
@@ -193,6 +195,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const { t } = useIdioma();
 
   const isPastor = user?.role === 'pastor';
   const esCopastor = !!user && esRolCopastor(user.role);
@@ -343,7 +346,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                   : 'bg-primary/10 text-primary'
               )}
             >
-              {user && esRolValido(user.role) ? ROLES[user.role].badge : 'Operativo'}
+              {user && esRolValido(user.role) ? t(ROLES[user.role].badge) : 'Operativo'}
             </Badge>
           </div>
         </div>
@@ -355,7 +358,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
           <div key={grupo.titulo ?? `grupo-${gi}`} className={gi > 0 ? 'mt-5' : ''}>
             {grupo.titulo && (
               <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                {grupo.titulo}
+                {t(grupo.titulo)}
               </p>
             )}
             <ul className="space-y-1">
@@ -390,7 +393,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                   )}
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                   {avisoCultos > 0 ? (
                     <span
                       className="ml-auto min-w-5 h-5 px-1.5 inline-flex items-center justify-center text-[11px] font-semibold rounded-full bg-amber-600 text-white leading-none"
@@ -420,7 +423,7 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                           : 'bg-primary/15 text-primary'
                       )}
                     >
-                      Nuevo
+                      {t('Nuevo')}
                     </span>
                   ) : null}
                 </button>
@@ -434,16 +437,25 @@ export function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
       {/* Footer */}
       <div className="p-4 border-t border-border">
+        {/* El selector vive junto a "Cerrar sesión" y no arriba: es un ajuste
+            de la cuenta, no una herramienta de trabajo. Sólo lo ve el
+            Co-pastor, que es el único perfil con dos idiomas. */}
+        {esCopastor && (
+          <div className="mb-3 flex items-center justify-between gap-2 px-3">
+            <span className="text-xs text-muted-foreground">{t('Idioma')}</span>
+            <SelectorIdioma />
+          </div>
+        )}
         <Button
           variant="ghost"
           className="w-full justify-start text-muted-foreground hover:text-destructive gap-2"
           onClick={handleLogout}
         >
           <LogOut className="w-4 h-4" />
-          Cerrar sesión
+          {t('Cerrar sesión')}
         </Button>
         <a href="/" className="flex items-center gap-2 px-3 py-2 mt-1 text-sm text-muted-foreground hover:text-foreground transition">
-          ← Volver al sitio
+          {t('← Volver al sitio')}
         </a>
       </div>
     </aside>

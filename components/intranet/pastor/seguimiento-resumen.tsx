@@ -2,6 +2,7 @@
 
 import { ArrowRight, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIdioma } from '@/lib/idioma';
 import { Titular } from './chart-kit';
 
 export interface ResumenRiesgo {
@@ -16,6 +17,7 @@ export interface ResumenRiesgo {
 // pantalla de Seguimiento (menú izquierdo) trae la lista completa con los
 // motivos y el botón de llamar.
 export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
+  const { t } = useIdioma();
   const total = data.bajo + data.medio + data.alto;
   const tono = data.alto > 0 ? 'grave' : data.medio > 0 ? 'atencion' : 'bueno';
 
@@ -24,10 +26,10 @@ export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="h-5 w-5 text-primary" aria-hidden />
-          Quién necesita seguimiento
+          {t('Quién necesita seguimiento')}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Según ausencias seguidas, caída de asistencia y antigüedad
+          {t('Según ausencias seguidas, caída de asistencia y antigüedad')}
         </p>
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
@@ -41,16 +43,16 @@ export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
               <Titular
                 valor={data.alto}
                 tono={tono as 'bueno' | 'atencion' | 'grave'}
-                pie={data.alto === 1 ? 'persona en riesgo alto' : 'personas en riesgo alto'}
+                pie={t(data.alto === 1 ? 'persona en riesgo alto' : 'personas en riesgo alto')}
               />
               <div className="flex gap-4 text-xs text-muted-foreground">
                 <span>
                   <span className="font-semibold tabular-nums text-foreground">{data.medio}</span>{' '}
-                  en atención
+                  {t('en atención')}
                 </span>
                 <span>
                   <span className="font-semibold tabular-nums text-foreground">{data.bajo}</span>{' '}
-                  al día
+                  {t('al día')}
                 </span>
               </div>
             </div>
@@ -60,7 +62,7 @@ export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
                 {data.nombresAlto.join(' · ')}
                 {data.alto > data.nombresAlto.length && (
                   <span className="text-muted-foreground">
-                    {' '}y {data.alto - data.nombresAlto.length} más
+                    {' '}{t('y')} {data.alto - data.nombresAlto.length} {t('más')}
                   </span>
                 )}
               </p>
@@ -70,7 +72,7 @@ export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
               href="/intranet/dashboard/seguimiento"
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
-              Ver la lista y llamar
+              {t('Ver la lista y llamar')}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
           </>
