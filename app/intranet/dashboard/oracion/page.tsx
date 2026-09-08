@@ -14,7 +14,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus, Users } from 'lucide-react';
+import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus, Users, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -146,6 +146,7 @@ export default function OracionPage() {
   // Equipos: grupos de personas que se hacen cargo. Se administran desde acá.
   const [equipos, setEquipos] = useState<EquipoOracion[]>([]);
   const [equiposAbierto, setEquiposAbierto] = useState(false);
+  const [exportarAbierto, setExportarAbierto] = useState(false);
   // El filtro por equipo sale de la URL para que los enlaces del menú de la
   // izquierda lleven directo al equipo, y para poder compartir esa vista.
   const params = useSearchParams();
@@ -451,10 +452,16 @@ export default function OracionPage() {
             )}
           </p>
         </div>
-        <Button onClick={() => setNuevaAbierta(true)} className="shrink-0">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nueva petición
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setExportarAbierto(true)}>
+            <Download className="h-4 w-4 mr-1.5" />
+            Informe
+          </Button>
+          <Button onClick={() => setNuevaAbierta(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nueva petición
+          </Button>
+        </div>
       </div>
 
       {/* Tablero: el estado de las peticiones de un vistazo. Cada tarjeta lleva
@@ -921,6 +928,23 @@ export default function OracionPage() {
         onCreada={load}
       />
 
+      <ExportarDialog
+        open={exportarAbierto}
+        onOpenChange={setExportarAbierto}
+        filtros={{
+          estado: filtro === 'todas' ? '' : filtro,
+          origen: filtroOrigen === 'todos' ? '' : filtroOrigen,
+          categoria: filtroCategoria === 'todas' ? '' : filtroCategoria,
+          equipo: filtroEquipo === 'todos' ? '' : filtroEquipo,
+        }}
+        hayFiltros={
+          filtro !== 'todas' || filtroOrigen !== 'todos' ||
+          filtroCategoria !== 'todas' || filtroEquipo !== 'todos'
+        }
+        visibles={visibles.length}
+        total={peticiones.length}
+      />
+
       <EquiposDialog
         open={equiposAbierto}
         onOpenChange={setEquiposAbierto}
@@ -982,6 +1006,150 @@ export default function OracionPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Informe descargable ─────────────────────────────────────────────────────
+//
+// Reemplaza el informe que hoy se arma A MANO cada semana. Las columnas siguen
+// las del documento real para que se reconozca de inmediato.
+type Periodo = 'todas' | 'semana' | 'mes' | 'mes_pasado';
+
+const PERIODOS: { valor: Periodo; label: string; ayuda: string }[] = [
+  { valor: 'semana', label: 'Última semana', ayuda: 'Peticiones llegadas en los últimos 7 días' },
+  { valor: 'mes', label: 'Este mes', ayuda: 'Peticiones llegadas este mes' },
+  { valor: 'mes_pasado', label: 'Mes pasado', ayuda: 'Peticiones llegadas el mes anterior' },
+  { valor: 'todas', label: 'Todas', ayuda: 'Todas las peticiones activas, sin importar la fecha' },
+];
+
+/** Rango 'YYYY-MM-DD' del período, calculado en la fecha de Chile. */
+function rangoDe(p: Periodo): { desde?: string; hasta?: string } {
+  const hoy = hoyEnChile();
+  const [a, m, d] = hoy.split('-').map(Number);
+  const iso = (aa: number, mm: number, dd: number) =>
+    `${aa}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+
+  if (p === 'todas') return {};
+  if (p === 'mes') return { desde: iso(a, m, 1), hasta: hoy };
+  if (p === 'mes_pasado') {
+    const aPrev = m === 1 ? a - 1 : a;
+    const mPrev = m === 1 ? 12 : m - 1;
+    // Día 0 del mes actual = último día del anterior. Se usa UTC para que el
+    // cálculo no dependa de la zona del navegador.
+    const ultimo = new Date(Date.UTC(a, m - 1, 0)).getUTCDate();
+    return { desde: iso(aPrev, mPrev, 1), hasta: iso(aPrev, mPrev, ultimo) };
+  }
+  // Última semana: 7 días hacia atrás contando hoy.
+  const ini = new Date(Date.UTC(a, m - 1, d - 6));
+  return {
+    desde: iso(ini.getUTCFullYear(), ini.getUTCMonth() + 1, ini.getUTCDate()),
+    hasta: hoy,
+  };
+}
+
+function ExportarDialog({
+  open,
+  onOpenChange,
+  filtros,
+  hayFiltros,
+  visibles,
+  total,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  filtros: { estado: string; origen: string; categoria: string; equipo: string };
+  hayFiltros: boolean;
+  visibles: number;
+  total: number;
+}) {
+  const [periodo, setPeriodo] = useState<Periodo>('semana');
+  // Por defecto respeta lo que se está viendo: si alguien filtró por un equipo
+  // y pide el informe, lo natural es que salga el de ese equipo.
+  const [conFiltros, setConFiltros] = useState(true);
+
+  function descargar() {
+    const qs = new URLSearchParams();
+    const { desde, hasta } = rangoDe(periodo);
+    if (desde) qs.set('desde', desde);
+    if (hasta) qs.set('hasta', hasta);
+    if (conFiltros) {
+      for (const [k, v] of Object.entries(filtros)) if (v) qs.set(k, v);
+    }
+    // Navegación directa, no fetch+blob: el navegador maneja la descarga y el
+    // nombre del archivo que manda el servidor.
+    window.location.href = `/api/oracion/exportar?${qs.toString()}`;
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Informe de peticiones</DialogTitle>
+          <DialogDescription>
+            Se descarga un archivo que se abre en Excel, con el seguimiento de cada petición.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Período</Label>
+            <div className="flex flex-col gap-1">
+              {PERIODOS.map((p) => (
+                <button
+                  key={p.valor}
+                  type="button"
+                  aria-pressed={periodo === p.valor}
+                  onClick={() => setPeriodo(p.valor)}
+                  className={cn(
+                    'flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 text-left text-sm transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                    periodo === p.valor
+                      ? 'border-primary bg-primary/8'
+                      : 'border-border hover:bg-secondary',
+                  )}
+                >
+                  <span>
+                    <span className={cn('block', periodo === p.valor && 'font-semibold text-primary')}>
+                      {p.label}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">{p.ayuda}</span>
+                  </span>
+                  {periodo === p.valor && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {hayFiltros && (
+            <label className="flex min-h-11 items-start gap-2.5 cursor-pointer select-none rounded-md border border-border p-3">
+              <input
+                type="checkbox"
+                checked={conFiltros}
+                onChange={(e) => setConFiltros(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
+              />
+              <span className="text-sm">
+                Aplicar los filtros de la pantalla
+                <span className="block text-xs text-muted-foreground">
+                  {conFiltros
+                    ? `Saldrán las ${visibles} que estás viendo, dentro del período`
+                    : `Saldrán las ${total} peticiones activas, dentro del período`}
+                </span>
+              </span>
+            </label>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={descargar}>
+            <Download className="mr-1.5 h-4 w-4" />
+            Descargar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
