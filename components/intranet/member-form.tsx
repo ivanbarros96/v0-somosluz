@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useMembers } from '@/lib/members-store';
+import { useIdioma } from '@/lib/idioma';
 import { useAuth } from '@/lib/auth-context';
 import type { Member, AdultoMember, NinoMember, JovenMember } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -209,6 +210,7 @@ function computeForm(member: Member | null | undefined) {
 }
 
 export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFormProps) {
+  const { t } = useIdioma();
   const { addMember, updateMember, convertirVisitante } = useMembers();
   const { user } = useAuth();
   const isEditing = !!member;
@@ -375,8 +377,8 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           }),
         });
         if (!res.ok) {
-          const { error } = await res.json().catch(() => ({ error: 'Error al registrar.' }));
-          throw new Error(error ?? 'Error al registrar.');
+          const { error } = await res.json().catch(() => ({ error: t('Error al registrar.') }));
+          throw new Error(error ?? t('Error al registrar.'));
         }
         setOk(true);
         setForm(emptyForm());
@@ -488,7 +490,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
       if (!isEditing) setForm(emptyForm());
       onSuccess?.();
     } catch (err: any) {
-      setError(err.message ?? 'Error al guardar.');
+      setError(err.message ?? t('Error al guardar.'));
     } finally {
       setLoading(false);
     }
@@ -525,7 +527,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
         <Tabs value={modo} onValueChange={(v) => cambiarModo(v as Modo)}>
           <TabsList className="w-full">
             {modosPermitidos.map((m) => (
-              <TabsTrigger key={m} value={m} className="flex-1">{TAB_LABELS[m]}</TabsTrigger>
+              <TabsTrigger key={m} value={m} className="flex-1">{t(TAB_LABELS[m])}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
@@ -534,45 +536,45 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
-            {modo === 'nino'
+            {t(modo === 'nino'
               ? 'Datos del Niño'
               : modo === 'joven'
                 ? 'Datos de Youth'
                 : modo === 'nuevo'
                   ? 'Datos del Visitante'
-                  : 'Datos Personales'}
+                  : 'Datos Personales')}
           </CardTitle>
-          <p className="text-xs text-muted-foreground/70">{TAB_HINT[modo]}</p>
+          <p className="text-xs text-muted-foreground/70">{t(TAB_HINT[modo])}</p>
         </CardHeader>
         <CardContent className="space-y-4">
 
           <div className="space-y-1">
-            <Label>Nombre Completo <span className="text-red-500">*</span></Label>
+            <Label>{t('Nombre Completo')}{' '}<span className="text-red-500">*</span></Label>
             <Input
               value={form.nombre}
               onChange={(e) => set('nombre', e.target.value)}
-              placeholder="Ej: María Isabel García"
+              placeholder={t('Ej: María Isabel García')}
             />
           </div>
 
           {modo !== 'nuevo' && (
             <div className="space-y-1">
-              <Label>Fecha de Nacimiento</Label>
+              <Label>{t('Fecha de Nacimiento')}</Label>
               <div className="grid grid-cols-3 gap-2">
                 <Select value={form.dia} onValueChange={(v) => set('dia', v)}>
-                  <SelectTrigger><SelectValue placeholder="Día" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('Día')} /></SelectTrigger>
                   <SelectContent>
                     {DIAS.map((d) => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.mes} onValueChange={(v) => set('mes', v)}>
-                  <SelectTrigger><SelectValue placeholder="Mes" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('Mes')} /></SelectTrigger>
                   <SelectContent>
-                    {MESES.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
+                    {MESES.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{t(m)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={form.anio} onValueChange={(v) => set('anio', v)}>
-                  <SelectTrigger><SelectValue placeholder="Año" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('Año')} /></SelectTrigger>
                   <SelectContent>
                     {ANIOS.map((a) => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
                   </SelectContent>
@@ -583,8 +585,8 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <div className="space-y-2">
                     <span className="block">
-                      Esta persona tendría {edadPreview} años según la fecha ingresada.
-                      ¿Seguro que corresponde al grupo Niño y no a Youth?
+                      {t('Esta persona tendría')} {edadPreview}{' '}
+                      {t('años según la fecha ingresada. ¿Seguro que corresponde al grupo Niño y no a Youth?')}
                     </span>
                     {/* Los niños crecen y en algún momento pasan a Youth. Sin este
                         botón había que cerrar, cambiar de pestaña y volver a
@@ -598,9 +600,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                         className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
                         onClick={() => cambiarModo('joven')}
                       >
-                        <ArrowRight className="mr-1 h-3 w-3" />
-                        Cambiar a Youth
-                      </Button>
+                        <ArrowRight className="mr-1 h-3 w-3" />{t('Cambiar a Youth')}</Button>
                     )}
                   </div>
                 </div>
@@ -621,9 +621,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                         className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
                         onClick={() => cambiarModo('nino')}
                       >
-                        <ArrowRight className="mr-1 h-3 w-3" />
-                        Cambiar a Niño
-                      </Button>
+                        <ArrowRight className="mr-1 h-3 w-3" />{t('Cambiar a Niño')}</Button>
                     )}
                     {edadPreview !== null && edadPreview > EDAD_YOUTH_MAX && modosPermitidos.includes('adulto') && (
                       <Button
@@ -631,9 +629,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                         className="h-7 border-amber-300 bg-white text-xs text-amber-900 hover:bg-amber-100"
                         onClick={() => cambiarModo('adulto')}
                       >
-                        <ArrowRight className="mr-1 h-3 w-3" />
-                        Cambiar a Adulto
-                      </Button>
+                        <ArrowRight className="mr-1 h-3 w-3" />{t('Cambiar a Adulto')}</Button>
                     )}
                   </div>
                 </div>
@@ -643,7 +639,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
 
           {modo !== 'nuevo' && (
             <div className="space-y-1">
-              <Label>Sexo <span className="text-red-500">*</span></Label>
+              <Label>{t('Sexo')}{' '}<span className="text-red-500">*</span></Label>
               <div className="flex gap-3">
                 {['Masculino', 'Femenino'].map((s) => (
                   <button
@@ -654,7 +650,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-muted border-border text-muted-foreground hover:bg-muted/80'}`}
                   >
-                    {s === 'Masculino' ? '♂ Masculino' : '♀ Femenino'}
+                    {s === 'Masculino' ? `♂ ${t('Masculino')}` : `♀ ${t('Femenino')}`}
                   </button>
                 ))}
               </div>
@@ -663,13 +659,13 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
 
           {(modo === 'adulto' || modo === 'joven') && (
             <div className="border-t pt-4 space-y-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Fe y Comunidad</p>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">{t('Fe y Comunidad')}</p>
 
               {/* Va ANTES del tiempo de conversión porque lo condiciona: a
                   quien está en su primera iglesia no tiene sentido preguntarle
                   hace cuánto conoce el evangelio. */}
               <div className="space-y-1.5">
-                <Label>¿Es su primera vez en una iglesia cristiana?</Label>
+                <Label>{t('¿Es su primera vez en una iglesia cristiana?')}</Label>
                 <div className="flex gap-2">
                   {/* Solo "Sí" y "No", sin coletilla: pedido de Johnny en la reunión del
                       24/08/2026. La pregunta ya es clara por sí sola y el texto extra
@@ -686,21 +682,19 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                           : 'border-border bg-background text-muted-foreground hover:bg-muted'
                       }`}
                     >
-                      {texto}
+                      {t(texto)}
                     </button>
                   ))}
                 </div>
                 {form.primeraIglesia === 'si' && (
-                  <p className="text-xs text-muted-foreground">
-                    Se marcará para el acompañamiento de quienes recién conocen el evangelio.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t('Se marcará para el acompañamiento de quienes recién conocen el evangelio.')}</p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {/* Solo aplica a quien ya venía del evangelio */}
                 <div className={`space-y-1 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
-                  <Label>Tiempo de Conversión</Label>
+                  <Label>{t('Tiempo de Conversión')}</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={form.convNum} onValueChange={(v) => set('convNum', v)}>
                       <SelectTrigger><SelectValue placeholder="N°" /></SelectTrigger>
@@ -711,10 +705,10 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                       </SelectContent>
                     </Select>
                     <Select value={form.convUnidad} onValueChange={(v) => set('convUnidad', v)}>
-                      <SelectTrigger><SelectValue placeholder="Unidad" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('Unidad')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Meses">Meses</SelectItem>
-                        <SelectItem value="Años">Años</SelectItem>
+                        <SelectItem value="Meses">{t('Meses')}</SelectItem>
+                        <SelectItem value="Años">{t('Años')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -723,7 +717,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                     EN una iglesia, así que quien nunca ha pisado una no puede
                     estar bautizado. Preguntarlo sería contradictorio. */}
                 <div className={`space-y-1 ${form.primeraIglesia === 'si' ? 'hidden' : ''}`}>
-                  <Label>¿Bautizado/a?</Label>
+                  <Label>{t('¿Bautizado/a?')}</Label>
                   <div
                     onClick={() => set('bautizado', !form.bautizado)}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors select-none
@@ -737,7 +731,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                         </svg>
                       )}
                     </div>
-                    <span className="text-sm">Sí, está bautizado/a</span>
+                    <span className="text-sm">{t('Sí, está bautizado/a')}</span>
                   </div>
                 </div>
               </div>
@@ -747,9 +741,9 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           {/* Niño: autocomplete de apoderado */}
           {modo === 'nino' && (
             <div className="border-t pt-4 space-y-3">
-              <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">Apoderado</p>
+              <p className="text-xs uppercase tracking-widest font-semibold text-muted-foreground">{t('Apoderado')}</p>
               <div className="space-y-1" ref={apoderadoRef}>
-                <Label>Apoderado <span className="text-red-500">*</span></Label>
+                <Label>{t('Apoderado')}{' '}<span className="text-red-500">*</span></Label>
                 <div className="relative">
                   <Input
                     type="text"
@@ -761,7 +755,7 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                       }
                     }}
                     onFocus={() => { if (apoderadoResultados.length > 0) setApoderadoDropdownOpen(true); }}
-                    placeholder="Buscar por nombre..."
+                    placeholder={t('Buscar por nombre...')}
                     autoComplete="off"
                   />
                   {apoderadoBuscando && (
@@ -790,14 +784,12 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                     </div>
                   )}
                   {apoderadoDropdownOpen && apoderadoQuery.length >= 2 && !apoderadoBuscando && apoderadoResultados.length === 0 && (
-                    <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg px-4 py-3 text-sm text-muted-foreground">
-                      Sin resultados. Registra primero al adulto.
-                    </div>
+                    <div className="absolute z-50 top-full mt-1 w-full bg-card border border-border rounded-lg shadow-lg px-4 py-3 text-sm text-muted-foreground">{t('Sin resultados. Registra primero al adulto.')}</div>
                   )}
                 </div>
                 {apoderadoSeleccionado && (
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs">
-                    <span className="font-semibold">Apoderado: {apoderadoSeleccionado.nombre}</span>
+                    <span className="font-semibold">{t('Apoderado')}: {apoderadoSeleccionado.nombre}</span>
                     {apoderadoSeleccionado.telefono && <span>— {apoderadoSeleccionado.telefono}</span>}
                   </div>
                 )}
@@ -812,12 +804,12 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
       {(modo === 'adulto' || modo === 'joven' || modo === 'nuevo') && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">Contacto</CardTitle>
+            <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">{t('Contacto')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
 
             <div className="space-y-1">
-              <Label>Teléfono</Label>
+              <Label>{t('Teléfono')}</Label>
               <div className="flex gap-2">
                 <Select value={form.codTel} onValueChange={(v) => set('codTel', v)}>
                   <SelectTrigger className="w-28">
@@ -847,19 +839,19 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
             </div>
 
             <div className="space-y-1">
-              <Label>Email <span className="text-muted-foreground text-xs font-normal">(opcional)</span></Label>
+              <Label>{t('Email')}{' '}<span className="text-muted-foreground text-xs font-normal">({t('opcional')})</span></Label>
               <Input
                 type="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
-                placeholder="correo@ejemplo.com"
+                placeholder={t('correo@ejemplo.com')}
               />
             </div>
 
             {(modo === 'adulto' || modo === 'joven') && (
               <>
                 <div className="space-y-1">
-                  <Label>WhatsApp</Label>
+                  <Label>{t('WhatsApp')}</Label>
                   <div className="flex gap-2">
                     <Select value={form.codWa} onValueChange={(v) => set('codWa', v)}>
                       <SelectTrigger className="w-28">
@@ -889,12 +881,12 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                 </div>
 
                 <div className="border-t pt-4 space-y-4">
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Ubicación</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">{t('Ubicación')}</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Región</Label>
+                      <Label>{t('Región')}</Label>
                       <Select value={form.region} onValueChange={handleRegionChange}>
-                        <SelectTrigger><SelectValue placeholder="Seleccione región..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('Seleccione región...')} /></SelectTrigger>
                         <SelectContent>
                           {Object.keys(REGIONES).map((r) => (
                             <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -903,14 +895,14 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                       </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label>Comuna</Label>
+                      <Label>{t('Comuna')}</Label>
                       <Select
                         value={form.comuna}
                         onValueChange={(v) => set('comuna', v)}
                         disabled={!form.region}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={form.region ? 'Seleccione comuna...' : 'Primero seleccione región'} />
+                          <SelectValue placeholder={t(form.region ? 'Seleccione comuna...' : 'Primero seleccione región')} />
                         </SelectTrigger>
                         <SelectContent>
                           {comunas.map((c) => (
@@ -921,11 +913,11 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label>Dirección</Label>
+                    <Label>{t('Dirección')}</Label>
                     <Input
                       value={form.direccion}
                       onChange={(e) => set('direccion', e.target.value)}
-                      placeholder="Ej: Av. Brasil 1234"
+                      placeholder={t('Ej: Av. Brasil 1234')}
                     />
                   </div>
                 </div>
@@ -948,37 +940,32 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
           // aparece en los listados ni en la asistencia del domingo.
           <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>
-              Ficha enviada. Queda <strong>esperando autorización de Secretaría</strong> antes de
-              aparecer en los listados.
-            </span>
+            <span>{t('Ficha enviada. Queda')}{' '}<strong>{t('esperando autorización de Secretaría')}</strong>{' '}{t('antes de aparecer en los listados.')}</span>
           </div>
         ) : (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-            ✓ {modo === 'nuevo' ? 'Visitante registrado en miembros nuevos' : 'Miembro registrado exitosamente'}
+            ✓ {modo === 'nuevo' ? t('Visitante registrado en miembros nuevos') : t('Miembro registrado exitosamente')}
           </div>
         )
       )}
 
       <div className="flex gap-3">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
-            Cancelar
-          </Button>
+          <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{t('Cancelar')}</Button>
         )}
         <Button type="submit" disabled={loading} className="flex-1">
           {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-          {esConversion
-            ? 'Convertir en miembro ✓'
+          {t(esConversion
+            ? 'Convertir en miembro'
             : isEditing
-            ? 'Guardar Cambios ✓'
+            ? 'Guardar Cambios'
             : modo === 'nino'
-              ? 'Registrar Niño ✓'
+              ? 'Registrar Niño'
               : modo === 'joven'
-                ? 'Registrar Youth ✓'
+                ? 'Registrar Youth'
                 : modo === 'nuevo'
-                  ? 'Registrar Visita ✓'
-                  : 'Registrar Miembro ✓'}
+                  ? 'Registrar Visita'
+                  : 'Registrar Miembro')} ✓
         </Button>
       </div>
 

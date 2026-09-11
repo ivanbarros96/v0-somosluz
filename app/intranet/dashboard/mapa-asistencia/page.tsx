@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, ptBR } from 'date-fns/locale';
 import { Grid3x3, Loader2 } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
+import { useIdioma } from '@/lib/idioma';
 import {
   MapaAsistencia, type DomingoColumna, type FilaAsistencia,
 } from '@/components/intranet/pastor/mapa-asistencia';
@@ -15,6 +16,7 @@ import {
 const DOMINGOS = 20;
 
 export default function MapaAsistenciaPage() {
+  const { t, idioma } = useIdioma();
   const [domingos, setDomingos] = useState<DomingoColumna[]>([]);
   const [filas, setFilas] = useState<FilaAsistencia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export default function MapaAsistenciaPage() {
             .map((c) => ({
               id: Number(c.id),
               fecha: c.fecha,
-              label: format(parseISO(c.fecha), 'd MMM', { locale: es }),
+              label: format(parseISO(c.fecha), 'd MMM', { locale: idioma === 'pt' ? ptBR : es }),
             })),
         );
         setFilas(
@@ -64,19 +66,15 @@ export default function MapaAsistenciaPage() {
       setLoading(false);
     }
     cargar();
-  }, []);
+  }, [idioma]);
 
   return (
     <div>
       <div className="mb-6 md:mb-8">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground md:text-3xl">
-          <Grid3x3 className="h-6 w-6 text-primary" />
-          Mapa de asistencia
-        </h1>
+          <Grid3x3 className="h-6 w-6 text-primary" />{t('Mapa de asistencia')}</h1>
         <p className="mt-1 text-sm text-muted-foreground md:text-base">
-          Cada fila es una persona y cada columna uno de los últimos {DOMINGOS} domingos. Se
-          ven de un vistazo los patrones: quién viene una semana sí y otra no, y quién dejó
-          de venir.
+          {t('Cada fila es una persona y cada columna uno de los últimos {n} domingos. Se ven de un vistazo los patrones: quién viene una semana sí y otra no, y quién dejó de venir.').replace('{n}', String(DOMINGOS))}
         </p>
       </div>
 

@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useIdioma } from '@/lib/idioma';
 import { toast } from 'sonner';
 import { puedeAutorizarAgenda } from '@/lib/roles';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,6 +77,7 @@ function FilaEvento({
   onRechazar: (e: Evento) => void;
   ocupado: boolean;
 }) {
+  const { t } = useIdioma();
   const hora = soloHora(e.hora);
   const ministerio = etiquetaMinisterio(e.ministerio);
 
@@ -86,7 +88,7 @@ function FilaEvento({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-foreground">{e.titulo}</span>
             <Badge variant="outline" className={cn('text-[10px]', ESTADO_STYLE[e.estado])}>
-              {ESTADO_LABEL[e.estado]}
+              {t(ESTADO_LABEL[e.estado])}
             </Badge>
             {ministerio && (
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
@@ -97,19 +99,19 @@ function FilaEvento({
 
           <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
             <CalendarDays className="h-3 w-3 shrink-0" />
-            {fechaLegible(e.fecha, true)}
+            {fechaLegible(e.fecha, true, t)}
             {hora && (
               <>
                 <span aria-hidden>·</span>
                 <Clock className="h-3 w-3 shrink-0" />
-                {hora} hrs
+                {hora} {t('hrs')}
               </>
             )}
           </p>
         </div>
 
         <Button
-          variant="ghost" size="icon" title="Ver detalle"
+          variant="ghost" size="icon" title={t('Ver detalle')}
           aria-label={`Ver el detalle de ${e.titulo}`}
           onClick={() => onVer(e)} disabled={ocupado}
           className="shrink-0"
@@ -121,13 +123,9 @@ function FilaEvento({
       {puedeAutorizar && e.estado === 'propuesta' && (
         <div className="flex gap-2">
           <Button size="sm" onClick={() => onConfirmar(e)} disabled={ocupado}>
-            <Check className="h-4 w-4 mr-1.5" />
-            Confirmar
-          </Button>
+            <Check className="h-4 w-4 mr-1.5" />{t('Confirmar')}</Button>
           <Button size="sm" variant="outline" onClick={() => onRechazar(e)} disabled={ocupado}>
-            <X className="h-4 w-4 mr-1.5" />
-            Rechazar
-          </Button>
+            <X className="h-4 w-4 mr-1.5" />{t('Rechazar')}</Button>
         </div>
       )}
     </div>
@@ -135,6 +133,7 @@ function FilaEvento({
 }
 
 export default function AgendaPage() {
+  const { t } = useIdioma();
   const { user } = useAuth();
   const puedeAutorizar = !!user && puedeAutorizarAgenda(user.role);
 
@@ -227,14 +226,12 @@ export default function AgendaPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <CalendarDays className="h-6 w-6 text-primary" />
-          Agenda
-        </h1>
+          <CalendarDays className="h-6 w-6 text-primary" />{t('Agenda')}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          El calendario de la iglesia con las fechas de todos los ministerios.
+          {t('El calendario de la iglesia con las fechas de todos los ministerios.')}
           {puedeAutorizar && pendientes > 0 && (
             <> <span className="text-orange-600 dark:text-orange-400 font-medium">
-              {pendientes} {pendientes === 1 ? 'solicitud espera' : 'solicitudes esperan'} tu respuesta.
+              {pendientes} {t(pendientes === 1 ? 'solicitud espera' : 'solicitudes esperan')} {t('tu respuesta.')}
             </span></>
           )}
         </p>
@@ -250,13 +247,9 @@ export default function AgendaPage() {
 
           <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-primary/25 border border-primary/40" />
-              Confirmada
-            </span>
+              <span className="h-2.5 w-2.5 rounded-sm bg-primary/25 border border-primary/40" />{t('Confirmada')}</span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm bg-orange-500/15 border border-dashed border-orange-500/60" />
-              Por confirmar
-            </span>
+              <span className="h-2.5 w-2.5 rounded-sm bg-orange-500/15 border border-dashed border-orange-500/60" />{t('Por confirmar')}</span>
           </div>
 
           <section className="space-y-3">
@@ -268,7 +261,7 @@ export default function AgendaPage() {
                   variant={filtro === f.valor ? 'default' : 'outline'}
                   onClick={() => setFiltro(f.valor)}
                 >
-                  {f.label}
+                  {t(f.label)}
                   {f.valor === 'propuesta' && pendientes > 0 && (
                     <span className="ml-1.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[10px] font-semibold rounded-full bg-orange-500 text-white leading-none">
                       {pendientes}
@@ -283,9 +276,9 @@ export default function AgendaPage() {
                 <CardContent className="py-14 text-center">
                   <CalendarClock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">
-                    {filtro === 'propuesta'
+                    {t(filtro === 'propuesta'
                       ? 'No hay solicitudes esperando respuesta.'
-                      : 'No hay fechas con ese filtro.'}
+                      : 'No hay fechas con ese filtro.')}
                   </p>
                 </CardContent>
               </Card>
@@ -309,18 +302,16 @@ export default function AgendaPage() {
                 <DialogTitle className="flex items-center gap-2 flex-wrap">
                   {viendo.titulo}
                   <Badge variant="outline" className={cn('text-[10px]', ESTADO_STYLE[viendo.estado])}>
-                    {ESTADO_LABEL[viendo.estado]}
+                    {t(ESTADO_LABEL[viendo.estado])}
                   </Badge>
                 </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Detalle de la solicitud de fecha
-                </DialogDescription>
+                <DialogDescription className="sr-only">{t('Detalle de la solicitud de fecha')}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <CalendarDays className="h-4 w-4 shrink-0" />
-                  <span className="text-foreground">{fechaLegible(viendo.fecha, true)}</span>
+                  <span className="text-foreground">{fechaLegible(viendo.fecha, true, t)}</span>
                   {vHora && (
                     <>
                       <span aria-hidden>·</span>
@@ -331,14 +322,12 @@ export default function AgendaPage() {
                 </div>
 
                 {vMin && (
-                  <div className="text-muted-foreground">
-                    Ministerio: <span className="text-foreground">{vMin}</span>
+                  <div className="text-muted-foreground">{t('Ministerio:')}{' '}<span className="text-foreground">{vMin}</span>
                   </div>
                 )}
 
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <User className="h-4 w-4 shrink-0" />
-                  Lo solicita <span className="text-foreground">{viendo.solicitante_nombre}</span>
+                  <User className="h-4 w-4 shrink-0" />{t('Lo solicita')}{' '}<span className="text-foreground">{viendo.solicitante_nombre}</span>
                 </div>
 
                 {viendo.solicitante_email && (
@@ -359,7 +348,7 @@ export default function AgendaPage() {
 
                 {viendo.estado === 'rechazada' && viendo.motivo_rechazo && (
                   <div className="rounded-lg border border-border p-3">
-                    <span className="font-medium text-foreground">Motivo del rechazo:</span>{' '}
+                    <span className="font-medium text-foreground">{t('Motivo del rechazo:')}</span>{' '}
                     <span className="text-muted-foreground">{viendo.motivo_rechazo}</span>
                   </div>
                 )}
@@ -372,12 +361,10 @@ export default function AgendaPage() {
                     onClick={() => { setRechazando(viendo); setMotivo(''); }}
                     disabled={ocupado}
                   >
-                    <X className="h-4 w-4 mr-1.5" />
-                    Rechazar
-                  </Button>
+                    <X className="h-4 w-4 mr-1.5" />{t('Rechazar')}</Button>
                   <Button onClick={() => resolver(viendo, 'confirmar')} disabled={ocupado}>
                     {ocupado ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />}
-                    Confirmar
+                    {t('Confirmar')}
                   </Button>
                 </DialogFooter>
               )}
@@ -390,36 +377,33 @@ export default function AgendaPage() {
       <Dialog open={!!rechazando} onOpenChange={(o) => !o && setRechazando(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Rechazar la fecha</DialogTitle>
+            <DialogTitle>{t('Rechazar la fecha')}</DialogTitle>
             <DialogDescription>
               Le llega por correo a {rechazando?.solicitante_nombre} con el motivo que escribas.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ag-motivo">
-              Motivo <span className="text-muted-foreground text-xs font-normal">(opcional)</span>
+            <Label htmlFor="ag-motivo">{t('Motivo')}{' '}<span className="text-muted-foreground text-xs font-normal">({t('opcional')})</span>
             </Label>
             <Textarea
               id="ag-motivo"
               value={motivo}
               maxLength={500}
               onChange={(ev) => setMotivo(ev.target.value)}
-              placeholder="Ej: ese día choca con el retiro de mujeres."
+              placeholder={t('Ej: ese día choca con el retiro de mujeres.')}
             />
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRechazando(null)} disabled={ocupado}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setRechazando(null)} disabled={ocupado}>{t('Cancelar')}</Button>
             <Button
               variant="destructive"
               onClick={() => rechazando && resolver(rechazando, 'rechazar', motivo.trim() || undefined)}
               disabled={ocupado}
             >
               {ocupado && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
-              Rechazar
+              {t('Rechazar')}
             </Button>
           </DialogFooter>
         </DialogContent>

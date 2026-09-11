@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
+import { useIdioma } from '@/lib/idioma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -43,6 +44,7 @@ function clasificar(pct: number): FidelidadNivel {
 }
 
 function FidelizacionContent() {
+  const { t } = useIdioma();
   const searchParams = useSearchParams();
   const nivelInicial = searchParams.get('nivel');
   const [filtro, setFiltro] = useState<Filtro>(
@@ -123,9 +125,9 @@ function FidelizacionContent() {
   }), [rowsFiltradosTipo]);
 
   const chartData: FidelidadData[] = [
-    { key: 'alta',  nivel: 'Alta (≥70%)',    total: conteos.alta,  color: NIVEL_STYLE.alta.color },
-    { key: 'media', nivel: 'Media (35-69%)', total: conteos.media, color: NIVEL_STYLE.media.color },
-    { key: 'baja',  nivel: 'Baja (<35%)',    total: conteos.baja,  color: NIVEL_STYLE.baja.color },
+    { key: 'alta',  nivel: `${t('Alta')} (≥70%)`,    total: conteos.alta,  color: NIVEL_STYLE.alta.color },
+    { key: 'media', nivel: `${t('Media')} (35-69%)`, total: conteos.media, color: NIVEL_STYLE.media.color },
+    { key: 'baja',  nivel: `${t('Baja')} (<35%)`,    total: conteos.baja,  color: NIVEL_STYLE.baja.color },
   ];
 
   const lista = rowsFiltradosTipo
@@ -149,11 +151,9 @@ function FidelizacionContent() {
     <div>
       <div className="mb-6 md:mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <HeartHandshake className="h-6 w-6 text-primary" />
-          Fidelización
-        </h1>
+          <HeartHandshake className="h-6 w-6 text-primary" />{t('Fidelización')}</h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Constancia de asistencia por persona desde que se unió · Alta ≥70% · Media 35-69% · Baja &lt;35%
+          {t('Constancia de asistencia por persona desde que se unió')} · {t('Alta')} ≥70% · {t('Media')} 35-69% · {t('Baja')} &lt;35%
         </p>
       </div>
 
@@ -174,7 +174,7 @@ function FidelizacionContent() {
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -194,7 +194,7 @@ function FidelizacionContent() {
                     : 'bg-background text-muted-foreground border-border hover:bg-muted'}`}
               >
                 {key !== 'todas' && <span className={`w-2 h-2 rounded-full ${NIVEL_STYLE[key as FidelidadNivel].dot}`} />}
-                {label}
+                {t(label)}
                 <span className={filtro === key ? 'opacity-80' : 'opacity-60'}>· {n}</span>
               </button>
             ))}
@@ -205,15 +205,15 @@ function FidelizacionContent() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
-                <p className="text-muted-foreground text-sm">No hay personas en este nivel.</p>
+                <p className="text-muted-foreground text-sm">{t('No hay personas en este nivel.')}</p>
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardHeader className="p-4 md:p-6 border-b border-border">
                 <CardTitle className="text-base">
-                  {lista.length} {lista.length === 1 ? 'persona' : 'personas'}
-                  {filtro !== 'todas' && ` · nivel ${NIVEL_STYLE[filtro as FidelidadNivel].label}`}
+                  {lista.length} {t(lista.length === 1 ? 'persona' : 'personas')}
+                  {filtro !== 'todas' && ` · ${t('nivel')} ${t(NIVEL_STYLE[filtro as FidelidadNivel].label)}`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -230,9 +230,9 @@ function FidelizacionContent() {
                           <div className="min-w-0">
                             <p className="text-foreground font-medium text-sm truncate">{r.nombre}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-muted-foreground text-xs capitalize">{r.source_tipo}</span>
+                              <span className="text-muted-foreground text-xs capitalize">{t(r.source_tipo)}</span>
                               <span className="text-muted-foreground">·</span>
-                              <span className="text-muted-foreground text-xs">asistió {r.presentes}/{r.elegibles}</span>
+                              <span className="text-muted-foreground text-xs">{t('asistió')} {r.presentes}/{r.elegibles}</span>
                               {r.telefono && (
                                 <>
                                   <span className="text-muted-foreground">·</span>
@@ -262,7 +262,7 @@ function FidelizacionContent() {
                                 variant="outline"
                                 className="h-8 w-8 p-0 shrink-0"
                                 onClick={() => setPendingCall({ tel, label })}
-                                aria-label={`Llamar a ${label}`}
+                                aria-label={`${t('Llamar')} ${label}`}
                               >
                                 <PhoneCall className="h-3.5 w-3.5" />
                               </Button>
@@ -284,19 +284,13 @@ function FidelizacionContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <PhoneCall className="h-5 w-5 text-primary" />
-              Confirmar llamada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Está a punto de llamar a <span className="font-semibold text-foreground">{pendingCall?.label}</span> al número <span className="font-semibold text-foreground">{pendingCall?.tel}</span>. ¿Desea continuar?
-            </AlertDialogDescription>
+              <PhoneCall className="h-5 w-5 text-primary" />{t('Confirmar llamada')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('Está a punto de llamar a')}{' '}<span className="font-semibold text-foreground">{pendingCall?.label}</span>{' '}{t('al número')}{' '}<span className="font-semibold text-foreground">{pendingCall?.tel}</span>{t('. ¿Desea continuar?')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('Cancelar')}</AlertDialogCancel>
             <AlertDialogAction asChild>
-              <a href={`tel:${pendingCall?.tel}`} onClick={() => setPendingCall(null)}>
-                Llamar
-              </a>
+              <a href={`tel:${pendingCall?.tel}`} onClick={() => setPendingCall(null)}>{t('Llamar')}</a>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

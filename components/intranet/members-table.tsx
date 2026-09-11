@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, EyeOff, Loader2, Pencil, Search, ShieldAlert, Trash2, UserRound, UserMinus, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useIdioma } from '@/lib/idioma';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,7 @@ function fmt(v: string | number | null | undefined) {
  * un dato que hay que completar. Hoy hay 7 jóvenes en esa situación.
  */
 function Contacto({ member }: { member: Member }) {
+  const { t } = useIdioma();
   if (member.telefono) return <>{member.telefono}</>;
 
   const delApoderado = member.tipo === 'nino' ? member.telefono_apoderado : null;
@@ -66,7 +68,7 @@ function Contacto({ member }: { member: Member }) {
     <span className="inline-flex items-center gap-1">
       <UserRound className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
       <span>{delApoderado}</span>
-      <span className="sr-only">(del apoderado)</span>
+      <span className="sr-only">{t('(del apoderado)')}</span>
     </span>
   );
 }
@@ -86,6 +88,7 @@ function MemberAvatar({ member }: { member: Member }) {
 }
 
 function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' | 'joven' }) {
+  const { t } = useIdioma();
   const cls =
     tipo === 'adulto' ? 'bg-primary/10 text-primary border-primary/25'
     : tipo === 'joven' ? 'bg-[#c08a3e]/10 text-[#a06f2e] border-[#c08a3e]/25'
@@ -93,12 +96,13 @@ function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' | 'joven' }) {
   const label = tipo === 'adulto' ? 'Adulto' : tipo === 'joven' ? 'Joven' : 'Niño';
   return (
     <Badge variant="outline" className={cls}>
-      {label}
+      {t(label)}
     </Badge>
   );
 }
 
 function ViewDialog({ member, open, onClose }: { member: Member | null; open: boolean; onClose: () => void }) {
+  const { t } = useIdioma();
   if (!member) return null;
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -111,7 +115,7 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
               <TypeBadge tipo={member.tipo} />
             </div>
           </div>
-          <DialogDescription>Datos completos del registro.</DialogDescription>
+          <DialogDescription>{t('Datos completos del registro.')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 md:grid-cols-2 text-sm">
           {([
@@ -127,49 +131,49 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
             ['Creado', member.created_at],
           ] as [string, string | null | undefined][]).map(([label, value]) => (
             <div key={label} className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
-              <p>{fmt(value)}</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t(label)}</p>
+              <p>{t(fmt(value))}</p>
             </div>
           ))}
           {isAdultoMember(member) && <>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Fecha nacimiento</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Fecha nacimiento')}</p>
               <p>{fmt(member.fecha_nacimiento)}</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Edad</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Edad')}</p>
               <p>{fmt(member.edad)}</p>
             </div>
             <div className="rounded-lg border p-3">
-  <p className="text-xs font-medium uppercase text-muted-foreground">Bautizado</p>
-  <p>{member.bautizado === 'si' ? 'Sí' : member.bautizado === 'no' ? 'No' : '—'}</p>
+  <p className="text-xs font-medium uppercase text-muted-foreground">{t('Bautizado')}</p>
+  <p>{member.bautizado === 'si' ? t('Sí') : member.bautizado === 'no' ? t('No') : '—'}</p>
 </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Tiempo conversión</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Tiempo conversión')}</p>
               <p>{fmt(member.tiempo_conversion)}</p>
             </div>
           </>}
           {isNinoMember(member) && <>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Fecha nacimiento</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Fecha nacimiento')}</p>
               <p>{fmt(member.fecha_nacimiento)}</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Edad</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Edad')}</p>
               <p>{fmt(member.edad)}</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Apoderado</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Apoderado')}</p>
               <p>{fmt(member.nombre_apoderado)}</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Tel. apoderado</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">{t('Tel. apoderado')}</p>
               <p>{fmt(member.telefono_apoderado)}</p>
             </div>
           </>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cerrar</Button>
+          <Button variant="outline" onClick={onClose}>{t('Cerrar')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -177,6 +181,7 @@ function ViewDialog({ member, open, onClose }: { member: Member | null; open: bo
 }
 
 export function MembersTable() {
+  const { t } = useIdioma();
   const { members, isLoading, error, deleteMember, refreshMembers } = useMembers();
   const { user } = useAuth();
   const esPastor = user?.role === 'pastor';
@@ -339,10 +344,10 @@ export function MembersTable() {
 
   const Actions = ({ m }: { m: Member }) => (
     <div className="flex justify-end gap-1">
-      <Button variant="ghost" size="icon" onClick={() => setViewing(m)} title="Ver ficha">
+      <Button variant="ghost" size="icon" onClick={() => setViewing(m)} title={t('Ver ficha')}>
         <Eye className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" onClick={() => setEditing(m)} title="Editar">
+      <Button variant="ghost" size="icon" onClick={() => setEditing(m)} title={t('Editar')}>
         <Pencil className="h-4 w-4" />
       </Button>
       {/* Dar de baja ≠ eliminar. La baja conserva la ficha y el historial: la
@@ -361,7 +366,7 @@ export function MembersTable() {
         size="icon"
         className="text-destructive"
         onClick={() => abrirEliminar(m)}
-        title="Eliminar definitivamente"
+        title={t('Eliminar definitivamente')}
       >
         <Trash2 className="h-4 w-4" />
       </Button>
@@ -369,7 +374,7 @@ export function MembersTable() {
   );
 
   if (isLoading) return (
-    <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">Cargando miembros...</div>
+    <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">{t('Cargando miembros...')}</div>
   );
 
   if (error) return (
@@ -380,11 +385,11 @@ export function MembersTable() {
     <>
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Miembros</CardTitle>
+          <CardTitle>{t('Miembros')}</CardTitle>
           <p className="text-sm text-muted-foreground">
             {ministerio && !verTodosMiembros
               ? `Mostrando el público de ${CULTO_TIPOS[ministerio].label} (${CULTO_TIPOS[ministerio].publico}).`
-              : 'Adultos, jóvenes y niños separados en tabs.'}
+              : t('Adultos, jóvenes y niños separados en tabs.')}
           </p>
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <div className="relative max-w-sm flex-1 min-w-52">
@@ -392,7 +397,7 @@ export function MembersTable() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por nombre, teléfono, email o comuna..."
+                placeholder={t('Buscar por nombre, teléfono, email o comuna...')}
                 className="pl-9"
               />
             </div>
@@ -416,22 +421,16 @@ export function MembersTable() {
             <div className="mt-3 flex flex-wrap items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
               <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p>
-                  También hay <strong>{visitasCoincidentes.length}</strong>{' '}
+                <p>{t('También hay')}{' '}<strong>{visitasCoincidentes.length}</strong>{' '}
                   {visitasCoincidentes.length === 1 ? 'visita' : 'visitas'} con ese nombre:{' '}
                   <span className="font-medium text-foreground">
                     {visitasCoincidentes.map((v) => v.nombre).join(', ')}
                   </span>
                   .
                 </p>
-                <p className="mt-1 text-muted-foreground">
-                  Si ya es parte de la iglesia, conviértela en miembro para conservar su
-                  historial — no la registres de nuevo.
-                </p>
+                <p className="mt-1 text-muted-foreground">{t('Si ya es parte de la iglesia, conviértela en miembro para conservar su historial — no la registres de nuevo.')}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setTab('visitantes')}>
-                Ver en Visitas
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => setTab('visitantes')}>{t('Ver en Visitas')}</Button>
             </div>
           )}
         </CardHeader>
@@ -439,29 +438,25 @@ export function MembersTable() {
           <Tabs value={tab} onValueChange={setTab}>
             <div className="px-6 pb-4">
               <TabsList className="grid w-full max-w-3xl grid-cols-6">
-                <TabsTrigger value="todos" className="gap-2">
-                  Todos <Badge variant="secondary">{todos.length}</Badge>
+                <TabsTrigger value="todos" className="gap-2">{t('Todos')}<Badge variant="secondary">{todos.length}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="adultos" className="gap-2">
-                  Adultos <Badge variant="secondary">{adultos.length}</Badge>
+                <TabsTrigger value="adultos" className="gap-2">{t('Adultos')}<Badge variant="secondary">{adultos.length}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="jovenes" className="gap-2">
-                  Jóvenes <Badge variant="secondary">{jovenes.length}</Badge>
+                <TabsTrigger value="jovenes" className="gap-2">{t('Jóvenes')}<Badge variant="secondary">{jovenes.length}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="ninos" className="gap-2">
-                  Niños <Badge variant="secondary">{ninos.length}</Badge>
+                <TabsTrigger value="ninos" className="gap-2">{t('Niños')}<Badge variant="secondary">{ninos.length}</Badge>
                 </TabsTrigger>
                 {/* Los visitantes viven en otra tabla (miembros_nuevos), por eso
                     su contenido es un componente aparte y no se mezcla con la
                     lista de miembros. */}
                 <TabsTrigger value="visitantes" className="gap-2">
-                  Visitas
+                  {t('Visitas')}
                   {visitasCoincidentes.length > 0 && (
                     <Badge variant="secondary">{visitasCoincidentes.length}</Badge>
                   )}
                 </TabsTrigger>
                 {/* Auto-registros del link público esperando revisión */}
-                <TabsTrigger value="pendientes">Pendientes</TabsTrigger>
+                <TabsTrigger value="pendientes">{t('Pendientes')}</TabsTrigger>
               </TabsList>
             </div>
 
@@ -469,16 +464,16 @@ export function MembersTable() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Edad</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t('Nombre')}</TableHead>
+                    <TableHead>{t('Tipo')}</TableHead>
+                    <TableHead>{t('Edad')}</TableHead>
+                    <TableHead>{t('Contacto')}</TableHead>
+                    <TableHead className="text-right">{t('Acciones')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {todos.length === 0
-                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin miembros registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">{t('Sin miembros registrados.')}</TableCell></TableRow>
                     : todos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -501,17 +496,17 @@ export function MembersTable() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Edad</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Comuna</TableHead>
-                    <TableHead>Bautizado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t('Nombre')}</TableHead>
+                    <TableHead>{t('Edad')}</TableHead>
+                    <TableHead>{t('Teléfono')}</TableHead>
+                    <TableHead>{t('Comuna')}</TableHead>
+                    <TableHead>{t('Bautizado')}</TableHead>
+                    <TableHead className="text-right">{t('Acciones')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {adultos.length === 0
-                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sin adultos registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">{t('Sin adultos registrados.')}</TableCell></TableRow>
                     : adultos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -541,19 +536,19 @@ export function MembersTable() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Edad</TableHead>
+                    <TableHead>{t('Nombre')}</TableHead>
+                    <TableHead>{t('Edad')}</TableHead>
                     {/* Telefono PROPIO, no el del apoderado: a esta edad ya
                         deben tener el suyo. Los vacios son datos por completar,
                         y taparlos con el del apoderado los volveria invisibles. */}
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Bautizado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t('Teléfono')}</TableHead>
+                    <TableHead>{t('Bautizado')}</TableHead>
+                    <TableHead className="text-right">{t('Acciones')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {jovenes.length === 0
-                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin jóvenes registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">{t('Sin jóvenes registrados.')}</TableCell></TableRow>
                     : jovenes.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -578,16 +573,16 @@ export function MembersTable() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Edad</TableHead>
-                    <TableHead>Apoderado</TableHead>
-                    <TableHead>Tel. apoderado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead>{t('Nombre')}</TableHead>
+                    <TableHead>{t('Edad')}</TableHead>
+                    <TableHead>{t('Apoderado')}</TableHead>
+                    <TableHead>{t('Tel. apoderado')}</TableHead>
+                    <TableHead className="text-right">{t('Acciones')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ninos.length === 0
-                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Sin niños registrados.</TableCell></TableRow>
+                    ? <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">{t('Sin niños registrados.')}</TableCell></TableRow>
                     : ninos.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>
@@ -624,17 +619,11 @@ export function MembersTable() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-destructive" />
-              Eliminar miembro
-            </DialogTitle>
-            <DialogDescription>
-              Vas a eliminar a <span className="font-semibold text-foreground">{deleting?.nombre}</span> y
-              todo su historial de asistencia, para siempre. Esta acción no se puede deshacer.
-              <br />
+              <ShieldAlert className="h-5 w-5 text-destructive" />{t('Eliminar miembro')}</DialogTitle>
+            <DialogDescription>{t('Vas a eliminar a')}{' '}<span className="font-semibold text-foreground">{deleting?.nombre}</span>{' '}{t('y todo su historial de asistencia, para siempre. Esta acción no se puede deshacer.')}<br />
               <span className="mt-1.5 inline-block">
                 Si solo quieres que deje de aparecer en listados y estadísticas, cierra esto y usa{' '}
-                <strong>Dar de baja</strong>: conserva la ficha y se puede revertir.
-              </span>
+                <strong>{t('Dar de baja')}</strong>{t(': conserva la ficha y se puede revertir.')}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -642,10 +631,10 @@ export function MembersTable() {
             <div className="space-y-3">
               <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
                 <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>Eliminar requiere autorización. Ingresa la <strong>contraseña del pastor</strong> para continuar.</span>
+                <span>{t('Eliminar requiere autorización. Ingresa la')}{' '}<strong>{t('contraseña del pastor')}</strong>{' '}{t('para continuar.')}</span>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="pwd-pastor">Contraseña del pastor</Label>
+                <Label htmlFor="pwd-pastor">{t('Contraseña del pastor')}</Label>
                 <Input
                   id="pwd-pastor"
                   type="password"
@@ -665,15 +654,13 @@ export function MembersTable() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setDeleting(null); setPwd(''); setDeleteError(''); }} disabled={working}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => { setDeleting(null); setPwd(''); setDeleteError(''); }} disabled={working}>{t('Cancelar')}</Button>
             <Button
               variant="destructive"
               onClick={confirmarEliminar}
               disabled={working || (!esPastor && !pwd)}
             >
-              {working ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Eliminando...</> : 'Eliminar'}
+              {working ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('Eliminando...')}</> : 'Eliminar'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -684,24 +671,20 @@ export function MembersTable() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserMinus className="h-5 w-5 text-muted-foreground" />
-              Dar de baja
-            </DialogTitle>
+              <UserMinus className="h-5 w-5 text-muted-foreground" />{t('Dar de baja')}</DialogTitle>
             <DialogDescription>
-              <span className="font-semibold text-foreground">{dandoBaja?.nombre}</span> dejará de
-              aparecer en los listados, en la asistencia de cada domingo y en las estadísticas.
-              Su ficha y su historial se conservan: el pastor lo sigue viendo en{' '}
-              <strong>Retiros</strong> y puede reactivarlo cuando quiera.
-            </DialogDescription>
+              <span className="font-semibold text-foreground">{dandoBaja?.nombre}</span>{' '}
+              {t('dejará de aparecer en los listados, en la asistencia de cada domingo y en las estadísticas. Su ficha y su historial se conservan: el pastor lo sigue viendo en')}{' '}
+              <strong>{t('Retiros')}</strong>{' '}{t('y puede reactivarlo cuando quiera.')}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Motivo</Label>
+            <Label className="text-sm font-medium">{t('Motivo')}</Label>
             <RadioGroup value={motivoBaja} onValueChange={setMotivoBaja} className="gap-2">
               {MOTIVOS_BAJA.map((m) => (
                 <div key={m} className="flex items-center gap-2">
                   <RadioGroupItem value={m} id={`baja-${m}`} />
-                  <Label htmlFor={`baja-${m}`} className="cursor-pointer text-sm font-normal">{m}</Label>
+                  <Label htmlFor={`baja-${m}`} className="cursor-pointer text-sm font-normal">{t(m)}</Label>
                 </div>
               ))}
             </RadioGroup>
@@ -710,7 +693,7 @@ export function MembersTable() {
                 autoFocus
                 value={motivoOtroBaja}
                 onChange={(e) => setMotivoOtroBaja(e.target.value)}
-                placeholder="Escribe el motivo"
+                placeholder={t('Escribe el motivo')}
                 disabled={working}
               />
             )}
@@ -721,9 +704,9 @@ export function MembersTable() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDandoBaja(null)} disabled={working}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDandoBaja(null)} disabled={working}>{t('Cancelar')}</Button>
             <Button onClick={confirmarBaja} disabled={working || !motivoBajaFinal}>
-              {working ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Dar de baja'}
+              {working ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Guardando...')}</> : 'Dar de baja'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -733,8 +716,8 @@ export function MembersTable() {
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Editar miembro</DialogTitle>
-            <DialogDescription>Actualiza los datos del registro.</DialogDescription>
+            <DialogTitle>{t('Editar miembro')}</DialogTitle>
+            <DialogDescription>{t('Actualiza los datos del registro.')}</DialogDescription>
           </DialogHeader>
           {editing && (
             <MemberForm

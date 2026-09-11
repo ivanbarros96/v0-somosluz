@@ -135,7 +135,7 @@ export function CopastorDashboard() {
                     <li key={v.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="truncate text-sm text-foreground">{v.nombre}</span>
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {v.visitas} {v.visitas === 1 ? 'visita' : 'visitas'}
+                        {v.visitas} {t(v.visitas === 1 ? 'visita' : 'visitas')}
                       </span>
                     </li>
                   ))}
@@ -174,7 +174,7 @@ export function CopastorDashboard() {
               <p className="mb-3 text-sm text-foreground">
                 {nuevos.slice(0, 4).map((n) => n.nombre).join(' · ')}
                 {nuevos.length > 4 && (
-                  <span className="text-muted-foreground"> y {nuevos.length - 4} más</span>
+                  <span className="text-muted-foreground"> {t('y')} {nuevos.length - 4} {t('más')}</span>
                 )}
               </p>
               <a

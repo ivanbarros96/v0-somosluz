@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { MAX_CONTACTOS } from '@/lib/roles';
+import { useIdioma, useRazon, type Idioma } from '@/lib/idioma';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -51,8 +52,8 @@ const DESENLACE_LABEL: Record<Desenlace, string> = {
 };
 
 const soloDigitos = (t: string) => t.replace(/\D/g, '');
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+const fechaCorta = (iso: string, idioma: Idioma) =>
+  new Date(iso).toLocaleDateString(idioma === 'pt' ? 'pt-BR' : 'es-CL', { day: '2-digit', month: 'short' });
 
 /**
  * Bandeja de trabajo del Co-pastor: una sola lista con todos los casos, cada
@@ -68,6 +69,9 @@ export function SeguimientoBandeja({
   soloLectura?: boolean;
   onCambio?: () => void;
 }) {
+  const { t, idioma } = useIdioma();
+  // El motivo trae un número dentro, así que no basta con t().
+  const razonTraducida = useRazon();
   const [registrando, setRegistrando] = useState<CasoEnBandeja | null>(null);
   const [cerrando, setCerrando] = useState<CasoEnBandeja | null>(null);
   const [canal, setCanal] = useState<Canal>('llamada');
@@ -133,7 +137,7 @@ export function SeguimientoBandeja({
     return (
       <div className="flex flex-col items-center gap-2 py-12 text-center">
         <CheckCircle2 className="h-10 w-10 text-primary/60" aria-hidden />
-        <p className="text-sm text-muted-foreground">Nada pendiente por acá.</p>
+        <p className="text-sm text-muted-foreground">{t('Nada pendiente por acá.')}</p>
       </div>
     );
   }
@@ -160,19 +164,19 @@ export function SeguimientoBandeja({
                           : 'text-xs'
                       }
                     >
-                      {c.motivo === 'nuevo_en_la_fe' ? 'Nuevo en la fe' : 'Ausencia'}
+                      {t(c.motivo === 'nuevo_en_la_fe' ? 'Nuevo en la fe' : 'Ausencia')}
                     </Badge>
                     {intentos > 0 && (
                       <Badge
                         variant="outline"
                         className={`text-xs tabular-nums ${topeAlcanzado ? 'border-amber-200 bg-amber-50 text-amber-700' : ''}`}
                       >
-                        {intentos}/{MAX_CONTACTOS} intentos
+                        {intentos}/{MAX_CONTACTOS} {t(intentos === 1 ? 'intento' : 'intentos')}
                       </Badge>
                     )}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {c.razon}
+                    {razonTraducida(c.razon)}
                     {c.telefono && ` · ${c.telefono}`}
                   </p>
                 </div>
@@ -181,7 +185,7 @@ export function SeguimientoBandeja({
                   <div className="flex shrink-0 items-center gap-2">
                     {c.telefono && (
                       <Button size="sm" variant="outline" className="h-8 w-8 p-0" asChild>
-                        <a href={`tel:${c.telefono}`} title="Llamar" aria-label={`Llamar a ${c.nombre}`}>
+                        <a href={`tel:${c.telefono}`} title={t('Llamar')} aria-label={`Llamar a ${c.nombre}`}>
                           <PhoneCall className="h-3.5 w-3.5" />
                         </a>
                       </Button>
@@ -191,21 +195,17 @@ export function SeguimientoBandeja({
                         <a
                           href={`https://wa.me/${soloDigitos(wa)}`}
                           target="_blank" rel="noopener noreferrer"
-                          title="WhatsApp" aria-label={`WhatsApp a ${c.nombre}`}
+                          title={t('WhatsApp')} aria-label={`WhatsApp a ${c.nombre}`}
                         >
                           <MessageCircle className="h-3.5 w-3.5" />
                         </a>
                       </Button>
                     )}
                     {topeAlcanzado ? (
-                      <Button size="sm" onClick={() => { setCerrando(c); setDesenlace('volvio'); }}>
-                        Cerrar caso
-                      </Button>
+                      <Button size="sm" onClick={() => { setCerrando(c); setDesenlace('volvio'); }}>{t('Cerrar caso')}</Button>
                     ) : (
                       <Button size="sm" variant="outline" onClick={() => abrirRegistro(c)}>
-                        <Plus className="mr-1 h-3.5 w-3.5" />
-                        Anotar contacto
-                      </Button>
+                        <Plus className="mr-1 h-3.5 w-3.5" />{t('Anotar contacto')}</Button>
                     )}
                     {intentos > 0 && !topeAlcanzado && (
                       <Button
@@ -213,9 +213,7 @@ export function SeguimientoBandeja({
                         variant="ghost"
                         className="text-muted-foreground"
                         onClick={() => { setCerrando(c); setDesenlace('volvio'); }}
-                      >
-                        Cerrar
-                      </Button>
+                      >{t('Cerrar')}</Button>
                     )}
                   </div>
                 )}
@@ -228,9 +226,9 @@ export function SeguimientoBandeja({
                   {c.contactos.map((ct, i) => (
                     <li key={ct.id} className="text-xs">
                       <span className="font-medium text-foreground">
-                        {i + 1}. {CANAL_LABEL[ct.canal]} · {RESULTADO_LABEL[ct.resultado]}
+                        {i + 1}. {t(CANAL_LABEL[ct.canal])} · {t(RESULTADO_LABEL[ct.resultado])}
                       </span>
-                      <span className="text-muted-foreground"> — {fechaCorta(ct.created_at)}</span>
+                      <span className="text-muted-foreground"> — {fechaCorta(ct.created_at, idioma)}</span>
                       {ct.nota && <p className="mt-0.5 italic text-muted-foreground">{ct.nota}</p>}
                     </li>
                   ))}
@@ -245,16 +243,15 @@ export function SeguimientoBandeja({
       <Dialog open={!!registrando} onOpenChange={(o) => { if (!o && !guardando) setRegistrando(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Anotar contacto</DialogTitle>
-            <DialogDescription>
-              Con <span className="font-semibold text-foreground">{registrando?.nombre}</span>.
-              Intento {(registrando?.contactos.length ?? 0) + 1} de {MAX_CONTACTOS}.
+            <DialogTitle>{t('Anotar contacto')}</DialogTitle>
+            <DialogDescription>{t('Con')}{' '}<span className="font-semibold text-foreground">{registrando?.nombre}</span>.{' '}
+              {t('Intento')} {(registrando?.contactos.length ?? 0) + 1} {t('de')} {MAX_CONTACTOS}.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>¿Por dónde?</Label>
+              <Label>{t('¿Por dónde?')}</Label>
               <div className="flex gap-2">
                 {(['llamada', 'whatsapp', 'presencial'] as Canal[]).map((v) => (
                   <button
@@ -268,14 +265,14 @@ export function SeguimientoBandeja({
                         : 'border-border bg-background text-muted-foreground hover:bg-muted'
                     }`}
                   >
-                    {CANAL_LABEL[v]}
+                    {t(CANAL_LABEL[v])}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label>¿Qué pasó?</Label>
+              <Label>{t('¿Qué pasó?')}</Label>
               <div className="flex gap-2">
                 {(['contesto', 'no_contesto', 'mensaje'] as Resultado[]).map((v) => (
                   <button
@@ -289,34 +286,30 @@ export function SeguimientoBandeja({
                         : 'border-border bg-background text-muted-foreground hover:bg-muted'
                     }`}
                   >
-                    {RESULTADO_LABEL[v]}
+                    {t(RESULTADO_LABEL[v])}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="nota-contacto">Nota</Label>
+              <Label htmlFor="nota-contacto">{t('Nota')}</Label>
               <Textarea
                 id="nota-contacto"
                 value={nota}
                 onChange={(e) => setNota(e.target.value)}
-                placeholder="Ej: Está enfermo, vuelve en dos semanas"
+                placeholder={t('Ej: Está enfermo, vuelve en dos semanas')}
                 rows={3}
                 maxLength={500}
               />
-              <p className="text-xs text-muted-foreground">
-                Solo la ven el Pastor y el Co-pastor.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('Solo la ven el Pastor y el Co-pastor.')}</p>
             </div>
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRegistrando(null)} disabled={guardando}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setRegistrando(null)} disabled={guardando}>{t('Cancelar')}</Button>
             <Button onClick={guardarContacto} disabled={guardando}>
-              {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Guardar'}
+              {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Guardando...')}</> : t('Guardar')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -326,7 +319,7 @@ export function SeguimientoBandeja({
       <Dialog open={!!cerrando} onOpenChange={(o) => { if (!o && !guardando) setCerrando(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Cerrar el caso</DialogTitle>
+            <DialogTitle>{t('Cerrar el caso')}</DialogTitle>
             <DialogDescription>
               ¿Cómo terminó el acompañamiento a{' '}
               <span className="font-semibold text-foreground">{cerrando?.nombre}</span>?
@@ -349,25 +342,21 @@ export function SeguimientoBandeja({
                   }`}
                 >
                   <Icono className="h-4 w-4 shrink-0" aria-hidden />
-                  {DESENLACE_LABEL[v]}
+                  {t(DESENLACE_LABEL[v])}
                 </button>
               );
             })}
           </div>
 
           {desenlace === 'se_retiro' && (
-            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Cerrar el caso no da de baja a nadie. Si corresponde, hazlo desde Miembros con
-              <strong> Dar de baja</strong>.
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{t('Cerrar el caso no da de baja a nadie. Si corresponde, hazlo desde Miembros con')}{' '}<strong>{t('Dar de baja')}</strong>.
             </p>
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setCerrando(null)} disabled={guardando}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setCerrando(null)} disabled={guardando}>{t('Cancelar')}</Button>
             <Button onClick={cerrarCaso} disabled={guardando}>
-              {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Cerrando...</> : 'Cerrar caso'}
+              {guardando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Cerrando...')}</> : 'Cerrar caso'}
             </Button>
           </DialogFooter>
         </DialogContent>

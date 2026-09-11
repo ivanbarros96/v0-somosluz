@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Loader2 } from 'lucide-react';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
+import { useIdioma } from '@/lib/idioma';
 import { calcularRiesgo } from '@/lib/seguimiento';
 import { ultimaAsistenciaPorTipo } from '@/lib/cultos-tipos';
 import { nuevosEnLaFe } from '@/lib/nuevos-en-la-fe';
@@ -36,6 +37,7 @@ const FILTROS: { valor: Filtro; label: string }[] = [
 ];
 
 export default function SeguimientoPage() {
+  const { t } = useIdioma();
   const { user } = useAuth();
   const puedeRegistrar = esRolCopastor(user?.role ?? '');
 
@@ -143,7 +145,7 @@ export default function SeguimientoPage() {
           .slice(0, 12)
           .map((c) => ({
             nombre: porNombre.get(c.persona_id)?.nombre ?? 'Persona',
-            desenlace: DESENLACE_LABEL[c.desenlace ?? ''] ?? '—',
+            desenlace: t(DESENLACE_LABEL[c.desenlace ?? ''] ?? '—'),
             motivo: c.motivo,
           })),
       );
@@ -172,16 +174,14 @@ export default function SeguimientoPage() {
     <div>
       <div className="mb-6 md:mb-8">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground md:text-3xl">
-          <Activity className="h-6 w-6 text-primary" />
-          Seguimiento
-        </h1>
+          <Activity className="h-6 w-6 text-primary" />{t('Seguimiento')}</h1>
         <p className="mt-1 text-sm text-muted-foreground md:text-base">
           {puedeRegistrar
-            ? 'A quién contactar y qué pasó en cada llamada. Cada fila dice por qué está aquí.'
-            : 'Trabajo de acompañamiento del Co-pastor: a quién ha contactado y cómo va cada caso.'}
+            ? t('A quién contactar y qué pasó en cada llamada. Cada fila dice por qué está aquí.')
+            : t('Trabajo de acompañamiento del Co-pastor: a quién ha contactado y cómo va cada caso.')}
         </p>
 
-        <div className="mt-4 flex gap-2" role="group" aria-label="Filtrar por motivo">
+        <div className="mt-4 flex gap-2" role="group" aria-label={t('Filtrar por motivo')}>
           {FILTROS.map((f) => (
             <button
               key={f.valor}
@@ -194,7 +194,7 @@ export default function SeguimientoPage() {
                   : 'border-border bg-background text-muted-foreground hover:bg-muted'
               }`}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
@@ -209,10 +209,10 @@ export default function SeguimientoPage() {
           <Card>
             <CardHeader className="p-4 md:p-6">
               <CardTitle className="flex items-center gap-2 text-base">
-                Por contactar
+                {t('Por contactar')}
                 {porContactarFiltrado.length > 0 && <Badge variant="secondary">{porContactarFiltrado.length}</Badge>}
               </CardTitle>
-              <p className="text-xs text-muted-foreground">Nadie los ha llamado todavía</p>
+              <p className="text-xs text-muted-foreground">{t('Nadie los ha llamado todavía')}</p>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
               <SeguimientoBandeja casos={porContactarFiltrado} soloLectura={!puedeRegistrar} onCambio={cargar} />
@@ -222,11 +222,11 @@ export default function SeguimientoPage() {
           <Card>
             <CardHeader className="p-4 md:p-6">
               <CardTitle className="flex items-center gap-2 text-base">
-                En proceso
+                {t('En proceso')}
                 {enProcesoFiltrado.length > 0 && <Badge variant="secondary">{enProcesoFiltrado.length}</Badge>}
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Ya hubo al menos un intento; abajo de cada uno está lo que pasó
+                {t('Ya hubo al menos un intento; abajo de cada uno está lo que pasó')}
               </p>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
@@ -237,8 +237,8 @@ export default function SeguimientoPage() {
           {cerradosFiltrado.length > 0 && (
             <Card>
               <CardHeader className="p-4 md:p-6">
-                <CardTitle className="text-base">Casos cerrados</CardTitle>
-                <p className="text-xs text-muted-foreground">Últimos acompañamientos terminados</p>
+                <CardTitle className="text-base">{t('Casos cerrados')}</CardTitle>
+                <p className="text-xs text-muted-foreground">{t('Últimos acompañamientos terminados')}</p>
               </CardHeader>
               <CardContent className="p-4 md:p-6 pt-0">
                 <ul className="divide-y divide-border">

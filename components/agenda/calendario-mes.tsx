@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useIdioma } from '@/lib/idioma';
 import { CULTO_TIPOS, CULTO_TIPO_KEYS, type CultoTipo } from '@/lib/cultos-tipos';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, X, Clock, CalendarOff } from 'lucide-react';
@@ -46,6 +47,15 @@ const DIAS = [
   { corto: 'D', largo: 'domingo' },
 ];
 
+// Las abreviaturas del encabezado no se pueden traducir letra por letra: en
+// portugues los dias son "segunda, terça, quarta…" y quedarian S/T/Q/Q/S/S/D,
+// con cuatro columnas indistinguibles. Se usan las tres letras habituales en
+// Brasil.
+const ABREV_PT: Record<string, string> = {
+  lunes: 'Seg', martes: 'Ter', 'miércoles': 'Qua', jueves: 'Qui',
+  viernes: 'Sex', 'sábado': 'Sáb', domingo: 'Dom',
+};
+
 /** Hoy en Chile, como 'YYYY-MM-DD'. */
 export function hoyEnChile(): string {
   // 'en-CA' entrega justo el formato YYYY-MM-DD, y se pide en la zona de Chile
@@ -54,10 +64,17 @@ export function hoyEnChile(): string {
 }
 
 /** '2026-09-12' → '12 de septiembre'. Se parte el texto, no se usa Date. */
-export function fechaLegible(iso: string, conAnio = false): string {
+/**
+ * Traductor opcional. Por defecto devuelve el texto tal cual, asi que quien no
+ * traduce (el correo del aviso, la vista publica) sigue funcionando igual; el
+ * Co-pastor le pasa el `t()` de lib/idioma y ve los meses en portugues.
+ */
+export type Traductor = (clave: string) => string;
+
+export function fechaLegible(iso: string, conAnio = false, t: Traductor = (x) => x): string {
   const [anio, mes, dia] = iso.split('-').map(Number);
   if (!anio || !mes || !dia) return iso;
-  return `${dia} de ${MESES[mes - 1] ?? ''}${conAnio ? ` de ${anio}` : ''}`;
+  return `${dia} ${t('de')} ${t(MESES[mes - 1] ?? '')}${conAnio ? ` ${t('de')} ${anio}` : ''}`;
 }
 
 export const soloHora = (h: string | null) => (h ? h.slice(0, 5) : null);
@@ -105,9 +122,9 @@ export function mesDeHoy(): string {
   return hoyEnChile().slice(0, 7);
 }
 
-export function tituloMes(mesISO: string): string {
+export function tituloMes(mesISO: string, t: Traductor = (x) => x): string {
   const [anio, mes] = mesISO.split('-').map(Number);
-  const nombre = MESES[mes - 1] ?? '';
+  const nombre = t(MESES[mes - 1] ?? '');
   return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`;
 }
 
@@ -150,6 +167,7 @@ export function CalendarioMes({
   eventos: EventoCalendario[];
   onCambiarMes: (mesNuevo: string) => void;
 }) {
+  const { t, idioma } = useIdioma();
   const hoy = hoyEnChile();
   const [diaAbierto, setDiaAbierto] = useState<string | null>(null);
 
@@ -199,7 +217,7 @@ export function CalendarioMes({
         <Button
           variant="ghost" size="icon"
           onClick={() => onCambiarMes(correrMes(mes, -1))}
-          aria-label="Mes anterior"
+          aria-label={t('Mes anterior')}
           className="h-11 w-11 shrink-0"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -207,15 +225,15 @@ export function CalendarioMes({
 
         <div className="text-center min-w-0">
           <h2 className="text-sm sm:text-base font-semibold text-foreground truncate">
-            {tituloMes(mes)}
+            {tituloMes(mes, t)}
           </h2>
           {/* Cuántos eventos hay en el mes que se está viendo: sin esto había
               que barrer la cuadrícula con la vista para saber si valía la pena
               mirarla. */}
           <p className="text-[11px] text-muted-foreground">
             {delMes.length === 0
-              ? 'Sin eventos'
-              : `${delMes.length} ${delMes.length === 1 ? 'evento' : 'eventos'}`}
+              ? t('Sin eventos')
+              : `${delMes.length} ${t(delMes.length === 1 ? 'evento' : 'eventos')}`}
           </p>
         </div>
 
@@ -228,13 +246,13 @@ export function CalendarioMes({
               onClick={() => onCambiarMes(mesDeHoy())}
               className="h-11 px-2 text-xs"
             >
-              Hoy
+              {t('Hoy')}
             </Button>
           )}
           <Button
             variant="ghost" size="icon"
             onClick={() => onCambiarMes(correrMes(mes, 1))}
-            aria-label="Mes siguiente"
+            aria-label={t('Mes siguiente')}
             className="h-11 w-11"
           >
             <ChevronRight className="h-4 w-4" />
@@ -246,11 +264,11 @@ export function CalendarioMes({
         {DIAS.map((d) => (
           <div
             key={d.largo}
-            title={d.largo}
+            title={t(d.largo)}
             className="py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
           >
-            <span aria-hidden="true">{d.corto}</span>
-            <span className="sr-only">{d.largo}</span>
+            <span aria-hidden="true">{idioma === 'pt' ? ABREV_PT[d.largo] : d.corto}</span>
+            <span className="sr-only">{t(d.largo)}</span>
           </div>
         ))}
       </div>
@@ -284,7 +302,7 @@ export function CalendarioMes({
                     type: 'button' as const,
                     onClick: () => setDiaAbierto(abierto ? null : dia),
                     'aria-expanded': abierto,
-                    'aria-label': `${fechaLegible(dia)}, ${delDia.length} ${delDia.length === 1 ? 'evento' : 'eventos'}`,
+                    'aria-label': `${fechaLegible(dia, false, t)}, ${delDia.length} ${t(delDia.length === 1 ? 'evento' : 'eventos')}`,
                   }
                 : { 'aria-hidden': false })}
               className={cn(
@@ -337,7 +355,7 @@ export function CalendarioMes({
                 })}
                 {delDia.length > 2 && (
                   <p className="text-[10px] text-muted-foreground pl-1">
-                    +{delDia.length - 2} más
+                    +{delDia.length - 2} {t('más')}
                   </p>
                 )}
               </div>
@@ -352,12 +370,12 @@ export function CalendarioMes({
         <div className="border-t border-border bg-muted/30">
           <div className="flex items-center justify-between gap-2 px-4 pt-3">
             <h3 className="text-sm font-semibold text-foreground">
-              {fechaLegible(diaAbierto, true)}
+              {fechaLegible(diaAbierto, true, t)}
             </h3>
             <Button
               variant="ghost" size="icon"
               onClick={() => setDiaAbierto(null)}
-              aria-label="Cerrar el detalle del día"
+              aria-label={t('Cerrar el detalle del día')}
               className="h-9 w-9"
             >
               <X className="h-4 w-4" />
@@ -379,7 +397,7 @@ export function CalendarioMes({
                       {e.titulo}
                       {estado === 'propuesta' && (
                         <span className="ml-1.5 text-[11px] font-medium text-orange-600 dark:text-orange-400">
-                          · por confirmar
+                          {t('· por confirmar')}
                         </span>
                       )}
                     </p>
@@ -387,7 +405,7 @@ export function CalendarioMes({
                       {hora && (
                         <>
                           <Clock className="h-3 w-3 shrink-0" />
-                          <span className="tabular-nums">{hora} hrs</span>
+                          <span className="tabular-nums">{hora} {t('hrs')}</span>
                         </>
                       )}
                       {min && <>{hora && <span aria-hidden>·</span>}{min}</>}

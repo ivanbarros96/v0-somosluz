@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIdioma } from '@/lib/idioma';
 import { Input } from '@/components/ui/input';
 import { SinDatos } from './chart-kit';
 
@@ -33,6 +34,7 @@ export function MapaAsistencia({
   /** false cuando la página ya pone su propio título, para no repetirlo. */
   conEncabezado?: boolean;
 }) {
+  const { t } = useIdioma();
   const [busqueda, setBusqueda] = useState('');
   const [verTodas, setVerTodas] = useState(false);
 
@@ -60,21 +62,18 @@ export function MapaAsistencia({
     <Card>
       {conEncabezado && (
         <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-base">Mapa de asistencia</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Cada fila es una persona y cada columna un domingo. Se ven de un vistazo los
-            patrones: quién viene una semana sí y otra no, y quién dejó de venir.
-          </p>
+          <CardTitle className="text-base">{t('Mapa de asistencia')}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t('Cada fila es una persona y cada columna un domingo. Se ven de un vistazo los patrones: quién viene una semana sí y otra no, y quién dejó de venir.')}</p>
         </CardHeader>
       )}
       <CardContent className={conEncabezado ? 'p-4 md:p-6 pt-0' : 'p-4 md:p-6'}>
         {domingos.length === 0 || filas.length === 0 ? (
-          <SinDatos>Todavía no hay domingos con asistencia registrada.</SinDatos>
+          <SinDatos>{t('Todavía no hay domingos con asistencia registrada.')}</SinDatos>
         ) : (
           <>
             <Input
               className="mb-3"
-              placeholder="Buscar persona..."
+              placeholder={t('Buscar persona...')}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -83,9 +82,7 @@ export function MapaAsistencia({
               <table className="border-separate border-spacing-[3px] text-sm">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-card px-2 py-1 text-left text-xs font-medium text-muted-foreground">
-                      Persona
-                    </th>
+                    <th className="sticky left-0 z-10 bg-card px-2 py-1 text-left text-xs font-medium text-muted-foreground">{t('Persona')}</th>
                     {domingos.map((d) => (
                       <th
                         key={d.id}
@@ -94,9 +91,7 @@ export function MapaAsistencia({
                         {d.label}
                       </th>
                     ))}
-                    <th className="px-2 py-1 text-center text-xs font-medium text-muted-foreground">
-                      Vino
-                    </th>
+                    <th className="px-2 py-1 text-center text-xs font-medium text-muted-foreground">{t('Vino')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,7 +100,7 @@ export function MapaAsistencia({
                       <th className="sticky left-0 z-10 max-w-[190px] truncate bg-card px-2 py-1 text-left font-normal">
                         <span className="text-foreground">{f.nombre}</span>
                         <span className="ml-1.5 text-xs text-muted-foreground">
-                          {TIPO_CORTO[f.tipo] ?? f.tipo}
+                          {t(TIPO_CORTO[f.tipo] ?? f.tipo)}
                         </span>
                       </th>
                       {domingos.map((d) => {
@@ -155,15 +150,12 @@ export function MapaAsistencia({
 
             <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-[3px] bg-[var(--chart-1)]" aria-hidden /> Asistió
-              </span>
+                <span className="h-3 w-3 rounded-[3px] bg-[var(--chart-1)]" aria-hidden />{t('Asistió')}</span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-[3px] bg-muted" aria-hidden /> Faltó
-              </span>
+                <span className="h-3 w-3 rounded-[3px] bg-muted" aria-hidden />{t('Faltó')}</span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-[3px] bg-muted/30" aria-hidden /> Aún no era miembro
-              </span>
-              <span>· Ordenado por menor asistencia primero</span>
+                <span className="h-3 w-3 rounded-[3px] bg-muted/30" aria-hidden />{t('Aún no era miembro')}</span>
+              <span>{t('· Ordenado por menor asistencia primero')}</span>
             </div>
           </>
         )}

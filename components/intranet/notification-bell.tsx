@@ -22,8 +22,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useIdioma, type Idioma } from '@/lib/idioma';
 import {
   Bell, UserPlus, CalendarDays, HandHeart, TrendingUp, CheckCheck, Inbox, AlertTriangle,
 } from 'lucide-react';
@@ -79,7 +80,17 @@ const MES = [
 
 // ── Constructores de notificaciones por fuente ──────────────────────────────
 
-async function cargarMiembros(items: Notif[]) {
+type Trad = (clave: string) => string;
+
+/** "4 días" / "50 horas" viene armado en lib/cultos-abiertos; acá solo se
+ *  traduce la unidad, que es la única palabra del texto. */
+function traducirLapso(lapso: string, t: Trad): string {
+  const m = lapso.match(/^(\d+) (días|horas)$/);
+  return m ? `${m[1]} ${t(m[2])}` : lapso;
+}
+
+
+async function cargarMiembros(items: Notif[], t: Trad) {
   const r = await fetch('/api/personas?soloPendientes=1', { cache: 'no-store' });
   if (!r.ok) return;
   const { personas } = await r.json();
@@ -87,15 +98,15 @@ async function cargarMiembros(items: Notif[]) {
     items.push({
       id: `miembro-${p.id}`,
       tipo: 'miembro',
-      titulo: 'Nueva solicitud de miembro',
-      detalle: p.nombre ?? 'Sin nombre',
+      titulo: t('Nueva solicitud de miembro'),
+      detalle: p.nombre ?? t('Sin nombre'),
       ts: p.created_at ?? p.fecha_registro ?? new Date().toISOString(),
       href: '/intranet/dashboard/members',
     });
   }
 }
 
-async function cargarAgenda(items: Notif[]) {
+async function cargarAgenda(items: Notif[], t: Trad) {
   const r = await fetch('/api/agenda', { cache: 'no-store' });
   if (!r.ok) return;
   const { eventos } = await r.json();
@@ -104,7 +115,7 @@ async function cargarAgenda(items: Notif[]) {
     items.push({
       id: `agenda-${e.id}`,
       tipo: 'agenda',
-      titulo: 'Nueva fecha propuesta',
+      titulo: t('Nueva fecha propuesta'),
       detalle: `${e.titulo} · ${e.solicitante_nombre}`,
       ts: e.created_at ?? new Date().toISOString(),
       href: '/intranet/dashboard/agenda',
@@ -112,7 +123,7 @@ async function cargarAgenda(items: Notif[]) {
   }
 }
 
-async function cargarOracion(items: Notif[]) {
+async function cargarOracion(items: Notif[], t: Trad) {
   const r = await fetch('/api/oracion', { cache: 'no-store' });
   if (!r.ok) return;
   const { peticiones } = await r.json();
@@ -121,8 +132,8 @@ async function cargarOracion(items: Notif[]) {
     items.push({
       id: `oracion-${p.id}`,
       tipo: 'oracion',
-      titulo: 'Nueva petición de oración',
-      detalle: p.nombre ?? 'Anónimo',
+      titulo: t('Nueva petición de oración'),
+      detalle: p.nombre ?? t('Anónimo'),
       ts: p.created_at ?? new Date().toISOString(),
       href: '/intranet/dashboard/oracion',
     });
@@ -179,14 +190,14 @@ async function cargarKpiPastor(items: Notif[]) {
 // asistencia de esa reunión está incompleta y todo lo que se calcula con ella
 // —promedios, tendencias, el "cómo nos fue la última vez"— sale mal sin que
 // nadie se entere. Cada quien ve solo los cultos que puede cerrar.
-async function cargarCultosSinCerrar(items: Notif[], role: string) {
+async function cargarCultosSinCerrar(items: Notif[], role: string, t: Trad, idioma: Idioma) {
   const r = await fetch('/api/cultos', { cache: 'no-store' });
   if (!r.ok) return;
   const { cultos } = await r.json();
 
   for (const c of cultosSinCerrar(cultos ?? [], ministerioDeRol(role))) {
-    const nombre = CULTO_TIPOS[c.tipo]?.label ?? 'Culto';
-    const dia = new Date(c.fecha).toLocaleDateString('es-CL', {
+    const nombre = t(CULTO_TIPOS[c.tipo]?.label ?? 'Culto');
+    const dia = new Date(c.fecha).toLocaleDateString(idioma === 'pt' ? 'pt-BR' : 'es-CL', {
       timeZone: 'UTC',
       day: 'numeric',
       month: 'long',
@@ -194,8 +205,8 @@ async function cargarCultosSinCerrar(items: Notif[], role: string) {
     items.push({
       id: `culto-${c.id}`,
       tipo: 'culto',
-      titulo: 'Hay un culto sin cerrar',
-      detalle: `${nombre} del ${dia} · lleva ${tiempoAbierto(c.horas)} abierto`,
+      titulo: t('Hay un culto sin cerrar'),
+      detalle: `${nombre} ${t('del')} ${dia} · ${t('lleva')} ${traducirLapso(tiempoAbierto(c.horas), t)} ${t('abierto')}`,
       // La fecha del aviso es cuando CUMPLIÓ las 48 h, no la del culto. Con la
       // del culto (vieja) el aviso nacía "ya leído" y el contador nunca se
       // encendía. Así se enciende al aparecer y se apaga al abrir la campana.
@@ -206,15 +217,15 @@ async function cargarCultosSinCerrar(items: Notif[], role: string) {
   }
 }
 
-async function construir(role: string): Promise<Notif[]> {
+async function construir(role: string, t: Trad, idioma: Idioma): Promise<Notif[]> {
   const items: Notif[] = [];
   const jobs: Promise<void>[] = [];
 
-  if (puedeAutorizarFichas(role)) jobs.push(cargarMiembros(items).catch(() => {}));
-  if (puedeAutorizarAgenda(role)) jobs.push(cargarAgenda(items).catch(() => {}));
-  if (puedeVerOracion(role)) jobs.push(cargarOracion(items).catch(() => {}));
+  if (puedeAutorizarFichas(role)) jobs.push(cargarMiembros(items, t).catch(() => {}));
+  if (puedeAutorizarAgenda(role)) jobs.push(cargarAgenda(items, t).catch(() => {}));
+  if (puedeVerOracion(role)) jobs.push(cargarOracion(items, t).catch(() => {}));
   if (role === 'pastor') jobs.push(cargarKpiPastor(items).catch(() => {}));
-  if (abreCultos(role)) jobs.push(cargarCultosSinCerrar(items, role).catch(() => {}));
+  if (abreCultos(role)) jobs.push(cargarCultosSinCerrar(items, role, t, idioma).catch(() => {}));
 
   await Promise.all(jobs);
   // Las advertencias van arriba SIEMPRE, aunque sean lo más viejo de la lista:
@@ -232,6 +243,7 @@ async function construir(role: string): Promise<Notif[]> {
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export function NotificationBell({ role }: { role: string }) {
+  const { t, idioma } = useIdioma();
   const router = useRouter();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [visto, setVisto] = useState(0);
@@ -240,11 +252,11 @@ export function NotificationBell({ role }: { role: string }) {
 
   const cargar = useCallback(async () => {
     try {
-      setNotifs(await construir(role));
+      setNotifs(await construir(role, t, idioma));
     } catch {
       // Silencioso: un fallo de red no debe romper la barra.
     }
-  }, [role]);
+  }, [role, t, idioma]);
 
   useEffect(() => {
     setVisto(leerVisto(role));
@@ -294,7 +306,7 @@ export function NotificationBell({ role }: { role: string }) {
 
   const cuando = (n: Notif) => {
     try {
-      return formatDistanceToNow(parseISO(n.ts), { addSuffix: true, locale: es });
+      return formatDistanceToNow(parseISO(n.ts), { addSuffix: true, locale: idioma === 'pt' ? ptBR : es });
     } catch {
       return '';
     }
@@ -336,7 +348,7 @@ export function NotificationBell({ role }: { role: string }) {
       <PopoverContent align="end" sideOffset={8} className="w-[min(92vw,380px)] p-0 overflow-hidden">
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm text-foreground">Notificaciones</span>
+            <span className="font-semibold text-sm text-foreground">{t('Notificaciones')}</span>
             {noLeidas > 0 && (
               <span
                 className={cn(
@@ -354,17 +366,15 @@ export function NotificationBell({ role }: { role: string }) {
               onClick={marcarTodas}
               className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
             >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Marcar vistas
-            </button>
+              <CheckCheck className="h-3.5 w-3.5" />{t('Marcar vistas')}</button>
           )}
         </div>
 
         {notifs.length === 0 ? (
           <div className="px-6 py-10 text-center">
             <Inbox className="h-9 w-9 text-muted-foreground/40 mx-auto mb-2" />
-            <p className="text-sm font-medium text-foreground">Estás al día</p>
-            <p className="text-xs text-muted-foreground mt-0.5">No hay nada nuevo por ahora.</p>
+            <p className="text-sm font-medium text-foreground">{t('Estás al día')}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t('No hay nada nuevo por ahora.')}</p>
           </div>
         ) : (
           <ul className="max-h-[min(60vh,440px)] overflow-y-auto divide-y divide-border">
@@ -404,19 +414,15 @@ export function NotificationBell({ role }: { role: string }) {
                       <span className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground">{n.titulo}</span>
                         {esAdv ? (
-                          <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-                            Atención
-                          </span>
+                          <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">{t('Atención')}</span>
                         ) : (
-                          noLeida && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" aria-label="sin leer" />
+                          noLeida && <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" aria-label={t('sin leer')} />
                         )}
                       </span>
                       <span className="block text-sm text-muted-foreground">{n.detalle}</span>
                       {esAdv ? (
                         // Sin el "qué hago ahora", el aviso solo genera angustia.
-                        <span className="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">
-                          Ábrelo en Asistencia y ciérralo para que las cifras cuadren.
-                        </span>
+                        <span className="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">{t('Ábrelo en Asistencia y ciérralo para que las cifras cuadren.')}</span>
                       ) : (
                         <span className="block text-xs text-muted-foreground/80 mt-0.5">{cuando(n)}</span>
                       )}

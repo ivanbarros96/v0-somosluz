@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { getPersonas } from '@/lib/datos';
+import { useIdioma } from '@/lib/idioma';
 import { useMembers } from '@/lib/members-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ const ETIQUETA: Record<string, string> = { adulto: 'Adulto', joven: 'Youth', nin
  * hasta que alguien las apruebe acá.
  */
 export function PendientesPanel() {
+  const { t } = useIdioma();
   const { members, refreshMembers } = useMembers();
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -106,26 +108,20 @@ export function PendientesPanel() {
   return (
     <div className="space-y-4 px-6 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 p-3">
-        <p className="text-sm text-muted-foreground">
-          Comparte este link para que la gente se registre sola. Lo que llegue aparece acá
-          para que lo revises antes de que entre a la lista.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('Comparte este link para que la gente se registre sola. Lo que llegue aparece acá para que lo revises antes de que entre a la lista.')}</p>
         <Button size="sm" variant="outline" onClick={copiarLink} className="shrink-0 gap-1.5">
           {copiado ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-          {copiado ? 'Copiado' : 'Copiar link'}
+          {copiado ? t('Copiado') : t('Copiar link')}
         </Button>
       </div>
 
       {cargando ? (
         <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando...
-        </div>
+          <Loader2 className="h-4 w-4 animate-spin" />{t('Cargando...')}</div>
       ) : pendientes.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center">
           <UserRoundPlus className="h-6 w-6 text-muted-foreground/60" aria-hidden />
-          <p className="text-sm text-muted-foreground">
-            No hay registros esperando revisión.
-          </p>
+          <p className="text-sm text-muted-foreground">{t('No hay registros esperando revisión.')}</p>
         </div>
       ) : (
         <ul className="divide-y divide-border">
@@ -143,21 +139,19 @@ export function PendientesPanel() {
                       <Badge
                         variant="outline"
                         className="gap-1 border-amber-200 bg-amber-50 text-xs text-amber-700"
-                        title="Ya hay un miembro con este mismo nombre"
+                        title={t('Ya hay un miembro con este mismo nombre')}
                       >
-                        <AlertTriangle className="h-3 w-3" />
-                        Posible duplicado
-                      </Badge>
+                        <AlertTriangle className="h-3 w-3" />{t('Posible duplicado')}</Badge>
                     )}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {[
-                      p.edad != null ? `${p.edad} años` : null,
+                      p.edad != null ? `${p.edad} ${t('años')}` : null,
                       p.sexo,
                       p.telefono,
                       p.comuna,
-                      p.nombre_apoderado ? `Apoderado: ${p.nombre_apoderado}` : null,
-                    ].filter(Boolean).join(' · ') || 'Sin datos adicionales'}
+                      p.nombre_apoderado ? `${t('Apoderado')}: ${p.nombre_apoderado}` : null,
+                    ].filter(Boolean).join(' · ') || t('Sin datos adicionales')}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -165,8 +159,8 @@ export function PendientesPanel() {
                     size="sm"
                     variant="ghost"
                     className="h-8 w-8 p-0"
-                    title="Ver la ficha completa antes de aprobar"
-                    aria-label={`Ver la ficha de ${p.nombre}`}
+                    title={t('Ver la ficha completa antes de aprobar')}
+                    aria-label={`${t('Ver la ficha de')} ${p.nombre}`}
                     onClick={() => setViendo(p)}
                   >
                     <Eye className="h-4 w-4" />
@@ -178,14 +172,12 @@ export function PendientesPanel() {
                     disabled={trabajando === p.id}
                     onClick={() => resolver(p, 'rechazar')}
                   >
-                    <X className="mr-1 h-3.5 w-3.5" />
-                    Descartar
-                  </Button>
+                    <X className="mr-1 h-3.5 w-3.5" />{t('Descartar')}</Button>
                   <Button size="sm" disabled={trabajando === p.id} onClick={() => resolver(p, 'aprobar')}>
                     {trabajando === p.id
                       ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                       : <Check className="mr-1 h-3.5 w-3.5" />}
-                    Aprobar
+                    {t('Aprobar')}
                   </Button>
                 </div>
               </li>
@@ -204,7 +196,7 @@ export function PendientesPanel() {
           <DialogHeader>
             <DialogTitle>{viendo?.nombre}</DialogTitle>
             <DialogDescription>
-              Se registró por el link público · {ETIQUETA[viendo?.source_tipo ?? ''] ?? viendo?.source_tipo}
+              {t('Se registró por el link público')} · {t(ETIQUETA[viendo?.source_tipo ?? ''] ?? viendo?.source_tipo ?? '')}
             </DialogDescription>
           </DialogHeader>
 
@@ -221,7 +213,7 @@ export function PendientesPanel() {
               ['Nombre', viendo.nombre, true],
               ['Sexo', viendo.sexo, true],
               ['Fecha de nacimiento', viendo.fecha_nacimiento, true],
-              ['Edad', viendo.edad != null ? `${viendo.edad} años` : null, true],
+              ['Edad', viendo.edad != null ? `${viendo.edad} ${t('años')}` : null, true],
             ];
             // A un niño no se le pide contacto propio: el suyo es el apoderado.
             const contacto: Campo[] = esNino ? [] : [
@@ -258,10 +250,8 @@ export function PendientesPanel() {
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
-                      Falta{faltan.length > 1 ? 'n' : ''}{' '}
-                      <strong>{faltan.map(([l]) => l.toLowerCase()).join(', ')}</strong>.
-                      Puedes aprobar igual y completarlo después desde Miembros.
-                    </span>
+                      {faltan.length > 1 ? t('Faltan') : t('Falta')}{' '}
+                      <strong>{faltan.map(([l]) => l.toLowerCase()).join(', ')}</strong>{t('. Puedes aprobar igual y completarlo después desde Miembros.')}</span>
                   </div>
                 )}
 
@@ -269,7 +259,7 @@ export function PendientesPanel() {
                   <Card key={titulo}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-xs uppercase tracking-widest text-muted-foreground">
-                        {titulo}
+                        {t(titulo)}
                       </CardTitle>
                     </CardHeader>
                     {/* Dos columnas en pantalla grande: es una ficha de LECTURA,
@@ -278,9 +268,9 @@ export function PendientesPanel() {
                     <CardContent className="grid gap-3 sm:grid-cols-2">
                       {campos.map(([label, valor, importante]) => (
                         <div key={label} className="space-y-1">
-                          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                          <p className="text-sm font-medium text-muted-foreground">{t(label)}</p>
                           <p className={valor ? 'text-sm' : `text-sm ${importante ? 'font-medium text-amber-700' : 'text-muted-foreground'}`}>
-                            {valor ?? (importante ? 'Falta' : '—')}
+                            {valor ? t(valor) : (importante ? t('Falta') : '—')}
                           </p>
                         </div>
                       ))}
@@ -298,16 +288,12 @@ export function PendientesPanel() {
               disabled={trabajando === viendo?.id}
               onClick={() => { if (viendo) { const p = viendo; setViendo(null); resolver(p, 'rechazar'); } }}
             >
-              <X className="mr-1 h-4 w-4" />
-              Descartar
-            </Button>
+              <X className="mr-1 h-4 w-4" />{t('Descartar')}</Button>
             <Button
               disabled={trabajando === viendo?.id}
               onClick={() => { if (viendo) { const p = viendo; setViendo(null); resolver(p, 'aprobar'); } }}
             >
-              <Check className="mr-1 h-4 w-4" />
-              Aprobar
-            </Button>
+              <Check className="mr-1 h-4 w-4" />{t('Aprobar')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

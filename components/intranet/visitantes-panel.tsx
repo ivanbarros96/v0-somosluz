@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useIdioma } from '@/lib/idioma';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +50,7 @@ interface VisitantesPanelProps {
 }
 
 export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
+  const { t } = useIdioma();
   const { user } = useAuth();
   // El pastor borra directo: su sesión ya lo identifica. Igual que en Miembros.
   const esPastor = user?.role === 'pastor';
@@ -145,16 +147,13 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
   if (cargando) {
     return (
       <div className="py-10 flex items-center justify-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cargando visitantes...
-      </div>
+        <Loader2 className="h-4 w-4 animate-spin" />{t('Cargando visitantes...')}</div>
     );
   }
 
   if (visitantes.length === 0) {
     return (
-      <p className="py-10 text-center text-muted-foreground text-sm">
-        No hay visitas registradas.
-      </p>
+      <p className="py-10 text-center text-muted-foreground text-sm">{t('No hay visitas registradas.')}</p>
     );
   }
 
@@ -189,9 +188,9 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
           <span>
             <strong>{habituales}</strong>{' '}
-            {habituales === 1 ? 'visita ya vino' : 'visitas ya vinieron'}{' '}
-            {VISITAS_HABITUAL} veces o más. Al convertirlos en miembros conservan todo su
-            historial de asistencia.
+            {t(habituales === 1 ? 'visita ya vino' : 'visitas ya vinieron')}{' '}
+            {VISITAS_HABITUAL}{' '}
+            {t('veces o más. Al convertirlos en miembros conservan todo su historial de asistencia.')}
           </span>
         </div>
       )}
@@ -200,11 +199,11 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead className="text-center">Visitas</TableHead>
-              <TableHead>Última visita</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead>{t('Nombre')}</TableHead>
+              <TableHead>{t('Teléfono')}</TableHead>
+              <TableHead className="text-center">{t('N° visitas')}</TableHead>
+              <TableHead>{t('Última visita')}</TableHead>
+              <TableHead className="text-right">{t('Acciones')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -231,17 +230,17 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
                       No existe "Dar de baja": esa registra un retiro contra
                       `personas` y una visita no tiene ficha ahí. */}
                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => setViendo(v)} title="Ver ficha">
+                    <Button variant="ghost" size="icon" onClick={() => setViendo(v)} title={t('Ver ficha')}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => abrirEditar(v)} title="Editar">
+                    <Button variant="ghost" size="icon" onClick={() => abrirEditar(v)} title={t('Editar')}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="text-destructive"
-                      title="Eliminar definitivamente"
+                      title={t('Eliminar definitivamente')}
                       onClick={() => { setEliminando(v); setPwd(''); setErrorAccion(''); }}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -250,14 +249,12 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
                       size="sm"
                       variant="outline"
                       className="ml-1"
-                      title="Conserva todo su historial de asistencia"
+                      title={t('Conserva todo su historial de asistencia')}
                       onClick={() => setConvirtiendo({
                         id: v.id, nombre: v.nombre, telefono: v.telefono, email: v.email,
                       })}
                     >
-                      <UserPlus className="mr-1 h-4 w-4" />
-                      Convertir en miembro
-                    </Button>
+                      <UserPlus className="mr-1 h-4 w-4" />{t('Convertir en miembro')}</Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -271,23 +268,23 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{viendo?.nombre}</DialogTitle>
-            <DialogDescription>Visita registrada</DialogDescription>
+            <DialogDescription>{t('Visita registrada')}</DialogDescription>
           </DialogHeader>
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Teléfono</dt>
+              <dt className="text-muted-foreground">{t('Teléfono')}</dt>
               <dd className="font-medium">{viendo?.telefono ?? '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Email</dt>
+              <dt className="text-muted-foreground">{t('Email')}</dt>
               <dd className="font-medium break-all">{viendo?.email ?? '—'}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Veces que ha venido</dt>
+              <dt className="text-muted-foreground">{t('Veces que ha venido')}</dt>
               <dd className="font-medium tabular-nums">{viendo?.visitas ?? 0}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Última visita</dt>
+              <dt className="text-muted-foreground">{t('Última visita')}</dt>
               <dd className="font-medium tabular-nums">{formatFecha(viendo?.ultimaVisita ?? null)}</dd>
             </div>
           </dl>
@@ -303,18 +300,15 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
       <Dialog open={!!editando} onOpenChange={(o) => { if (!o && !trabajando) { setEditando(null); setErrorAccion(''); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar visita</DialogTitle>
-            <DialogDescription>
-              Una visita solo guarda nombre y contacto. La ficha completa se llena
-              al convertirla en miembro.
-            </DialogDescription>
+            <DialogTitle>{t('Editar visita')}</DialogTitle>
+            <DialogDescription>{t('Una visita solo guarda nombre y contacto. La ficha completa se llena al convertirla en miembro.')}</DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"
             onSubmit={(e) => { e.preventDefault(); guardarEdicion(); }}
           >
             <div className="space-y-1.5">
-              <Label htmlFor="v-nombre">Nombre</Label>
+              <Label htmlFor="v-nombre">{t('Nombre')}</Label>
               <Input
                 id="v-nombre"
                 value={form.nombre}
@@ -323,7 +317,7 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="v-telefono">Teléfono</Label>
+              <Label htmlFor="v-telefono">{t('Teléfono')}</Label>
               <Input
                 id="v-telefono"
                 value={form.telefono}
@@ -332,7 +326,7 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="v-email">Email</Label>
+              <Label htmlFor="v-email">{t('Email')}</Label>
               <Input
                 id="v-email"
                 type="email"
@@ -345,11 +339,9 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
             )}
           </form>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditando(null)} disabled={trabajando}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setEditando(null)} disabled={trabajando}>{t('Cancelar')}</Button>
             <Button onClick={guardarEdicion} disabled={trabajando || !form.nombre.trim()}>
-              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Guardar'}
+              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Guardando...')}</> : t('Guardar')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -360,21 +352,19 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" />
-              Eliminar visita
-            </DialogTitle>
+              <Trash2 className="h-5 w-5 text-destructive" />{t('Eliminar visita')}</DialogTitle>
             <DialogDescription>
-              Vas a eliminar a{' '}
+              {t('Vas a eliminar a')}{' '}
               <span className="font-semibold text-foreground">{eliminando?.nombre}</span>
               {eliminando && eliminando.visitas > 0 && (
-                <> y sus <strong>{eliminando.visitas}</strong>{' '}
-                  {eliminando.visitas === 1 ? 'marca de asistencia' : 'marcas de asistencia'}</>
+                <>{' '}{t('y sus')}{' '}<strong>{eliminando.visitas}</strong>{' '}
+                  {t(eliminando.visitas === 1 ? 'marca de asistencia' : 'marcas de asistencia')}</>
               )}
-              , para siempre. Esta acción no se puede deshacer.
+              {t(', para siempre. Esta acción no se puede deshacer.')}
               {eliminando && eliminando.visitas > 0 && (
                 <span className="mt-1.5 inline-block">
-                  Si lo que quieres es conservar su historial, cierra esto y usa{' '}
-                  <strong>Convertir en miembro</strong>.
+                  {t('Si lo que quieres es conservar su historial, cierra esto y usa')}{' '}
+                  <strong>{t('Convertir en miembro')}</strong>.
                 </span>
               )}
             </DialogDescription>
@@ -384,10 +374,10 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
             <div className="space-y-3">
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Eliminar requiere autorización. Ingresa la <strong>contraseña del pastor</strong>.</span>
+                <span>{t('Eliminar requiere autorización. Ingresa la')}{' '}<strong>{t('contraseña del pastor')}</strong>.</span>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="v-pwd">Contraseña del pastor</Label>
+                <Label htmlFor="v-pwd">{t('Contraseña del pastor')}</Label>
                 <Input
                   id="v-pwd"
                   type="password"
@@ -407,15 +397,13 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setEliminando(null); setPwd(''); setErrorAccion(''); }} disabled={trabajando}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => { setEliminando(null); setPwd(''); setErrorAccion(''); }} disabled={trabajando}>{t('Cancelar')}</Button>
             <Button
               variant="destructive"
               onClick={confirmarEliminar}
               disabled={trabajando || (!esPastor && !pwd)}
             >
-              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando...</> : 'Eliminar'}
+              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Eliminando...')}</> : t('Eliminar')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -424,12 +412,10 @@ export function VisitantesPanel({ query = '' }: VisitantesPanelProps) {
       <Dialog open={!!convirtiendo} onOpenChange={(o) => { if (!o) setConvirtiendo(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Convertir en miembro</DialogTitle>
+            <DialogTitle>{t('Convertir en miembro')}</DialogTitle>
             <DialogDescription>
-              Elige la categoría y completa la ficha de{' '}
-              <span className="font-semibold text-foreground">{convirtiendo?.nombre}</span>.
-              Sus asistencias anteriores se conservan y pasan a la ficha nueva.
-            </DialogDescription>
+              {t('Elige la categoría y completa la ficha de')}{' '}
+              <span className="font-semibold text-foreground">{convirtiendo?.nombre}</span>{t('. Sus asistencias anteriores se conservan y pasan a la ficha nueva.')}</DialogDescription>
           </DialogHeader>
           {convirtiendo && (
             <MemberForm

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { getRetiros, type RetiroRow } from '@/lib/datos';
+import { useIdioma, type Idioma } from '@/lib/idioma';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,10 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, RotateCcw, Trash2, ShieldAlert, UserMinus } from 'lucide-react';
 
-const formatFecha = (iso: string) =>
-  new Date(iso + (iso.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('es-CL', {
-    day: '2-digit', month: 'long', year: 'numeric',
-  });
+const formatFecha = (iso: string, idioma: Idioma) =>
+  new Date(iso + (iso.length === 10 ? 'T00:00:00' : '')).toLocaleDateString(
+    idioma === 'pt' ? 'pt-BR' : 'es-CL',
+    { day: '2-digit', month: 'long', year: 'numeric' },
+  );
 
 /**
  * Miembros dados de baja: siguen en la base con todo su historial, pero fuera
@@ -24,6 +26,7 @@ const formatFecha = (iso: string) =>
  * borrarlos de verdad.
  */
 export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
+  const { t, idioma } = useIdioma();
   const [retiros, setRetiros] = useState<RetiroRow[]>([]);
   const [cargando, setCargando] = useState(true);
   const [reactivando, setReactivando] = useState<RetiroRow | null>(null);
@@ -96,23 +99,17 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="flex items-center gap-2 text-base">
             <UserMinus className="h-5 w-5 text-muted-foreground" aria-hidden />
-            Miembros inactivos
+            {t('Miembros inactivos')}
             {retiros.length > 0 && <Badge variant="secondary">{retiros.length}</Badge>}
           </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Fuera de los listados y de las estadísticas, pero conservados en la base con todo su
-            historial — por si vuelven o para invitarlos a algo puntual
-          </p>
+          <p className="text-xs text-muted-foreground">{t('Fuera de los listados y de las estadísticas, pero conservados en la base con todo su historial — por si vuelven o para invitarlos a algo puntual')}</p>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
           {cargando ? (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Cargando...
-            </div>
+              <Loader2 className="h-4 w-4 animate-spin" />{t('Cargando...')}</div>
           ) : retiros.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No hay miembros dados de baja.
-            </p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t('No hay miembros dados de baja.')}</p>
           ) : (
             <ul className="divide-y divide-border">
               {retiros.map((r) => (
@@ -120,7 +117,7 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">{r.nombre}</p>
                     <p className="text-xs text-muted-foreground">
-                      Baja el {formatFecha(r.fecha_retiro)} · {r.motivo}
+                      {t('Baja el')} {formatFecha(r.fecha_retiro, idioma)} · {t(r.motivo)}
                     </p>
                     {r.observaciones && (
                       <p className="mt-0.5 text-xs italic text-muted-foreground">{r.observaciones}</p>
@@ -128,18 +125,14 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => { cerrarDialogos(); setReactivando(r); }}>
-                      <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                      Reactivar
-                    </Button>
+                      <RotateCcw className="mr-1 h-3.5 w-3.5" />{t('Reactivar')}</Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="border-destructive/30 text-destructive hover:bg-destructive/10"
                       onClick={() => { cerrarDialogos(); setEliminando(r); }}
                     >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Eliminar
-                    </Button>
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />{t('Eliminar')}</Button>
                   </div>
                 </li>
               ))}
@@ -153,22 +146,17 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="h-5 w-5 text-primary" aria-hidden />
-              Reactivar miembro
-            </DialogTitle>
+              <RotateCcw className="h-5 w-5 text-primary" aria-hidden />{t('Reactivar miembro')}</DialogTitle>
             <DialogDescription>
-              <span className="font-semibold text-foreground">{reactivando?.nombre}</span> volverá a
-              aparecer en los listados y en las estadísticas, con todo su historial de asistencia
-              intacto — nunca se borró.
-            </DialogDescription>
+              <span className="font-semibold text-foreground">{reactivando?.nombre}</span>{' '}{t('volverá a aparecer en los listados y en las estadísticas, con todo su historial de asistencia intacto — nunca se borró.')}</DialogDescription>
           </DialogHeader>
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={cerrarDialogos} disabled={trabajando}>Cancelar</Button>
+            <Button variant="outline" onClick={cerrarDialogos} disabled={trabajando}>{t('Cancelar')}</Button>
             <Button onClick={reactivar} disabled={trabajando}>
-              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Reactivando...</> : 'Reactivar'}
+              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Reactivando...')}</> : t('Reactivar')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -179,26 +167,18 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-destructive" aria-hidden />
-              Eliminar definitivamente
-            </DialogTitle>
+              <Trash2 className="h-5 w-5 text-destructive" aria-hidden />{t('Eliminar definitivamente')}</DialogTitle>
             <DialogDescription>
               Se borrará la ficha de{' '}
-              <span className="font-semibold text-foreground">{eliminando?.nombre}</span> y todo su
-              historial de asistencia. Esto no es dar de baja: la persona desaparece de la base y no
-              se puede recuperar.
-            </DialogDescription>
+              <span className="font-semibold text-foreground">{eliminando?.nombre}</span>{' '}{t('y todo su historial de asistencia. Esto no es dar de baja: la persona desaparece de la base y no se puede recuperar.')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <span>
-                Si solo quieres que deje de aparecer, cancela: ya está inactivo y así conservas sus
-                datos.
-              </span>
+              <span>{t('Si solo quieres que deje de aparecer, cancela: ya está inactivo y así conservas sus datos.')}</span>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pwd-eliminar-inactivo">Contraseña del pastor</Label>
+              <Label htmlFor="pwd-eliminar-inactivo">{t('Contraseña del pastor')}</Label>
               <Input
                 id="pwd-eliminar-inactivo"
                 type="password"
@@ -215,9 +195,9 @@ export function InactivosPanel({ onCambio }: { onCambio?: () => void }) {
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={cerrarDialogos} disabled={trabajando}>Cancelar</Button>
+            <Button variant="outline" onClick={cerrarDialogos} disabled={trabajando}>{t('Cancelar')}</Button>
             <Button variant="destructive" onClick={eliminarDefinitivo} disabled={trabajando || !pwd}>
-              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando...</> : 'Eliminar para siempre'}
+              {trabajando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('Eliminando...')}</> : t('Eliminar para siempre')}
             </Button>
           </DialogFooter>
         </DialogContent>

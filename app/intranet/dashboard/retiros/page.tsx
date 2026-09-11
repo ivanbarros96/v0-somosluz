@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { getPersonas, getAsistenciasConFechaCulto } from '@/lib/datos';
+import { useIdioma } from '@/lib/idioma';
 import { InactivosPanel } from '@/components/intranet/pastor/inactivos-panel';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -40,6 +41,7 @@ interface AusenteRow {
 }
 
 export default function RetirosPage() {
+  const { t, idioma } = useIdioma();
   const [ausentes, setAusentes] = useState<AusenteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AusenteRow | null>(null);
@@ -134,11 +136,9 @@ export default function RetirosPage() {
     <div>
       <div className="mb-6 md:mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <UserX className="h-6 w-6 text-orange-500" />
-          Retiros
-        </h1>
+          <UserX className="h-6 w-6 text-orange-500" />{t('Retiros')}</h1>
         <p className="text-muted-foreground mt-1 text-sm md:text-base">
-          Miembros sin asistencia en +{DIAS_UMBRAL} días · confirma y registra el motivo del retiro
+          {t('Miembros sin asistencia en +{n} días · confirma y registra el motivo del retiro').replace('{n}', String(DIAS_UMBRAL))}
         </p>
       </div>
 
@@ -150,16 +150,14 @@ export default function RetirosPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-            <h3 className="font-semibold text-foreground text-lg">Sin candidatos a retiro</h3>
-            <p className="text-muted-foreground text-sm mt-1">
-              Todos los miembros han asistido en el último mes.
-            </p>
+            <h3 className="font-semibold text-foreground text-lg">{t('Sin candidatos a retiro')}</h3>
+            <p className="text-muted-foreground text-sm mt-1">{t('Todos los miembros han asistido en el último mes.')}</p>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader className="p-4 md:p-6 border-b border-border">
-            <CardTitle className="text-base">{ausentes.length} personas ausentes</CardTitle>
+            <CardTitle className="text-base">{ausentes.length} {t(ausentes.length === 1 ? 'persona ausente' : 'personas ausentes')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border">
@@ -172,17 +170,17 @@ export default function RetirosPage() {
                     <div className="min-w-0">
                       <p className="text-foreground font-medium text-sm truncate">{a.nombre}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-muted-foreground text-xs capitalize">{a.source_tipo}</span>
+                        <span className="text-muted-foreground text-xs capitalize">{t(a.source_tipo)}</span>
                         {a.ultimaFecha ? (
                           <>
                             <span className="text-muted-foreground">·</span>
                             <span className="text-muted-foreground text-xs flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              Última vez {formatDistanceToNow(parseISO(a.ultimaFecha), { addSuffix: true, locale: es })}
+                              {t('Última vez')}{' '}{formatDistanceToNow(parseISO(a.ultimaFecha), { addSuffix: true, locale: idioma === 'pt' ? ptBR : es })}
                             </span>
                           </>
                         ) : (
-                          <span className="text-muted-foreground text-xs">Sin asistencias registradas</span>
+                          <span className="text-muted-foreground text-xs">{t('Sin asistencias registradas')}</span>
                         )}
                       </div>
                     </div>
@@ -194,16 +192,14 @@ export default function RetirosPage() {
                         ? 'bg-destructive/10 text-destructive'
                         : 'bg-orange-500/10 text-orange-600'
                     }`}>
-                      {a.diasAusente === 9999 ? 'Nunca' : `${a.diasAusente}d`}
+                      {a.diasAusente === 9999 ? t('Nunca') : `${a.diasAusente}d`}
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       className="text-xs"
                       onClick={() => openModal(a)}
-                    >
-                      Registrar retiro
-                    </Button>
+                    >{t('Registrar retiro')}</Button>
                   </div>
                 </div>
               ))}
@@ -223,7 +219,7 @@ export default function RetirosPage() {
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Registrar retiro</DialogTitle>
+            <DialogTitle>{t('Registrar retiro')}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-2">
@@ -233,17 +229,17 @@ export default function RetirosPage() {
               </div>
               <div>
                 <p className="font-medium text-sm">{selected?.nombre}</p>
-                <p className="text-muted-foreground text-xs capitalize">{selected?.source_tipo}</p>
+                <p className="text-muted-foreground text-xs capitalize">{t(selected?.source_tipo ?? '')}</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Motivo del retiro</Label>
+              <Label className="text-sm font-medium">{t('Motivo del retiro')}</Label>
               <RadioGroup value={motivo} onValueChange={setMotivo} className="space-y-2">
                 {MOTIVOS.map((m) => (
                   <div key={m} className="flex items-center gap-2">
                     <RadioGroupItem value={m} id={m} />
-                    <Label htmlFor={m} className="text-sm font-normal cursor-pointer">{m}</Label>
+                    <Label htmlFor={m} className="text-sm font-normal cursor-pointer">{t(m)}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -251,7 +247,7 @@ export default function RetirosPage() {
               {motivo === OTRO && (
                 <Input
                   autoFocus
-                  placeholder="Escribe el motivo..."
+                  placeholder={t('Escribe el motivo...')}
                   value={motivoOtro}
                   onChange={(e) => setMotivoOtro(e.target.value)}
                   className="text-sm mt-1"
@@ -261,9 +257,9 @@ export default function RetirosPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Observaciones <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Label className="text-sm font-medium">{t('Observaciones')}{' '}<span className="text-muted-foreground font-normal">({t('opcional')})</span></Label>
               <Textarea
-                placeholder="Detalles adicionales..."
+                placeholder={t('Detalles adicionales...')}
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
                 className="resize-none text-sm"
@@ -273,9 +269,9 @@ export default function RetirosPage() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setSelected(null)} disabled={saving}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setSelected(null)} disabled={saving}>{t('Cancelar')}</Button>
             <Button onClick={confirmarRetiro} disabled={saving || !puedeGuardar} variant="destructive">
-              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</> : 'Confirmar retiro'}
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('Guardando...')}</> : t('Confirmar retiro')}
             </Button>
           </DialogFooter>
         </DialogContent>

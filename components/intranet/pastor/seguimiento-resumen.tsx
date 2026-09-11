@@ -34,9 +34,7 @@ export function SeguimientoResumen({ data }: { data: ResumenRiesgo }) {
       </CardHeader>
       <CardContent className="p-4 md:p-6 pt-0">
         {total === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Aún no hay datos suficientes para evaluar el seguimiento.
-          </p>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t('Aún no hay datos suficientes para evaluar el seguimiento.')}</p>
         ) : (
           <>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
