@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getPersonas, getAsistenciasConFechaCulto } from '@/lib/datos';
 import { useIdioma } from '@/lib/idioma';
+import { getMemberTypeLabel } from '@/lib/types';
 import { InactivosPanel } from '@/components/intranet/pastor/inactivos-panel';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es, ptBR } from 'date-fns/locale';
@@ -170,7 +171,7 @@ export default function RetirosPage() {
                     <div className="min-w-0">
                       <p className="text-foreground font-medium text-sm truncate">{a.nombre}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-muted-foreground text-xs capitalize">{t(a.source_tipo)}</span>
+                        <span className="text-muted-foreground text-xs">{t(getMemberTypeLabel(a.source_tipo))}</span>
                         {a.ultimaFecha ? (
                           <>
                             <span className="text-muted-foreground">·</span>
@@ -229,7 +230,7 @@ export default function RetirosPage() {
               </div>
               <div>
                 <p className="font-medium text-sm">{selected?.nombre}</p>
-                <p className="text-muted-foreground text-xs capitalize">{t(selected?.source_tipo ?? '')}</p>
+                <p className="text-muted-foreground text-xs">{selected ? t(getMemberTypeLabel(selected.source_tipo)) : ''}</p>
               </div>
             </div>
 

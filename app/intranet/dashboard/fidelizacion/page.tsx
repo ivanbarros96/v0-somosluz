@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getPersonas, getCultos, getAsistencias } from '@/lib/datos';
 import { useIdioma } from '@/lib/idioma';
+import { getMemberTypeLabel } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -230,7 +231,7 @@ function FidelizacionContent() {
                           <div className="min-w-0">
                             <p className="text-foreground font-medium text-sm truncate">{r.nombre}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-muted-foreground text-xs capitalize">{t(r.source_tipo)}</span>
+                              <span className="text-muted-foreground text-xs">{t(getMemberTypeLabel(r.source_tipo))}</span>
                               <span className="text-muted-foreground">·</span>
                               <span className="text-muted-foreground text-xs">{t('asistió')} {r.presentes}/{r.elegibles}</span>
                               {r.telefono && (

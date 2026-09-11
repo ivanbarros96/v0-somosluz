@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMembers } from '@/lib/members-store';
 import { useAuth } from '@/lib/auth-context';
-import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember, isJovenMember } from '@/lib/types';
+import { type AdultoMember, type Member, type NinoMember, getMemberInitials, isAdultoMember, isNinoMember, isJovenMember, getMemberTypeLabel } from '@/lib/types';
 import { ministerioDeRol } from '@/lib/roles';
 import { CULTO_TIPOS, idsQueAsistieron } from '@/lib/cultos-tipos';
 import { getCultos, getAsistencias, buscarDirectorio, type DirectorioRow } from '@/lib/datos';
@@ -93,7 +93,7 @@ function TypeBadge({ tipo }: { tipo: 'adulto' | 'nino' | 'joven' }) {
     tipo === 'adulto' ? 'bg-primary/10 text-primary border-primary/25'
     : tipo === 'joven' ? 'bg-[#c08a3e]/10 text-[#a06f2e] border-[#c08a3e]/25'
     : 'bg-accent/10 text-accent border-accent/25';
-  const label = tipo === 'adulto' ? 'Adulto' : tipo === 'joven' ? 'Joven' : 'Niño';
+  const label = getMemberTypeLabel(tipo);
   return (
     <Badge variant="outline" className={cls}>
       {t(label)}

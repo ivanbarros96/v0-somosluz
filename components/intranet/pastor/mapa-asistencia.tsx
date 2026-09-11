@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIdioma } from '@/lib/idioma';
 import { Input } from '@/components/ui/input';
+import { getMemberTypeLabel } from '@/lib/types';
 import { SinDatos } from './chart-kit';
 
 export interface DomingoColumna {
@@ -23,8 +24,6 @@ export interface FilaAsistencia {
 // Cuántas personas se muestran antes de pedir "ver todas". Mantiene la tarjeta
 // legible sin cortar información: el buscador y el botón dan acceso al resto.
 const VISIBLES = 25;
-
-const TIPO_CORTO: Record<string, string> = { adulto: 'Adulto', joven: 'Joven', nino: 'Niño' };
 
 export function MapaAsistencia({
   domingos, filas, conEncabezado = true,
@@ -100,7 +99,7 @@ export function MapaAsistencia({
                       <th className="sticky left-0 z-10 max-w-[190px] truncate bg-card px-2 py-1 text-left font-normal">
                         <span className="text-foreground">{f.nombre}</span>
                         <span className="ml-1.5 text-xs text-muted-foreground">
-                          {t(TIPO_CORTO[f.tipo] ?? f.tipo)}
+                          {t(getMemberTypeLabel(f.tipo))}
                         </span>
                       </th>
                       {domingos.map((d) => {
