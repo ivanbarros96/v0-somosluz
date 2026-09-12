@@ -103,7 +103,7 @@ export interface ActividadSemanal {
 export const AGENDA_SEMANAL: ActividadSemanal[] = [
   { dia: 'Martes', hora: '19:30', nombre: 'Hombría al Máximo', tipo: 'Discipulado · Varones', online: true },
   { dia: 'Martes', hora: '21:00', nombre: 'Amadas', tipo: 'Discipulado · Mujeres', online: true },
-  { dia: 'Viernes', hora: '19:30', nombre: 'Viernes de Discipulado', tipo: 'Formación espiritual' },
+  { dia: 'Miércoles', hora: '19:30', nombre: 'Miércoles de Discipulado', tipo: 'Formación espiritual' },
   { dia: 'Sábado', hora: '17:00', nombre: 'Generación Youth', tipo: 'Jóvenes' },
   { dia: 'Domingo', hora: '11:00', nombre: 'Iglesia de Niños', tipo: 'Ministerio infantil' },
   { dia: 'Domingo', hora: '11:30', nombre: 'Culto General', tipo: 'Reunión congregacional', destacado: true },
@@ -142,8 +142,8 @@ export const MINISTERIOS: Ministerio[] = [
   },
   {
     id: 'discipulado',
-    nombre: 'Viernes de Discipulado',
-    horario: 'Viernes 19:30',
+    nombre: 'Miércoles de Discipulado',
+    horario: 'Miércoles 19:30',
     publico: 'Formación espiritual',
     descripcion:
       'Un tiempo de enseñanza y crecimiento donde acompañamos a cada persona a conocer más a Dios, ser transformada a la imagen de Cristo, vivir guiada por el Espíritu Santo y descubrir el propósito para el cual Dios la ha llamado.',

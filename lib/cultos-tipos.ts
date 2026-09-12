@@ -73,7 +73,7 @@ export const CULTO_TIPOS: Record<
     },
   },
   discipulado: {
-    label: 'Viernes de Discipulado',
+    label: 'Miércoles de Discipulado',
     corto: 'Discipulado',
     publico: 'Adultos',
     elegibilidad: (p) => {

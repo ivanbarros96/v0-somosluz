@@ -73,7 +73,7 @@ Sí, la Iglesia de Niños los domingos a las 11:00 hrs.
 
 **¿Hay actividades durante la semana?**
 Sí: discipulado para varones y mujeres los martes, formación espiritual los
-viernes y reunión de jóvenes los sábados. Ver la agenda de arriba.
+miércoles y reunión de jóvenes los sábados. Ver la agenda de arriba.
 `;
 
   return new Response(cuerpo, {
