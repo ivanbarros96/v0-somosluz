@@ -51,7 +51,7 @@ const GRUPOS = [
       { role: 'kids', icon: Baby, desc: 'Niños · en paralelo al dominical' },
       { role: 'amadas', icon: Heart, desc: 'Mujeres' },
       { role: 'hombres', icon: Shield, desc: 'Varones', corto: 'Hombría' },
-      { role: 'discipulado', icon: GraduationCap, desc: 'Formación · miércoles', corto: 'Discipulado' },
+      { role: 'discipulado', icon: GraduationCap, desc: 'Formación espiritual', corto: 'Discipulado' },
       { role: 'youth', icon: Flame, desc: 'Jóvenes 15–20', corto: 'Youth' },
     ],
   },

@@ -19,12 +19,14 @@ export const ROLES = {
   // hacía. La clave interna del rol y su env var NO cambian: renombrarlas
   // cerraría las sesiones activas y obligaría a reconfigurar Vercel.
   somosluz: { name: 'Secretaría', badge: 'Operativo', envVar: 'SOMOSLUZ_PASSWORD', ministerio: null },
-  // Insignia "Reunión" y no "Ministerio": Miércoles de Discipulado es una
-  // reunión de formación, no un ministerio, y las cinco comparten insignia.
+  // Insignia "Reunión" y no "Ministerio": Discipulado es una reunión de
+  // formación, no un ministerio, y las cinco comparten insignia. Sin día en el
+  // nombre a propósito: el discipulado corre el miércoles y el viernes (nuevos),
+  // y el día real de cada asistencia lo da la fecha del culto, no la etiqueta.
   // Es solo texto visible — ningún permiso depende de este campo.
   amadas: { name: 'Amadas', badge: 'Reunión', envVar: 'AMADAS_PASSWORD', ministerio: 'mujeres' },
   hombres: { name: 'Hombría al Máximo', badge: 'Reunión', envVar: 'HOMBRES_PASSWORD', ministerio: 'hombres' },
-  discipulado: { name: 'Miércoles de Discipulado', badge: 'Reunión', envVar: 'DISCIPULADO_PASSWORD', ministerio: 'discipulado' },
+  discipulado: { name: 'Discipulado', badge: 'Reunión', envVar: 'DISCIPULADO_PASSWORD', ministerio: 'discipulado' },
   youth: { name: 'Generación Youth', badge: 'Reunión', envVar: 'YOUTH_PASSWORD', ministerio: 'youth' },
   // Kids sí tiene reunión propia desde el 09/08/2026: la clase de niños corre
   // en paralelo al dominical. Antes compartía el registro del general y las
