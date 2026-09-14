@@ -154,6 +154,49 @@ export const LABEL_TIPO_PERSONA: Record<string, string> = {
   nino: 'Niño',
 };
 
+// Hora a la que corren los avisos diarios de n8n (correo al pastor y grupo de
+// WhatsApp), en hora de Chile.
+const HORA_AVISO_DIARIO = 8;
+
+/** Fecha y hora actual en Chile, sin depender de la zona del navegador. */
+function ahoraEnChile(ahora: Date) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23',
+  }).formatToParts(ahora);
+  const n = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return { anio: n('year'), mes: n('month'), dia: n('day'), hora: n('hour') };
+}
+
+/**
+ * Si al cargar esta fecha de nacimiento el cumpleaños YA pasó en los últimos
+ * 7 días (o es hoy y el aviso de las 08:00 ya salió), devuelve cuántos días
+ * pasaron. Si no, null.
+ *
+ * Existe porque los avisos automáticos solo ven lo que hay en la base al
+ * momento de correr: una fecha cargada tarde se pierde el aviso del día y el
+ * recordatorio previo. Caso real: Isidora Pinochet, cumple 09/09, ficha
+ * completada ese día a las 16:23 — solo la vio el resumen del domingo 13/09.
+ */
+export function cumpleRecienPasado(
+  fechaDMY: string | null | undefined,
+  ahora: Date = new Date(),
+): { diasDesde: number; dia: number; mes: number } | null {
+  if (!fechaDMY) return null;
+  const [dia, mes] = fechaDMY.split('/').map((p) => parseInt(p, 10));
+  if (!dia || !mes) return null;
+
+  const hoy = ahoraEnChile(ahora);
+  const hoyUTC = Date.UTC(hoy.anio, hoy.mes - 1, hoy.dia);
+  let ultimo = Date.UTC(hoy.anio, mes - 1, dia);
+  if (ultimo > hoyUTC) ultimo = Date.UTC(hoy.anio - 1, mes - 1, dia);
+
+  const diasDesde = Math.round((hoyUTC - ultimo) / 86_400_000);
+  if (diasDesde > 7) return null;
+  if (diasDesde === 0 && hoy.hora < HORA_AVISO_DIARIO) return null; // el aviso de hoy todavía la va a tomar
+  return { diasDesde, dia, mes };
+}
+
 /** '14 de agosto' — para mostrar la fecha del cumpleaños sin el año. */
 export function fechaCumpleLegible(cumpleDia: number, cumpleMes: number): string {
   const MESES = [

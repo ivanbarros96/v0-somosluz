@@ -176,6 +176,11 @@ export function MembersProvider({ children }: { children: ReactNode }) {
 
   const updateMember = useCallback(async (id: string, data: Partial<Member>) => {
     const row: any = {};
+    // Sin esto, "Cambiar a Youth/Niño/Adulto" al EDITAR guardaba los campos de
+    // la nueva categoría pero la ficha seguía con la anterior. Así quedó
+    // Isidora Pinochet: 'nino' con teléfono propio y sin apoderado, y los
+    // avisos de cumpleaños la trataban como niña sin contacto.
+    if (data.tipo !== undefined) row.source_tipo = data.tipo;
     if (data.nombre !== undefined) row.nombre = data.nombre;
     if (data.sexo !== undefined) row.sexo = data.sexo;
     if (data.telefono !== undefined) row.telefono = data.telefono;

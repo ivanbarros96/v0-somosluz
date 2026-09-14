@@ -428,6 +428,11 @@ const PT: Record<string, string> = {
   'veces o más. Al convertirlos en miembros conservan todo su historial de asistencia.': 'vezes ou mais. Ao convertê-los em membros mantêm todo o histórico de presença.',
   'Esta persona tendría': 'Esta pessoa teria',
   'años según la fecha ingresada. ¿Seguro que corresponde al grupo Niño y no a Youth?': 'anos conforme a data informada. Tem certeza de que é do grupo Criança e não Jovem?',
+  'Su cumpleaños fue': 'O aniversário foi',
+  'hoy': 'hoje',
+  'ayer': 'ontem',
+  'hace': 'há',
+  'Los avisos automáticos de ese día ya salieron sin este cumpleaños. Puedes enviar el saludo desde la sección Cumpleaños.': 'Os avisos automáticos desse dia já saíram sem este aniversário. Você pode enviar a saudação pela seção Cumpleaños.',
 
   // -- Calendario --
   'enero': 'janeiro',

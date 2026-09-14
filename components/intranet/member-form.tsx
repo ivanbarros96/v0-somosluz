@@ -12,13 +12,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowRight, Cake } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   buscarPersonas, existePersona, existeMiembroNuevo, buscarDirectorio,
   type DirectorioRow,
 } from '@/lib/datos';
 import { ministerioDeRol, registraSinAprobacion } from '@/lib/roles';
 import { PAISES, REGIONES } from '@/lib/chile';
+import { cumpleRecienPasado } from '@/lib/cumpleanos';
+
+// "9/9/2009" y "09/09/2009" son la misma fecha: se compara por números para
+// no avisar de un cumpleaños atrasado cuando solo se re-guardó la ficha.
+function mismaFecha(a: string | null | undefined, b: string | null | undefined) {
+  const partes = (f: string | null | undefined) => (f ?? '').split('/').map((p) => parseInt(p, 10) || 0).join('/');
+  return partes(a) === partes(b);
+}
+
+function textoCumpleAtrasado(
+  aviso: NonNullable<ReturnType<typeof cumpleRecienPasado>>,
+  t: (s: string) => string,
+) {
+  const cuando = aviso.diasDesde === 0 ? t('hoy')
+    : aviso.diasDesde === 1 ? t('ayer')
+    : `${t('hace')} ${aviso.diasDesde} ${t('días')}`;
+  return `${t('Su cumpleaños fue')} ${cuando} (${aviso.dia}/${aviso.mes}). ${t('Los avisos automáticos de ese día ya salieron sin este cumpleaños. Puedes enviar el saludo desde la sección Cumpleaños.')}`;
+}
 
 // Palabras del nombre, sin tildes y en minúscula, ignorando partículas cortas
 // ("de", "la"). Comparar por palabras y no por texto completo es lo que permite
@@ -219,9 +238,16 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
   // Un único punto de guardado para las tres pestañas (adulto/joven/niño):
   // convertir un visitante, editar, o crear desde cero.
   const guardar = async (data: Parameters<typeof addMember>[0]) => {
-    if (visitante) return convertirVisitante(visitante.id, data);
-    if (isEditing) return updateMember(member!.id, data);
-    return addMember(data);
+    if (visitante) await convertirVisitante(visitante.id, data);
+    else if (isEditing) await updateMember(member!.id, data);
+    else await addMember(data);
+
+    // El formulario se cierra al guardar, así que el aviso de cumpleaños
+    // atrasado se repite como toast para que no se pierda.
+    if (!mismaFecha(data.fecha_nacimiento, member?.fecha_nacimiento)) {
+      const aviso = cumpleRecienPasado(data.fecha_nacimiento);
+      if (aviso) toast.warning(textoCumpleAtrasado(aviso, t), { duration: 12_000 });
+    }
   };
 
   // Pestañas que este rol puede usar al CREAR (en edición, el modo ya viene
@@ -508,6 +534,12 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
   const mostrarAvisoEdadYouth = modo === 'joven' && edadPreview !== null
     && (edadPreview < EDAD_YOUTH_MIN || edadPreview > EDAD_YOUTH_MAX);
 
+  // Solo si la fecha es nueva o cambió: re-guardar una ficha vieja no avisa.
+  const fechaPreview = (form.dia && form.mes && form.anio) ? `${form.dia}/${form.mes}/${form.anio}` : null;
+  const avisoCumpleAtrasado = modo !== 'nuevo' && !mismaFecha(fechaPreview, member?.fecha_nacimiento)
+    ? cumpleRecienPasado(fechaPreview)
+    : null;
+
   // Cambiar de categoría limpia el apoderado (solo aplica a Niño) pero conserva
   // el resto de lo tipeado, porque `form` es un único estado compartido entre
   // pestañas. La usan tanto los tabs como los atajos de los avisos de edad.
@@ -580,6 +612,12 @@ export function MemberForm({ member, visitante, onSuccess, onCancel }: MemberFor
                   </SelectContent>
                 </Select>
               </div>
+              {avisoCumpleAtrasado && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
+                  <Cake className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>{textoCumpleAtrasado(avisoCumpleAtrasado, t)}</span>
+                </div>
+              )}
               {mostrarAvisoEdadNino && (
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs mt-1">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
