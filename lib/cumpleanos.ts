@@ -197,6 +197,25 @@ export function cumpleRecienPasado(
   return { diasDesde, dia, mes };
 }
 
+/**
+ * Día en que la persona cumplió `edad` años ('YYYY-MM-DD'), si ya los cumplió
+ * según la fecha de hoy en Chile. null si todavía no, o si no hay fecha.
+ */
+export function diaEnQueCumplio(
+  fechaDMY: string | null | undefined,
+  edad: number,
+  ahora: Date = new Date(),
+): string | null {
+  if (!fechaDMY) return null;
+  const [dia, mes, anio] = fechaDMY.split('/').map((p) => parseInt(p, 10));
+  if (!dia || !mes || !anio) return null;
+
+  const hoy = ahoraEnChile(ahora);
+  const cumple = Date.UTC(anio + edad, mes - 1, dia);
+  if (cumple > Date.UTC(hoy.anio, hoy.mes - 1, hoy.dia)) return null;
+  return new Date(cumple).toISOString().slice(0, 10);
+}
+
 /** '14 de agosto' — para mostrar la fecha del cumpleaños sin el año. */
 export function fechaCumpleLegible(cumpleDia: number, cumpleMes: number): string {
   const MESES = [

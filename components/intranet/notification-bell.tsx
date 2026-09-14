@@ -9,6 +9,9 @@
 //   · Co-pastor  → fechas propuestas (las confirma).
 //   · Quien abra cultos → advertencia si dejó uno sin cerrar (ministerios
 //     incluidos: por esto llevan campana desde el 03/09/2026).
+//   · Secretaría + Youth → un Niño cumplió 15 y hay que pasarlo a Youth.
+//     Secretaría lo recibe como advertencia (es quien edita la ficha); Youth
+//     solo como aviso, porque no puede resolverlo (decisión de Iván, 14/09/2026).
 //
 // "No leído" es por navegador (localStorage, una marca por rol): se guarda la
 // última vez que se abrió la campana; lo más nuevo cuenta como sin leer. El
@@ -26,7 +29,7 @@ import { es, ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useIdioma, type Idioma } from '@/lib/idioma';
 import {
-  Bell, UserPlus, CalendarDays, HandHeart, TrendingUp, CheckCheck, Inbox, AlertTriangle,
+  Bell, UserPlus, CalendarDays, HandHeart, TrendingUp, CheckCheck, Inbox, AlertTriangle, Sprout,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -35,8 +38,13 @@ import {
 import { CULTO_TIPOS } from '@/lib/cultos-tipos';
 import { cultosSinCerrar, tiempoAbierto, inicioDelDia, HORAS_LIMITE } from '@/lib/cultos-abiertos';
 import { leerVisto, guardarVisto, alCambiarVisto } from '@/lib/notif-visto';
+import { diaEnQueCumplio } from '@/lib/cumpleanos';
 
-type TipoNotif = 'miembro' | 'agenda' | 'oracion' | 'kpi' | 'culto';
+type TipoNotif = 'miembro' | 'agenda' | 'oracion' | 'kpi' | 'culto' | 'edad';
+
+// Edad desde la que un Niño ya corresponde a Youth (el formulario de registro
+// define Niño como "14 años o menos").
+const EDAD_PASA_A_YOUTH = 15;
 
 interface Notif {
   id: string;
@@ -47,6 +55,8 @@ interface Notif {
   href: string;
   /** Advertencia: se pinta en ámbar, va arriba y no se puede silenciar. */
   advertencia?: boolean;
+  /** Qué hacer para resolver la advertencia. */
+  accion?: string;
 }
 
 const POLL_MS = 60_000;
@@ -57,6 +67,7 @@ const ICONO: Record<TipoNotif, typeof UserPlus> = {
   oracion: HandHeart,
   kpi: TrendingUp,
   culto: AlertTriangle,
+  edad: Sprout,
 };
 
 // Roles que llevan campana.
@@ -213,6 +224,39 @@ async function cargarCultosSinCerrar(items: Notif[], role: string, t: Trad, idio
       ts: new Date(inicioDelDia(c.fecha) + HORAS_LIMITE * 3_600_000).toISOString(),
       href: '/intranet/dashboard/asistencia',
       advertencia: true,
+      accion: t('Ábrelo en Asistencia y ciérralo para que las cifras cuadren.'),
+    });
+  }
+}
+
+// Un Niño que ya cumplió 15 sigue registrado como Niño hasta que alguien lo
+// cambia a mano — y mientras tanto los avisos de cumpleaños le escriben al
+// apoderado y Youth no lo ve en su lista. Caso real: Isidora Pinochet, 17 años
+// registrada como Niño. El aviso desaparece solo cuando se cambia la categoría.
+async function cargarNinosQueCumplieron15(items: Notif[], role: string, t: Trad) {
+  const r = await fetch('/api/personas', { cache: 'no-store' });
+  if (!r.ok) return;
+  const { personas } = await r.json();
+  const esSecretaria = puedeAutorizarFichas(role);
+
+  for (const p of personas ?? []) {
+    if (p.source_tipo !== 'nino') continue;
+    const dia = diaEnQueCumplio(p.fecha_nacimiento, EDAD_PASA_A_YOUTH);
+    if (!dia) continue;
+    items.push({
+      id: `edad-${p.id}`,
+      tipo: 'edad',
+      titulo: `${p.nombre} ${t('cumplió 15 años')}`,
+      detalle: esSecretaria
+        ? t(String(p.sexo).toLowerCase() === 'femenino'
+          ? 'Sigue registrada como Niño. Pásala a Youth.'
+          : 'Sigue registrado como Niño. Pásalo a Youth.')
+        : t('Llega a Youth. Secretaría actualizará su ficha.'),
+      // Fechado el día que cumplió 15: así se enciende ese día y no antes.
+      ts: `${dia}T12:00:00.000Z`,
+      href: esSecretaria ? '/intranet/dashboard/members' : '/intranet/dashboard/asistencia',
+      advertencia: esSecretaria,
+      accion: esSecretaria ? t('Ábrelo en Miembros y usa «Cambiar a Youth».') : undefined,
     });
   }
 }
@@ -226,6 +270,9 @@ async function construir(role: string, t: Trad, idioma: Idioma): Promise<Notif[]
   if (puedeVerOracion(role)) jobs.push(cargarOracion(items, t).catch(() => {}));
   if (role === 'pastor') jobs.push(cargarKpiPastor(items).catch(() => {}));
   if (abreCultos(role)) jobs.push(cargarCultosSinCerrar(items, role, t, idioma).catch(() => {}));
+  if (role === 'somosluz' || ministerioDeRol(role) === 'youth') {
+    jobs.push(cargarNinosQueCumplieron15(items, role, t).catch(() => {}));
+  }
 
   await Promise.all(jobs);
   // Las advertencias van arriba SIEMPRE, aunque sean lo más viejo de la lista:
@@ -422,7 +469,7 @@ export function NotificationBell({ role }: { role: string }) {
                       <span className="block text-sm text-muted-foreground">{n.detalle}</span>
                       {esAdv ? (
                         // Sin el "qué hago ahora", el aviso solo genera angustia.
-                        <span className="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">{t('Ábrelo en Asistencia y ciérralo para que las cifras cuadren.')}</span>
+                        <span className="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">{n.accion}</span>
                       ) : (
                         <span className="block text-xs text-muted-foreground/80 mt-0.5">{cuando(n)}</span>
                       )}
