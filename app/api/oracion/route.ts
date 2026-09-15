@@ -35,7 +35,10 @@ async function notificarPastor(nombre: string, email: string, peticion: string, 
   const remitente = process.env.ORACION_NOTIFY_FROM || 'Somos Luz <onboarding@resend.dev>';
 
   try {
-    await resend.emails.send({
+    // Resend v6 NO lanza excepción si rechaza el envío: devuelve `error` en el
+    // resultado. Sin revisarlo, un remitente inválido o una key de otra cuenta
+    // fallaban en silencio (así estuvo hasta el 14/09/2026).
+    const { error } = await resend.emails.send({
       from: remitente,
       to: destino,
       replyTo: email || undefined,
@@ -56,6 +59,7 @@ async function notificarPastor(nombre: string, email: string, peticion: string, 
   <a href="https://somosluziglesia.cl/intranet/dashboard/oracion" style="color:#0f766e;font-weight:600;text-decoration:none">Ver en la intranet →</a>
 </div>`,
     });
+    if (error) console.error('[oracion] Resend rechazó el correo', error);
   } catch (err) {
     console.error('[oracion] fallo al notificar por correo', err);
   }
