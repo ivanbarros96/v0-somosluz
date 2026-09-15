@@ -60,8 +60,9 @@ function nombreRol(role: string): string {
 }
 
 function remitente(): string {
-  // En modo prueba de Resend el remitente debe ser onboarding@resend.dev.
-  // Con el dominio verificado, cambiar a algo como agenda@somosluziglesia.cl.
+  // Respaldo de sandbox: Resend solo lo deja enviar al dueño de la cuenta. En
+  // producción manda AGENDA_NOTIFY_FROM (agenda@somosluziglesia.cl, dominio
+  // verificado el 14/09/2026).
   return process.env.AGENDA_NOTIFY_FROM || 'Somos Luz <onboarding@resend.dev>';
 }
 
@@ -124,7 +125,8 @@ export async function notificarResolucion(e: {
     ${e.motivo ? `<div style="background:${CREMA};border-radius:8px;padding:14px;font-size:14px;color:#2b2521;line-height:1.55;margin:0 0 18px"><strong>Motivo:</strong> ${escapeHtml(e.motivo)}</div>` : ''}`;
 
   try {
-    await resend.emails.send({
+    // Resend v6 devuelve el rechazo en `error`, no como excepción (ver api/oracion).
+    const { error } = await resend.emails.send({
       from: remitente(),
       to: destino,
       subject: e.confirmada
@@ -133,6 +135,7 @@ export async function notificarResolucion(e: {
       text: `Tu solicitud "${e.titulo}" del ${fechaLegible(e.fecha)} quedó ${veredicto} por ${nombreRol(e.resueltoPor)}.${e.motivo ? `\n\nMotivo: ${e.motivo}` : ''}`,
       html: envoltorio(e.confirmada ? 'Tu fecha quedó confirmada' : 'Tu fecha no se pudo agendar', cuerpo),
     });
+    if (error) console.error('[agenda] Resend rechazó el correo', error);
   } catch (err) {
     console.error('[agenda] fallo al avisar la resolución', err);
   }
