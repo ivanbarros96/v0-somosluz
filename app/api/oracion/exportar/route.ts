@@ -3,8 +3,8 @@ import ExcelJS from 'exceljs';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { getSession } from '@/lib/session';
 import { puedeVerOracion } from '@/lib/roles';
-import { etiquetaCategoria } from '@/lib/oracion-categorias';
-import { ORIGENES_ORACION, esOrigenOracion } from '@/lib/oracion-origen';
+import { CATEGORIA_KEYS, etiquetaCategoria } from '@/lib/oracion-categorias';
+import { ORIGENES_ORACION, ORIGEN_KEYS, esOrigenOracion } from '@/lib/oracion-origen';
 
 export const dynamic = 'force-dynamic';
 // exceljs es una librería de Node, no corre en el runtime Edge.
@@ -80,6 +80,79 @@ const COLUMNAS: { titulo: string; clave: string; ancho: number; envolver?: boole
 
 const DIAS_SIN_NOTICIAS = 14;
 
+// ── Hoja "Resumen" ──────────────────────────────────────────────────────────
+//
+// Pedido de Iván (14/09/2026): la lista dice el estado de CADA petición, pero
+// no el avance de un vistazo. El resumen responde eso — cuántas hay en cada
+// estado, qué porcentaje está contestada y cuáles necesitan un llamado — y va
+// como PRIMERA pestaña para que sea lo que se ve al abrir el archivo.
+//
+// Todo sale de las mismas peticiones que la lista (mismo período y filtros):
+// si no, los números del resumen y los de la lista podrían no cuadrar.
+
+type Estado = 'pendiente' | 'orando' | 'contestada';
+type Conteo = Record<Estado, number> & { total: number };
+
+const ESTADOS_ORDEN: Estado[] = ['pendiente', 'orando', 'contestada'];
+
+function conteoVacio(): Conteo {
+  return { pendiente: 0, orando: 0, contestada: 0, total: 0 };
+}
+
+function contar(c: Conteo, estado: string) {
+  if (estado === 'pendiente' || estado === 'orando' || estado === 'contestada') c[estado]++;
+  c.total++;
+}
+
+function sumar(mapa: Map<string, Conteo>, clave: string, estado: string) {
+  let c = mapa.get(clave);
+  if (!c) mapa.set(clave, (c = conteoVacio()));
+  contar(c, estado);
+}
+
+function estiloCabecera(celda: ExcelJS.Cell) {
+  celda.font = { name: 'Calibri', size: 11, bold: true, color: { argb: CREMA } };
+  celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BOSQUE } };
+  celda.alignment = { vertical: 'middle', horizontal: 'left' };
+}
+
+function tituloSeccion(hoja: ExcelJS.Worksheet, fila: number, texto: string) {
+  const celda = hoja.getCell(fila, 1);
+  celda.value = texto;
+  celda.font = { name: 'Calibri', size: 12, bold: true, color: { argb: BOSQUE } };
+  hoja.getRow(fila).height = 20;
+}
+
+/**
+ * Tabla de desglose: una fila por grupo con sus cantidades por estado.
+ * Devuelve la primera fila libre después de la tabla (dejando un espacio).
+ */
+function tablaDesglose(
+  hoja: ExcelJS.Worksheet,
+  inicio: number,
+  titulo: string,
+  grupo: string,
+  filas: { nombre: string; c: Conteo }[],
+): number {
+  tituloSeccion(hoja, inicio, titulo);
+  const cab = hoja.getRow(inicio + 1);
+  [grupo, 'En espera', 'Orando', 'Contestada', 'Total', '% contestadas'].forEach((t, i) => {
+    const celda = cab.getCell(i + 1);
+    celda.value = t;
+    estiloCabecera(celda);
+  });
+
+  let r = inicio + 2;
+  for (const { nombre, c } of filas) {
+    const fila = hoja.getRow(r);
+    fila.values = [nombre, c.pendiente, c.orando, c.contestada, c.total, c.total ? c.contestada / c.total : null];
+    fila.font = { name: 'Calibri', size: 10 };
+    fila.getCell(6).numFmt = '0%';
+    r++;
+  }
+  return r + 1;
+}
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !puedeVerOracion(session.role)) {
@@ -137,6 +210,12 @@ export async function GET(req: NextRequest) {
   libro.creator = 'Somos Luz';
   libro.created = new Date();
 
+  // Se crea antes que la lista para que sea la primera pestaña; se llena al
+  // final, cuando ya están los conteos.
+  const resumen = libro.addWorksheet('Resumen', {
+    pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+
   const hoja = libro.addWorksheet('Peticiones', {
     // Encabezado fijo: con 30 filas se pierde de vista qué columna es cuál.
     views: [{ state: 'frozen', ySplit: 2 }],
@@ -169,10 +248,27 @@ export async function GET(req: NextRequest) {
   });
   cabecera.height = 22;
 
+  const general = conteoVacio();
+  const porCategoria = new Map<string, Conteo>();
+  const porEquipo = new Map<string, Conteo>();
+  const porOrigen = new Map<string, Conteo>();
+  let nuncaContactadas = 0;
+  let sinNoticiasLargo = 0;
+
   for (const p of peticiones ?? []) {
     const historial = porPeticion.get(p.id) ?? [];
     const ultimo = historial[0];
     const dias = ultimo ? diasDesde(ultimo.fecha) : null;
+
+    contar(general, p.estado);
+    sumar(porCategoria, p.categoria ?? 'sin', p.estado);
+    sumar(porEquipo, p.equipo_id ? nombreEquipo.get(p.equipo_id) ?? 'Equipo archivado' : 'Sin asignar', p.estado);
+    sumar(porOrigen, p.origen ?? '', p.estado);
+    // Las contestadas no necesitan un llamado: no cuentan como pendientes de contacto.
+    if (p.estado !== 'contestada') {
+      if (dias === null) nuncaContactadas++;
+      else if (dias >= DIAS_SIN_NOTICIAS) sinNoticiasLargo++;
+    }
 
     const fila = hoja.addRow({
       id: `PET-${String(p.numero).padStart(3, '0')}`,
@@ -223,6 +319,90 @@ export async function GET(req: NextRequest) {
       from: { row: 2, column: 1 },
       to: { row: ultimaFila, column: COLUMNAS.length },
     };
+  }
+
+  // ── Llenado de la hoja Resumen ───────────────────────────────────────────
+  resumen.columns = [{ width: 34 }, { width: 13 }, { width: 13 }, { width: 13 }, { width: 11 }, { width: 15 }];
+
+  const hayFiltros = Boolean(estado || origen || categoria || equipo);
+  resumen.getCell('A1').value = `Resumen de peticiones de oración · ${periodo}`;
+  resumen.mergeCells('A1:F1');
+  resumen.getCell('A1').font = { name: 'Calibri', size: 14, bold: true, color: { argb: BOSQUE } };
+  resumen.getRow(1).height = 26;
+  resumen.getCell('A2').value =
+    `Generado el ${fechaCLdeTimestamp(new Date().toISOString())}` +
+    (hayFiltros ? ' · con los filtros aplicados en pantalla' : '') +
+    ' · El detalle está en la pestaña "Peticiones"';
+  resumen.mergeCells('A2:F2');
+  resumen.getCell('A2').font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B7280' } };
+
+  if (general.total === 0) {
+    resumen.getCell('A4').value = 'No hay peticiones en este período.';
+    resumen.getCell('A4').font = { name: 'Calibri', size: 11 };
+  } else {
+    // Estado general
+    tituloSeccion(resumen, 4, 'Estado general');
+    ['Estado', 'Cantidad', '% del total'].forEach((t, i) => {
+      const celda = resumen.getCell(5, i + 1);
+      celda.value = t;
+      estiloCabecera(celda);
+    });
+    let r = 6;
+    for (const e of ESTADOS_ORDEN) {
+      const fila = resumen.getRow(r++);
+      fila.values = [ESTADO_LABEL[e], general[e], general[e] / general.total];
+      fila.font = { name: 'Calibri', size: 11 };
+      fila.getCell(3).numFmt = '0%';
+    }
+    const total = resumen.getRow(r++);
+    total.values = ['Total', general.total, 1];
+    total.getCell(3).numFmt = '0%';
+    total.font = { name: 'Calibri', size: 11, bold: true };
+    [1, 2, 3].forEach((c) => {
+      total.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CREMA } };
+    });
+
+    // Necesitan un llamado: mismos colores que las filas pintadas de la lista.
+    r++;
+    tituloSeccion(resumen, r++, 'Necesitan contacto (sin contar las contestadas)');
+    const alertas: [string, number, string][] = [
+      ['Nunca contactadas', nuncaContactadas, ROJO_SUAVE],
+      [`${DIAS_SIN_NOTICIAS} días o más sin noticias`, sinNoticiasLargo, AMBAR_SUAVE],
+    ];
+    for (const [texto, cantidad, color] of alertas) {
+      const fila = resumen.getRow(r++);
+      fila.values = [texto, cantidad];
+      fila.font = { name: 'Calibri', size: 11 };
+      // Se pintan solo las dos celdas: pintar la fila entera la tiñe hasta el
+      // final de la hoja.
+      [1, 2].forEach((c) => {
+        fila.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+      });
+    }
+
+    r++;
+    const ordenar = (a: { c: Conteo }, b: { c: Conteo }) => b.c.total - a.c.total;
+
+    r = tablaDesglose(resumen, r, 'Por categoría', 'Categoría', [
+      ...CATEGORIA_KEYS.filter((k) => porCategoria.has(k)).map((k) => ({ nombre: etiquetaCategoria(k), c: porCategoria.get(k)! })),
+      ...(porCategoria.has('sin') ? [{ nombre: 'Sin clasificar', c: porCategoria.get('sin')! }] : []),
+    ]);
+
+    r = tablaDesglose(
+      resumen,
+      r,
+      'Por equipo',
+      'Equipo',
+      [...porEquipo].map(([nombre, c]) => ({ nombre, c })).sort(ordenar),
+    );
+
+    tablaDesglose(
+      resumen,
+      r,
+      'Por procedencia',
+      'Procedencia',
+      ORIGEN_KEYS.filter((k) => porOrigen.has(k)).map((k) => ({ nombre: ORIGENES_ORACION[k].nombre, c: porOrigen.get(k)! })),
+    );
   }
 
   const buffer = await libro.xlsx.writeBuffer();
