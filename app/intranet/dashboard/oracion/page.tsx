@@ -14,9 +14,7 @@ import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus, Users, Download, Send, XCircle } from 'lucide-react';
-import { useAuth } from '@/lib/auth-context';
-import { esRolOracion } from '@/lib/roles';
+import { HandHeart, Clock, Mail, MessageCircle, Loader2, CheckCircle2, Plus, ChevronsUpDown, Check, Trash2, Pencil, MessageSquarePlus, Users, Download } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -152,10 +150,6 @@ export default function OracionPage() {
   const [equipos, setEquipos] = useState<EquipoOracion[]>([]);
   const [equiposAbierto, setEquiposAbierto] = useState(false);
   const [exportarAbierto, setExportarAbierto] = useState(false);
-  const [enviarAbierto, setEnviarAbierto] = useState(false);
-  // El envío al pastor es solo del perfil Oración (el servidor también lo exige).
-  const { user } = useAuth();
-  const puedeEnviarAlPastor = esRolOracion(user?.role ?? '');
   // El filtro por equipo sale de la URL para que los enlaces del menú de la
   // izquierda lleven directo al equipo, y para poder compartir esa vista.
   const params = useSearchParams();
@@ -466,12 +460,6 @@ export default function OracionPage() {
             <Download className="h-4 w-4 mr-1.5" />
             Informe
           </Button>
-          {puedeEnviarAlPastor && (
-            <Button variant="outline" onClick={() => setEnviarAbierto(true)}>
-              <Send className="h-4 w-4 mr-1.5" />
-              Enviar al pastor
-            </Button>
-          )}
           <Button onClick={() => setNuevaAbierta(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Nueva petición
@@ -911,10 +899,6 @@ export default function OracionPage() {
         onCreada={load}
       />
 
-      {puedeEnviarAlPastor && (
-        <EnviarPastorDialog open={enviarAbierto} onOpenChange={setEnviarAbierto} />
-      )}
-
       <ExportarDialog
         open={exportarAbierto}
         onOpenChange={setExportarAbierto}
@@ -1193,187 +1177,6 @@ function ExportarDialog({
           <Button onClick={descargar}>
             <Download className="mr-1.5 h-4 w-4" />
             Descargar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Enviar informe al pastor ────────────────────────────────────────────────
-//
-// Nicole elige período y canal; el servidor arma el mismo Excel de la descarga
-// y n8n lo reparte (ver POST /api/oracion/enviar-informe). Va sin los filtros
-// de pantalla: al pastor le llega el período completo.
-//
-// Si un canal falla el otro sale igual, así que el resultado se muestra canal
-// por canal y el diálogo queda abierto: Nicole ve cuál llegó y puede reintentar
-// solo el que faltó (típico: WhatsApp desconectado).
-
-type EstadoCanal = { estado: 'enviado' | 'omitido' | 'error'; detalle?: string };
-
-const CANALES = [
-  { clave: 'whatsapp', label: 'WhatsApp', enFrase: 'WhatsApp', icono: MessageCircle },
-  { clave: 'correo', label: 'Correo', enFrase: 'correo', icono: Mail },
-] as const;
-
-function EnviarPastorDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
-  const [periodo, setPeriodo] = useState<Periodo>('semana');
-  const [canales, setCanales] = useState({ whatsapp: true, correo: true });
-  const [enviando, setEnviando] = useState(false);
-  const [resultado, setResultado] = useState<Record<'whatsapp' | 'correo', EstadoCanal> | null>(null);
-
-  function cambiarApertura(v: boolean) {
-    if (enviando) return; // no cerrar a mitad del envío
-    onOpenChange(v);
-    if (!v) setResultado(null);
-  }
-
-  async function enviar() {
-    setEnviando(true);
-    setResultado(null);
-    try {
-      const res = await fetch('/api/oracion/enviar-informe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodo, canales }),
-      });
-      const datos = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(datos.error ?? 'No pudimos enviar el informe');
-        return;
-      }
-      const r = { whatsapp: datos.whatsapp as EstadoCanal, correo: datos.correo as EstadoCanal };
-      if (r.whatsapp.estado !== 'error' && r.correo.estado !== 'error') {
-        const por = CANALES.filter((c) => r[c.clave].estado === 'enviado').map((c) => c.enFrase);
-        toast.success(`Informe enviado al pastor por ${por.join(' y ')}`);
-        onOpenChange(false);
-        return;
-      }
-      // Algún canal falló: se deja a la vista y se desmarcan los que ya salieron,
-      // para que "Enviar" de nuevo reintente solo lo que faltó.
-      setResultado(r);
-      setCanales({ whatsapp: r.whatsapp.estado === 'error', correo: r.correo.estado === 'error' });
-    } catch {
-      toast.error('No pudimos conectar con el servidor');
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  const ningunCanal = !canales.whatsapp && !canales.correo;
-
-  return (
-    <Dialog open={open} onOpenChange={cambiarApertura}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Enviar informe al pastor</DialogTitle>
-          <DialogDescription>
-            Le llega el resumen y el Excel con el detalle de cada petición.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Período</Label>
-            <div className="flex flex-col gap-1">
-              {PERIODOS.map((p) => (
-                <button
-                  key={p.valor}
-                  type="button"
-                  aria-pressed={periodo === p.valor}
-                  onClick={() => setPeriodo(p.valor)}
-                  disabled={enviando}
-                  className={cn(
-                    'flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 text-left text-sm transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                    periodo === p.valor
-                      ? 'border-primary bg-primary/8'
-                      : 'border-border hover:bg-secondary',
-                  )}
-                >
-                  <span>
-                    <span className={cn('block', periodo === p.valor && 'font-semibold text-primary')}>
-                      {p.label}
-                    </span>
-                    <span className="block text-xs text-muted-foreground">{p.ayuda}</span>
-                  </span>
-                  {periodo === p.valor && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Enviar por</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {CANALES.map(({ clave, label, icono: Icono }) => (
-                <label
-                  key={clave}
-                  className={cn(
-                    'flex min-h-11 cursor-pointer select-none items-center gap-2.5 rounded-md border px-3 text-sm transition-colors',
-                    canales[clave] ? 'border-primary bg-primary/8' : 'border-border hover:bg-secondary',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={canales[clave]}
-                    disabled={enviando}
-                    onChange={(e) => setCanales((c) => ({ ...c, [clave]: e.target.checked }))}
-                    className="h-4 w-4 shrink-0 rounded border-border accent-primary"
-                  />
-                  <Icono className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  {label}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {resultado && (
-            <div className="space-y-1.5 rounded-md border border-border p-3 text-sm" role="status">
-              {CANALES.map(({ clave, label }) => {
-                const r = resultado[clave];
-                if (r.estado === 'omitido') return null;
-                return (
-                  <p key={clave} className="flex items-start gap-2">
-                    {r.estado === 'enviado' ? (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                    ) : (
-                      <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
-                    )}
-                    <span>
-                      {label}: {r.estado === 'enviado' ? 'enviado' : 'no se pudo enviar'}
-                      {r.estado === 'error' && r.detalle && (
-                        <span className="block text-xs text-muted-foreground">{r.detalle}</span>
-                      )}
-                    </span>
-                  </p>
-                );
-              })}
-              <p className="pt-1 text-xs text-muted-foreground">
-                Quedó marcado solo lo que faltó: vuelve a enviar para reintentarlo.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => cambiarApertura(false)} disabled={enviando}>
-            {resultado ? 'Cerrar' : 'Cancelar'}
-          </Button>
-          <Button onClick={enviar} disabled={enviando || ningunCanal}>
-            {enviando ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-1.5 h-4 w-4" />
-            )}
-            {enviando ? 'Enviando…' : 'Enviar'}
           </Button>
         </DialogFooter>
       </DialogContent>

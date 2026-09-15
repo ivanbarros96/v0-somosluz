@@ -432,3 +432,94 @@ export async function generarInformeOracion(filtros: FiltrosInforme): Promise<{
 
   return { buffer, nombreArchivo: `peticiones-oracion-${sufijo}.xlsx`, resumen };
 }
+
+// ── Mensajes para el pastor (WhatsApp y correo) ──────────────────────────────
+//
+// Se arman a partir del mismo `ResumenInforme` que la hoja Resumen, para que el
+// texto del mensaje y el Excel adjunto no puedan contradecirse. Los usa el
+// envío semanal (GET /api/oracion/informe-semanal, que n8n consulta los lunes).
+
+// En plural para el mensaje ("Contestadas: 2"); el Excel usa ESTADO_LABEL
+// porque ahí etiqueta a cada petición por separado.
+const ESTADO_PLURAL: Record<string, string> = { ...ESTADO_LABEL, contestada: 'Contestadas' };
+const ICONO_ESTADO: Record<string, string> = { pendiente: '⏳', orando: '🙏', contestada: '✅' };
+
+const pct = (parte: number, total: number) => (total ? Math.round((parte / total) * 100) : 0);
+const escapeHtmlMsg = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** WhatsApp: *negrita* y _cursiva_ en su propio formato, sin HTML. */
+export function textoWhatsappInforme(r: ResumenInforme, etiquetaPeriodo: string): string {
+  const g = r.general;
+  const lineas = ['📊 *Informe de oración*', `_${etiquetaPeriodo} · ${r.periodo}_`, ''];
+
+  if (g.total === 0) {
+    lineas.push('No llegaron peticiones en este período.');
+  } else {
+    for (const e of ESTADOS_ORDEN) {
+      const extra = e === 'contestada' ? ` (${pct(g.contestada, g.total)}%)` : '';
+      lineas.push(`${ICONO_ESTADO[e]} ${ESTADO_PLURAL[e]}: ${g[e]}${extra}`);
+    }
+    lineas.push(`*Total: ${g.total}*`, '');
+    lineas.push('⚠️ *Necesitan contacto*');
+    lineas.push(`• Nunca contactadas: ${r.nuncaContactadas}`);
+    lineas.push(`• ${DIAS_SIN_NOTICIAS} días o más sin noticias: ${r.sinNoticiasLargo}`, '');
+    lineas.push('*Por categoría*');
+    for (const f of r.porCategoria) lineas.push(`• ${f.nombre}: ${f.c.total}`);
+  }
+
+  lineas.push('', '📎 El detalle de cada petición va en el Excel adjunto.');
+  return lineas.join('\n');
+}
+
+export function htmlCorreoInforme(r: ResumenInforme, etiquetaPeriodo: string): string {
+  const g = r.general;
+  const VERDE = '#223F2F', CREMA_H = '#ECE9D8', MOCHA_H = '#6E4E37';
+
+  const fila = (a: string, b: string | number, fondo = '#fff', negrita = false) =>
+    `<tr style="background:${fondo}"><td style="padding:8px 12px;border-bottom:1px solid #eee;${negrita ? 'font-weight:700' : ''}">${a}</td>` +
+    `<td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;${negrita ? 'font-weight:700' : ''}">${b}</td></tr>`;
+  const tabla = (filas: string) =>
+    `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#2b2521;margin:0 0 18px">${filas}</table>`;
+  const titulo = (t: string) =>
+    `<p style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:${MOCHA_H};font-weight:700;margin:0 0 8px">${t}</p>`;
+
+  let cuerpo: string;
+  if (g.total === 0) {
+    cuerpo = '<p style="font-size:15px;color:#2b2521">No llegaron peticiones en este período.</p>';
+  } else {
+    cuerpo =
+      titulo('Estado general') +
+      tabla(
+        ESTADOS_ORDEN.map((e) =>
+          fila(`${ICONO_ESTADO[e]} ${ESTADO_PLURAL[e]}`, e === 'contestada' ? `${g[e]} (${pct(g[e], g.total)}%)` : g[e]),
+        ).join('') + fila('Total', g.total, CREMA_H, true),
+      ) +
+      titulo('Necesitan contacto') +
+      tabla(
+        fila('Nunca contactadas', r.nuncaContactadas, '#FBE9E7') +
+        fila(`${DIAS_SIN_NOTICIAS} días o más sin noticias`, r.sinNoticiasLargo, '#FDF3E0'),
+      ) +
+      titulo('Por categoría') +
+      tabla(r.porCategoria.map((f) => fila(escapeHtmlMsg(f.nombre), f.c.total)).join('')) +
+      titulo('Por equipo') +
+      tabla(r.porEquipo.map((f) => fila(escapeHtmlMsg(f.nombre), f.c.total)).join(''));
+  }
+
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f3eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
+  <div style="max-width:600px;margin:0 auto;padding:24px 18px">
+    <div style="background:${VERDE};border-radius:12px;padding:22px;text-align:center;margin-bottom:20px">
+      <div style="font-size:28px;line-height:1">📊</div>
+      <div style="color:${CREMA_H};font-size:20px;font-weight:700;margin-top:8px">Informe de oración</div>
+      <div style="color:#bca286;font-size:13px;margin-top:5px">${escapeHtmlMsg(etiquetaPeriodo)} · ${escapeHtmlMsg(r.periodo)}</div>
+    </div>
+    <div style="background:#fff;border:1px solid #dcd6cf;border-radius:12px;padding:18px">${cuerpo}</div>
+    <p style="font-size:13px;color:#2b2521;margin:18px 0 0">📎 El detalle de cada petición, con su seguimiento, va en el Excel adjunto.</p>
+    <p style="font-size:12px;color:#8a8578;text-align:center;margin:26px 0 0;line-height:1.5">
+      Enviado por la Red de Oración · Somos Luz Iglesia<br>
+      Contiene información sensible de las personas: no reenviar.
+    </p>
+  </div>
+</body></html>`;
+}
